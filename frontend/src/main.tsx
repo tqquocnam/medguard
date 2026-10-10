@@ -25,40 +25,15 @@ import {
   notifyUnauthorized,
 } from "./auth/AuthContext";
 
+import {
+  API_BASE_URL,
+} from "./api/apiClient";
+
 import "./index.css";
 
 
 // ======================================================
 // GRAPHQL FETCH
-// ======================================================
-//
-// Tất cả request GraphQL đi qua:
-//
-// frontend
-//    ↓
-// http://localhost:3000/api/graphql
-//    ↓
-// backend requireAuth
-//    ↓
-// Hasura
-//
-// Nếu backend trả HTTP 401:
-//
-// JWT hết hạn
-// USER bị khóa
-// USER bị xóa
-// JWT không hợp lệ
-//
-// thì:
-//
-// notifyUnauthorized()
-//    ↓
-// AuthContext user = null
-//    ↓
-// ProtectedRoute
-//    ↓
-// /login
-//
 // ======================================================
 
 const graphqlFetch:
@@ -67,7 +42,6 @@ const graphqlFetch:
     input,
     init
   ) => {
-
     const response =
       await fetch(
         input,
@@ -84,7 +58,6 @@ const graphqlFetch:
       response.status ===
       401
     ) {
-
       notifyUnauthorized();
     }
 
@@ -94,19 +67,21 @@ const graphqlFetch:
 
 
 // ======================================================
-// HTTP LINK
+// GRAPHQL URL
 // ======================================================
-//
-// KHÔNG gọi trực tiếp Hasura.
-// KHÔNG chứa Hasura admin secret.
-//
+
+const GRAPHQL_URL =
+  `${API_BASE_URL}/graphql`;
+
+
+// ======================================================
+// HTTP LINK
 // ======================================================
 
 const httpLink =
   new HttpLink({
-
     uri:
-      "http://localhost:3000/api/graphql",
+      GRAPHQL_URL,
 
     credentials:
       "include",
@@ -122,7 +97,6 @@ const httpLink =
 
 const client =
   new ApolloClient({
-
     link:
       httpLink,
 
@@ -142,26 +116,17 @@ ReactDOM
     )!
   )
   .render(
-
     <React.StrictMode>
-
       <ApolloProvider
         client={
           client
         }
       >
-
         <BrowserRouter>
-
           <AuthProvider>
-
             <App />
-
           </AuthProvider>
-
         </BrowserRouter>
-
       </ApolloProvider>
-
     </React.StrictMode>
   );

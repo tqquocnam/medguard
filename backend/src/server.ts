@@ -40,7 +40,7 @@ import dashboardRoutes
   from "./modules/dashboard/dashboard.routes.js";
 
 import reportsRoutes
-  from "./modules/reports/reports.routes.js";  
+  from "./modules/reports/reports.routes.js";
 
 
 // ======================================================
@@ -54,24 +54,133 @@ const app =
 const PORT =
   Number(
     process.env.PORT
-  ) || 3000;
+  ) ||
+  3000;
+
+
+// ======================================================
+// TRUST PROXY
+// ======================================================
+//
+// Backend đang chạy sau Cloudflare Tunnel.
+//
+// ======================================================
+
+app.set(
+  "trust proxy",
+  1
+);
 
 
 // ======================================================
 // CORS
 // ======================================================
-//
-// Cho frontend Vite gửi cookie medguard_token.
-//
-// ======================================================
+
+const allowedOrigins =
+  [
+    "http://localhost:5173",
+
+    "https://medguard-beta.vercel.app",
+  ];
+
 
 app.use(
   cors({
-    origin:
-      "http://localhost:5173",
+    origin: (
+      origin,
+      callback
+    ) => {
+      // Cho phép request không có Origin:
+      // Postman, health check, server-to-server...
+      if (
+        !origin
+      ) {
+        callback(
+          null,
+          true
+        );
+
+        return;
+      }
+
+
+      if (
+        allowedOrigins.includes(
+          origin
+        )
+      ) {
+        callback(
+          null,
+          true
+        );
+
+        return;
+      }
+
+
+      // Cho phép preview deployment của project MedGuard trên Vercel.
+      //
+      // Ví dụ:
+      // https://medguard-xxxxx-tqquocnams-projects.vercel.app
+
+      const isMedGuardVercelPreview =
+        /^https:\/\/medguard(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(
+          origin
+        ) ||
+        /^https:\/\/medguard-[a-z0-9-]+-tqquocnams-projects\.vercel\.app$/i.test(
+          origin
+        );
+
+
+      if (
+        isMedGuardVercelPreview
+      ) {
+        callback(
+          null,
+          true
+        );
+
+        return;
+      }
+
+
+      console.warn(
+        "CORS blocked origin:",
+        origin
+      );
+
+
+      callback(
+        new Error(
+          `Origin không được phép: ${origin}`
+        )
+      );
+    },
 
     credentials:
       true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+    ],
+
+    exposedHeaders: [
+      "Content-Type",
+    ],
+
+    optionsSuccessStatus:
+      204,
   })
 );
 
@@ -96,10 +205,7 @@ app.use(
   })
 );
 
-app.use(
-  "/api/reports",
-  reportsRoutes
-);
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
@@ -111,9 +217,7 @@ app.get(
     _req,
     res
   ) => {
-
     try {
-
       const result =
         await db.query(
           "SELECT NOW() AS time"
@@ -145,7 +249,6 @@ app.get(
     } catch (
       error
     ) {
-
       console.error(
         "Health check error:",
         error
@@ -153,7 +256,9 @@ app.get(
 
 
       res
-        .status(500)
+        .status(
+          500
+        )
         .json({
           success:
             false,
@@ -162,8 +267,7 @@ app.get(
             "disconnected",
 
           message:
-            error instanceof
-            Error
+            error instanceof Error
               ? error.message
               : "Database error",
         });
@@ -175,13 +279,6 @@ app.get(
 // ======================================================
 // AUTH
 // ======================================================
-//
-// /api/auth/login
-// /api/auth/me
-// /api/auth/logout
-// ...
-//
-// ======================================================
 
 app.use(
   "/api/auth",
@@ -192,31 +289,6 @@ app.use(
 // ======================================================
 // GRAPHQL PROXY
 // ======================================================
-//
-// Frontend:
-//
-// POST /api/graphql
-//
-//        ↓
-//
-// graphqlRoutes
-//
-//        ↓
-//
-// requireAuth
-//
-//        ↓
-//
-// ADMIN / USER permissions
-//
-//        ↓
-//
-// Hasura
-//
-// QUAN TRỌNG:
-// Không tạo app.post("/api/graphql") lần thứ hai.
-//
-// ======================================================
 
 app.use(
   "/api/graphql",
@@ -226,14 +298,6 @@ app.use(
 
 // ======================================================
 // DASHBOARD
-// ======================================================
-//
-// ADMIN ✅
-// USER  ✅
-// Chưa login ❌
-//
-// GET /api/dashboard/summary
-//
 // ======================================================
 
 app.use(
@@ -283,15 +347,53 @@ app.use(
 
 
 // ======================================================
+// REPORTS
+// ======================================================
+
+app.use(
+  "/api/reports",
+  reportsRoutes
+);
+
+
+// ======================================================
+// 404
+// ======================================================
+
+app.use(
+  (
+    req,
+    res
+  ) => {
+    res
+      .status(
+        404
+      )
+      .json({
+        success:
+          false,
+
+        message:
+          `Không tìm thấy API ${req.method} ${req.originalUrl}`,
+      });
+  }
+);
+
+
+// ======================================================
 // START SERVER
 // ======================================================
 
 app.listen(
   PORT,
   () => {
-
     console.log(
       `MedGuard API running at http://localhost:${PORT}`
+    );
+
+    console.log(
+      "Allowed frontend origins:",
+      allowedOrigins
     );
   }
 );

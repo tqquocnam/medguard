@@ -62,8 +62,7 @@ interface Props {
   fields: FieldConfig[];
 }
 
-// const API =
-//   "http://localhost:3000/api";
+
 
 export default function RuleCatalogPage({
   title,

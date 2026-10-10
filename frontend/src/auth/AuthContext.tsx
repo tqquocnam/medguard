@@ -12,35 +12,34 @@ import {
 } from "@apollo/client/react";
 
 
-// ======================================================
-// CONFIG
-// ======================================================
+
+const ENV_API_URL =
+  String(
+    import.meta.env
+      .VITE_API_URL ??
+      ""
+  ).trim();
+
 
 const API =
-  "http://localhost:3000/api";
+  (
+    ENV_API_URL ||
+    "http://localhost:3000/api"
+  ).replace(
+    /\/+$/,
+    ""
+  );
 
+
+// ======================================================
+// UNAUTHORIZED EVENT
+// ======================================================
 
 export const AUTH_UNAUTHORIZED_EVENT =
   "medguard:unauthorized";
 
 
-// ======================================================
-// THÔNG BÁO PHIÊN KHÔNG HỢP LỆ
-// ======================================================
-//
-// apiClient / apiFetch / GraphQL có thể gọi:
-//
-// notifyUnauthorized();
-//
-// AuthProvider sẽ:
-// - user = null
-// - xóa Apollo cache
-// - ProtectedRoute đưa về /login
-//
-// ======================================================
-
 export function notifyUnauthorized() {
-
   window.dispatchEvent(
     new Event(
       AUTH_UNAUTHORIZED_EVENT
@@ -54,17 +53,21 @@ export function notifyUnauthorized() {
 // ======================================================
 
 export interface AuthUser {
+  id:
+    string;
 
-  id: string;
+  username:
+    string;
 
-  username: string;
+  role:
+    string;
 
-  role: string;
+  fullName?:
+    string;
 }
 
 
 interface AuthContextValue {
-
   user:
     AuthUser |
     null;
@@ -72,20 +75,16 @@ interface AuthContextValue {
   loading:
     boolean;
 
-
   login: (
     username: string,
     password: string
   ) => Promise<void>;
 
-
   logout:
     () => Promise<void>;
 
-
   refreshUser:
     () => Promise<void>;
-
 
   clearSession:
     () => void;
@@ -115,18 +114,9 @@ export function AuthProvider({
   children:
     ReactNode;
 }) {
-
-  // ====================================================
-  // APOLLO
-  // ====================================================
-
   const apolloClient =
     useApolloClient();
 
-
-  // ====================================================
-  // USER
-  // ====================================================
 
   const [
     user,
@@ -140,10 +130,6 @@ export function AuthProvider({
     );
 
 
-  // ====================================================
-  // LOADING
-  // ====================================================
-
   const [
     loading,
     setLoading,
@@ -156,31 +142,14 @@ export function AuthProvider({
   // ====================================================
   // CLEAR SESSION
   // ====================================================
-  //
-  // Dùng khi:
-  // - JWT hết hạn
-  // - tài khoản bị khóa
-  // - tài khoản bị xóa
-  // - logout
-  //
-  // ====================================================
 
   const clearSession =
     useCallback(
       () => {
-
-        // Xóa user trước để ProtectedRoute
-        // chuyển về /login ngay.
-
         setUser(
           null
         );
 
-
-        // Xóa dữ liệu GraphQL của tài khoản cũ.
-        //
-        // Dùng clearStore thay vì resetStore
-        // để KHÔNG refetch các query cũ.
 
         void apolloClient
           .clearStore()
@@ -188,15 +157,14 @@ export function AuthProvider({
             (
               error
             ) => {
-
               console.error(
                 "Apollo clearStore error:",
                 error
               );
             }
           );
-
       },
+
       [
         apolloClient,
       ]
@@ -210,9 +178,7 @@ export function AuthProvider({
   const refreshUser =
     useCallback(
       async () => {
-
         try {
-
           const response =
             await fetch(
               `${API}/auth/me`,
@@ -222,19 +188,19 @@ export function AuthProvider({
 
                 credentials:
                   "include",
+
+                headers: {
+                  Accept:
+                    "application/json",
+                },
               }
             );
 
-
-          // ============================================
-          // CHƯA LOGIN / JWT HẾT / USER BỊ KHÓA
-          // ============================================
 
           if (
             response.status ===
             401
           ) {
-
             setUser(
               null
             );
@@ -242,14 +208,14 @@ export function AuthProvider({
             return;
           }
 
-
-          // ============================================
-          // API ERROR
-          // ============================================
 
           if (
             !response.ok
           ) {
+            console.error(
+              "Auth me HTTP error:",
+              response.status
+            );
 
             setUser(
               null
@@ -258,39 +224,30 @@ export function AuthProvider({
             return;
           }
 
-
-          // ============================================
-          // JSON
-          // ============================================
 
           const json =
             await response.json();
 
 
-          // ============================================
-          // SUCCESS
-          // ============================================
-
           if (
             json.success &&
             json.user
           ) {
-
             setUser(
               json.user
             );
 
-          } else {
-
-            setUser(
-              null
-            );
+            return;
           }
+
+
+          setUser(
+            null
+          );
 
         } catch (
           error
         ) {
-
           console.error(
             "Auth me error:",
             error
@@ -302,6 +259,7 @@ export function AuthProvider({
           );
         }
       },
+
       []
     );
 
@@ -312,13 +270,11 @@ export function AuthProvider({
 
   useEffect(
     () => {
-
       let mounted =
         true;
 
 
       async function load() {
-
         setLoading(
           true
         );
@@ -330,7 +286,6 @@ export function AuthProvider({
         if (
           mounted
         ) {
-
           setLoading(
             false
           );
@@ -342,12 +297,11 @@ export function AuthProvider({
 
 
       return () => {
-
         mounted =
           false;
       };
-
     },
+
     [
       refreshUser,
     ]
@@ -355,36 +309,13 @@ export function AuthProvider({
 
 
   // ====================================================
-  // LẮNG NGHE HTTP 401
-  // ====================================================
-  //
-  // apiClient / apiFetch / GraphQL
-  //
-  //        ↓
-  //
-  // HTTP 401
-  //
-  //        ↓
-  //
-  // notifyUnauthorized()
-  //
-  //        ↓
-  //
-  // clearSession()
-  //
-  //        ↓
-  //
-  // user = null
-  // Apollo cache bị xóa
-  //
+  // HANDLE GLOBAL 401
   // ====================================================
 
   useEffect(
     () => {
-
       const handleUnauthorized =
         () => {
-
           console.warn(
             "MedGuard session invalidated."
           );
@@ -401,14 +332,13 @@ export function AuthProvider({
 
 
       return () => {
-
         window.removeEventListener(
           AUTH_UNAUTHORIZED_EVENT,
           handleUnauthorized
         );
       };
-
     },
+
     [
       clearSession,
     ]
@@ -422,10 +352,12 @@ export function AuthProvider({
   const login =
     useCallback(
       async (
-        username: string,
-        password: string
-      ) => {
+        username:
+          string,
 
+        password:
+          string
+      ) => {
         const response =
           await fetch(
             `${API}/auth/login`,
@@ -437,6 +369,9 @@ export function AuthProvider({
                 "include",
 
               headers: {
+                Accept:
+                  "application/json",
+
                 "Content-Type":
                   "application/json",
               },
@@ -451,29 +386,24 @@ export function AuthProvider({
 
 
         let json:
-          any = null;
+          any =
+          null;
 
 
         try {
-
           json =
             await response.json();
-
         } catch {
-
-          // Backend trả dữ liệu không phải JSON.
+          throw new Error(
+            "Backend trả dữ liệu không hợp lệ."
+          );
         }
 
-
-        // ==============================================
-        // LOGIN FAIL
-        // ==============================================
 
         if (
           !response.ok ||
           !json?.success
         ) {
-
           throw new Error(
             json?.message ||
             "Đăng nhập thất bại."
@@ -481,33 +411,21 @@ export function AuthProvider({
         }
 
 
-        // ==============================================
-        // BACKEND KHÔNG TRẢ USER
-        // ==============================================
-
         if (
           !json.user
         ) {
-
           throw new Error(
             "Backend không trả về thông tin tài khoản."
           );
         }
 
 
-        // ==============================================
-        // XÓA CACHE CỦA TÀI KHOẢN TRƯỚC
-        // ==============================================
-
         try {
-
           await apolloClient
             .clearStore();
-
         } catch (
           error
         ) {
-
           console.error(
             "Apollo clearStore after login error:",
             error
@@ -515,14 +433,11 @@ export function AuthProvider({
         }
 
 
-        // ==============================================
-        // SET USER MỚI
-        // ==============================================
-
         setUser(
           json.user
         );
       },
+
       [
         apolloClient,
       ]
@@ -536,9 +451,7 @@ export function AuthProvider({
   const logout =
     useCallback(
       async () => {
-
         try {
-
           await fetch(
             `${API}/auth/logout`,
             {
@@ -547,43 +460,35 @@ export function AuthProvider({
 
               credentials:
                 "include",
+
+              headers: {
+                Accept:
+                  "application/json",
+              },
             }
           );
 
         } catch (
           error
         ) {
-
           console.error(
             "Logout error:",
             error
           );
 
         } finally {
-
-          // ============================================
-          // DÙ BACKEND LOGOUT CÓ LỖI
-          // FRONTEND VẪN PHẢI THOÁT PHIÊN
-          // ============================================
-
           setUser(
             null
           );
 
 
-          // ============================================
-          // XÓA APOLLO CACHE
-          // ============================================
-
           try {
-
             await apolloClient
               .clearStore();
 
           } catch (
             error
           ) {
-
             console.error(
               "Apollo clearStore logout error:",
               error
@@ -591,6 +496,7 @@ export function AuthProvider({
           }
         }
       },
+
       [
         apolloClient,
       ]
@@ -602,25 +508,17 @@ export function AuthProvider({
   // ====================================================
 
   return (
-
     <AuthContext.Provider
       value={{
         user,
-
         loading,
-
         login,
-
         logout,
-
         refreshUser,
-
         clearSession,
       }}
     >
-
       {children}
-
     </AuthContext.Provider>
   );
 }
@@ -631,15 +529,15 @@ export function AuthProvider({
 // ======================================================
 
 export function useAuth() {
-
   const context =
     useContext(
       AuthContext
     );
 
 
-  if (!context) {
-
+  if (
+    !context
+  ) {
     throw new Error(
       "useAuth phải được sử dụng bên trong AuthProvider."
     );

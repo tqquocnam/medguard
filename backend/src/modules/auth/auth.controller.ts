@@ -13,6 +13,44 @@ import type {
 
 
 // ======================================================
+// COOKIE CONFIG
+// ======================================================
+
+function getCookieOptions() {
+  const isProduction =
+    process.env.NODE_ENV ===
+    "production";
+
+
+  return {
+    httpOnly:
+      true,
+
+    secure:
+      isProduction,
+
+    sameSite:
+      (
+        isProduction
+          ? "none"
+          : "lax"
+      ) as
+        | "none"
+        | "lax",
+
+    maxAge:
+      8 *
+      60 *
+      60 *
+      1000,
+
+    path:
+      "/",
+  };
+}
+
+
+// ======================================================
 // LOGIN
 // ======================================================
 
@@ -20,14 +58,13 @@ export async function login(
   req: Request,
   res: Response
 ): Promise<void> {
-
   try {
-
     const username =
       String(
         req.body?.username ??
         ""
       ).trim();
+
 
     const password =
       String(
@@ -40,11 +77,14 @@ export async function login(
       !username ||
       !password
     ) {
-
       res
-        .status(400)
+        .status(
+          400
+        )
         .json({
-          success: false,
+          success:
+            false,
+
           message:
             "Vui lòng nhập tài khoản và mật khẩu.",
         });
@@ -60,12 +100,17 @@ export async function login(
       );
 
 
-    if (!result) {
-
+    if (
+      !result
+    ) {
       res
-        .status(401)
+        .status(
+          401
+        )
         .json({
-          success: false,
+          success:
+            false,
+
           message:
             "Sai tài khoản hoặc mật khẩu.",
         });
@@ -77,26 +122,13 @@ export async function login(
     res.cookie(
       "medguard_token",
       result.token,
-      {
-        httpOnly: true,
-
-        sameSite:
-          "lax",
-
-        secure:
-          false,
-
-        maxAge:
-          8 *
-          60 *
-          60 *
-          1000,
-      }
+      getCookieOptions()
     );
 
 
     res.json({
-      success: true,
+      success:
+        true,
 
       message:
         "Đăng nhập thành công.",
@@ -105,8 +137,9 @@ export async function login(
         result.user,
     });
 
-  } catch (error) {
-
+  } catch (
+    error
+  ) {
     console.error(
       "Login error:",
       error
@@ -114,9 +147,12 @@ export async function login(
 
 
     res
-      .status(500)
+      .status(
+        500
+      )
       .json({
-        success: false,
+        success:
+          false,
 
         message:
           error instanceof Error
@@ -135,9 +171,9 @@ export async function me(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
-
   res.json({
-    success: true,
+    success:
+      true,
 
     user: {
       id:
@@ -161,19 +197,32 @@ export async function logout(
   _req: Request,
   res: Response
 ): Promise<void> {
+  const cookieOptions =
+    getCookieOptions();
+
 
   res.clearCookie(
     "medguard_token",
     {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: false,
+      httpOnly:
+        cookieOptions.httpOnly,
+
+      secure:
+        cookieOptions.secure,
+
+      sameSite:
+        cookieOptions.sameSite,
+
+      path:
+        cookieOptions.path,
     }
   );
 
 
   res.json({
-    success: true,
+    success:
+      true,
+
     message:
       "Đã đăng xuất.",
   });

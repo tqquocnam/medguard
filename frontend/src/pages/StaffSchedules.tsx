@@ -35,18 +35,24 @@ import {
 } from "react";
 
 import dayjs, {
-  Dayjs,
+  type Dayjs,
 } from "dayjs";
 
+import {
+  apiFetch,
+} from "../api/apiClient";
 
-const API =
-  "http://localhost:3000/api";
 
+// ======================================================
+// TYPES
+// ======================================================
 
 interface MedicalStaff {
-  id: string;
+  id:
+    string;
 
-  fullName: string;
+  fullName:
+    string;
 
   socialInsuranceCode?:
     string |
@@ -67,11 +73,14 @@ interface MedicalStaff {
 
 
 interface StaffSchedule {
-  id: string;
+  id:
+    string;
 
-  staffId: string;
+  staffId:
+    string;
 
-  fullName: string;
+  fullName:
+    string;
 
   socialInsuranceCode?:
     string |
@@ -81,11 +90,14 @@ interface StaffSchedule {
     string |
     null;
 
-  workDate: string;
+  workDate:
+    string;
 
-  startTime: string;
+  startTime:
+    string;
 
-  endTime: string;
+  endTime:
+    string;
 
   status:
     | "ACTIVE"
@@ -102,21 +114,30 @@ interface StaffSchedule {
 
 
 interface ScheduleFormValues {
-  staffId: string;
+  staffId:
+    string;
 
-  workDate: Dayjs;
+  workDate:
+    Dayjs;
 
-  startTime: Dayjs;
+  startTime:
+    Dayjs;
 
-  endTime: Dayjs;
+  endTime:
+    Dayjs;
 
   status:
     | "ACTIVE"
     | "OFF";
 
-  note?: string;
+  note?:
+    string;
 }
 
+
+// ======================================================
+// HELPERS
+// ======================================================
 
 function getWeekdayLabel(
   value:
@@ -126,6 +147,7 @@ function getWeekdayLabel(
     dayjs(
       value
     );
+
 
   switch (
     date.day()
@@ -163,13 +185,29 @@ function normalizeTime(
 ) {
   return String(
     value ??
-      ""
+    ""
   ).slice(
     0,
     5
   );
 }
 
+
+async function readJson(
+  response:
+    Response
+) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+
+// ======================================================
+// PAGE
+// ======================================================
 
 export default function StaffSchedules() {
   const [
@@ -259,7 +297,7 @@ export default function StaffSchedules() {
   ] =
     useState<number>(
       dayjs().month() +
-        1
+      1
     );
 
 
@@ -312,29 +350,36 @@ export default function StaffSchedules() {
     );
 
 
+  // ====================================================
+  // LOAD STAFF
+  // ====================================================
+
   async function loadStaff() {
     try {
       const response =
-        await fetch(
-          `${API}/catalog/medical-staff?page=1&pageSize=500&active=true`,
+        await apiFetch(
+          "/catalog/medical-staff?page=1&pageSize=500&active=true",
           {
-            credentials:
-              "include",
+            method:
+              "GET",
           }
         );
 
 
       const json =
-        await response.json();
+        await readJson(
+          response
+        );
 
 
       if (
         !response.ok ||
-        !json.success
+        json?.success !==
+          true
       ) {
         throw new Error(
-          json.message ||
-            "Không thể tải danh sách nhân viên."
+          json?.message ||
+          "Không thể tải danh sách nhân viên."
         );
       }
 
@@ -362,6 +407,10 @@ export default function StaffSchedules() {
     }
   }
 
+
+  // ====================================================
+  // LOAD SCHEDULES
+  // ====================================================
 
   async function loadSchedules() {
     try {
@@ -435,26 +484,29 @@ export default function StaffSchedules() {
 
 
       const response =
-        await fetch(
-          `${API}/catalog/staff-schedules?${params.toString()}`,
+        await apiFetch(
+          `/catalog/staff-schedules?${params.toString()}`,
           {
-            credentials:
-              "include",
+            method:
+              "GET",
           }
         );
 
 
       const json =
-        await response.json();
+        await readJson(
+          response
+        );
 
 
       if (
         !response.ok ||
-        !json.success
+        json?.success !==
+          true
       ) {
         throw new Error(
-          json.message ||
-            "Không thể tải lịch làm việc."
+          json?.message ||
+          "Không thể tải lịch làm việc."
         );
       }
 
@@ -471,7 +523,7 @@ export default function StaffSchedules() {
       setTotal(
         Number(
           json?.data?.total ??
-            0
+          0
         )
       );
 
@@ -491,6 +543,10 @@ export default function StaffSchedules() {
     }
   }
 
+
+  // ====================================================
+  // EFFECTS
+  // ====================================================
 
   useEffect(
     () => {
@@ -514,6 +570,10 @@ export default function StaffSchedules() {
     ]
   );
 
+
+  // ====================================================
+  // STAFF OPTIONS
+  // ====================================================
 
   const staffOptions =
     useMemo(
@@ -542,6 +602,10 @@ export default function StaffSchedules() {
     );
 
 
+  // ====================================================
+  // SUMMARY
+  // ====================================================
+
   const summary =
     useMemo(
       () => {
@@ -569,6 +633,7 @@ export default function StaffSchedules() {
             active++;
           }
 
+
           if (
             item.status ===
             "OFF"
@@ -576,12 +641,14 @@ export default function StaffSchedules() {
             off++;
           }
 
+
           if (
             item.source ===
             "MANUAL"
           ) {
             manual++;
           }
+
 
           if (
             item.source ===
@@ -604,6 +671,10 @@ export default function StaffSchedules() {
       ]
     );
 
+
+  // ====================================================
+  // CREATE MODAL
+  // ====================================================
 
   function openCreateModal() {
     setEditingSchedule(
@@ -646,6 +717,10 @@ export default function StaffSchedules() {
     );
   }
 
+
+  // ====================================================
+  // EDIT MODAL
+  // ====================================================
 
   function openEditModal(
     record:
@@ -696,6 +771,10 @@ export default function StaffSchedules() {
   }
 
 
+  // ====================================================
+  // SAVE
+  // ====================================================
+
   async function handleSave() {
     try {
       const values =
@@ -741,21 +820,18 @@ export default function StaffSchedules() {
 
       const url =
         editingSchedule
-          ? `${API}/catalog/staff-schedules/${editingSchedule.id}`
-          : `${API}/catalog/staff-schedules`;
+          ? `/catalog/staff-schedules/${editingSchedule.id}`
+          : "/catalog/staff-schedules";
 
 
       const response =
-        await fetch(
+        await apiFetch(
           url,
           {
             method:
               editingSchedule
                 ? "PUT"
                 : "POST",
-
-            credentials:
-              "include",
 
             headers: {
               "Content-Type":
@@ -771,16 +847,19 @@ export default function StaffSchedules() {
 
 
       const json =
-        await response.json();
+        await readJson(
+          response
+        );
 
 
       if (
         !response.ok ||
-        !json.success
+        json?.success !==
+          true
       ) {
         throw new Error(
-          json.message ||
-            "Không thể lưu lịch."
+          json?.message ||
+          "Không thể lưu lịch."
         );
       }
 
@@ -827,35 +906,39 @@ export default function StaffSchedules() {
   }
 
 
+  // ====================================================
+  // DELETE
+  // ====================================================
+
   async function handleDelete(
     id:
       string
   ) {
     try {
       const response =
-        await fetch(
-          `${API}/catalog/staff-schedules/${id}`,
+        await apiFetch(
+          `/catalog/staff-schedules/${id}`,
           {
             method:
               "DELETE",
-
-            credentials:
-              "include",
           }
         );
 
 
       const json =
-        await response.json();
+        await readJson(
+          response
+        );
 
 
       if (
         !response.ok ||
-        !json.success
+        json?.success !==
+          true
       ) {
         throw new Error(
-          json.message ||
-            "Không thể xóa lịch."
+          json?.message ||
+          "Không thể xóa lịch."
         );
       }
 
@@ -879,7 +962,11 @@ export default function StaffSchedules() {
   }
 
 
-  async function handleGenerateDefault() {
+  // ====================================================
+  // GENERATE DEFAULT
+  // ====================================================
+
+  function handleGenerateDefault() {
     if (
       !selectedStaffId
     ) {
@@ -987,14 +1074,11 @@ export default function StaffSchedules() {
 
 
             const response =
-              await fetch(
-                `${API}/catalog/staff-schedules/generate-default`,
+              await apiFetch(
+                "/catalog/staff-schedules/generate-default",
                 {
                   method:
                     "POST",
-
-                  credentials:
-                    "include",
 
                   headers: {
                     "Content-Type":
@@ -1015,23 +1099,26 @@ export default function StaffSchedules() {
 
 
             const json =
-              await response.json();
+              await readJson(
+                response
+              );
 
 
             if (
               !response.ok ||
-              !json.success
+              json?.success !==
+                true
             ) {
               throw new Error(
-                json.message ||
-                  "Không thể tạo lịch mặc định."
+                json?.message ||
+                "Không thể tạo lịch mặc định."
               );
             }
 
 
             message.success(
-              json.message ||
-                "Tạo lịch mặc định thành công."
+              json?.message ||
+              "Tạo lịch mặc định thành công."
             );
 
 
@@ -1056,29 +1143,41 @@ export default function StaffSchedules() {
   }
 
 
+  // ====================================================
+  // RESET FILTER
+  // ====================================================
+
   function handleReset() {
     setSelectedStaffId(
       undefined
     );
 
+
     setYear(
       dayjs().year()
     );
 
+
     setMonth(
       dayjs().month() +
-        1
+      1
     );
+
 
     setStatus(
       undefined
     );
+
 
     setPage(
       1
     );
   }
 
+
+  // ====================================================
+  // RENDER
+  // ====================================================
 
   return (
     <div
@@ -1089,7 +1188,9 @@ export default function StaffSchedules() {
       >
         <div>
           <Typography.Title
-            level={3}
+            level={
+              3
+            }
 
             style={{
               margin:
@@ -1169,10 +1270,7 @@ export default function StaffSchedules() {
         className="schedule-stat-grid"
       >
         <Card
-          className="
-            schedule-stat-card
-            schedule-stat-total
-          "
+          className="schedule-stat-card schedule-stat-total"
         >
           <div
             className="schedule-stat-icon"
@@ -1197,10 +1295,7 @@ export default function StaffSchedules() {
 
 
         <Card
-          className="
-            schedule-stat-card
-            schedule-stat-active
-          "
+          className="schedule-stat-card schedule-stat-active"
         >
           <div
             className="schedule-stat-icon"
@@ -1227,10 +1322,7 @@ export default function StaffSchedules() {
 
 
         <Card
-          className="
-            schedule-stat-card
-            schedule-stat-off
-          "
+          className="schedule-stat-card schedule-stat-off"
         >
           <div
             className="schedule-stat-icon"
@@ -1257,10 +1349,7 @@ export default function StaffSchedules() {
 
 
         <Card
-          className="
-            schedule-stat-card
-            schedule-stat-default
-          "
+          className="schedule-stat-card schedule-stat-default"
         >
           <div
             className="schedule-stat-icon"
@@ -1299,6 +1388,7 @@ export default function StaffSchedules() {
             >
               Bộ lọc lịch làm việc
             </Typography.Text>
+
 
             <Typography.Text
               type="secondary"
@@ -1384,6 +1474,7 @@ export default function StaffSchedules() {
               Nhân viên
             </Typography.Text>
 
+
             <Select
               showSearch
 
@@ -1429,6 +1520,7 @@ export default function StaffSchedules() {
             >
               Năm
             </Typography.Text>
+
 
             <Select
               value={
@@ -1498,6 +1590,7 @@ export default function StaffSchedules() {
               Tháng
             </Typography.Text>
 
+
             <Select
               value={
                 month
@@ -1514,7 +1607,6 @@ export default function StaffSchedules() {
                     length:
                       12,
                   },
-
                   (
                     _,
                     index
@@ -1552,6 +1644,7 @@ export default function StaffSchedules() {
             >
               Trạng thái
             </Typography.Text>
+
 
             <Select
               allowClear
@@ -1627,6 +1720,7 @@ export default function StaffSchedules() {
               Danh sách lịch làm việc
             </Typography.Text>
 
+
             <Typography.Text
               type="secondary"
 
@@ -1656,9 +1750,7 @@ export default function StaffSchedules() {
         </div>
 
 
-        <Table<
-          StaffSchedule
-        >
+        <Table<StaffSchedule>
           rowKey="id"
 
           loading={
@@ -2137,6 +2229,7 @@ export default function StaffSchedules() {
               }
             </div>
 
+
             <div
               style={{
                 marginTop:
@@ -2420,8 +2513,10 @@ export default function StaffSchedules() {
             border:
               1px solid
               #edf0f5;
+
             border-radius:
               14px;
+
             box-shadow:
               0
               4px
@@ -2432,6 +2527,7 @@ export default function StaffSchedules() {
                 42,
                 0.04
               );
+
             transition:
               all
               0.2s
@@ -2443,6 +2539,7 @@ export default function StaffSchedules() {
               translateY(
                 -2px
               );
+
             box-shadow:
               0
               8px
@@ -2460,6 +2557,7 @@ export default function StaffSchedules() {
             display: flex;
             align-items: center;
             gap: 13px;
+
             padding:
               16px
               17px;
@@ -2468,19 +2566,27 @@ export default function StaffSchedules() {
           .schedule-stat-icon {
             width: 40px;
             height: 40px;
+
             display: flex;
             align-items: center;
             justify-content: center;
+
             flex-shrink: 0;
-            border-radius: 11px;
-            font-size: 18px;
+
+            border-radius:
+              11px;
+
+            font-size:
+              18px;
           }
 
           .schedule-stat-label {
             color:
               #64748b;
+
             font-size:
               12px;
+
             font-weight:
               500;
           }
@@ -2488,12 +2594,16 @@ export default function StaffSchedules() {
           .schedule-stat-value {
             margin-top:
               2px;
+
             color:
               #172033;
+
             font-size:
               23px;
+
             line-height:
               1.2;
+
             font-weight:
               800;
           }
@@ -2508,6 +2618,7 @@ export default function StaffSchedules() {
           .schedule-stat-icon {
             color:
               #1677ff;
+
             background:
               #e6f4ff;
           }
@@ -2522,6 +2633,7 @@ export default function StaffSchedules() {
           .schedule-stat-icon {
             color:
               #52c41a;
+
             background:
               #f6ffed;
           }
@@ -2536,6 +2648,7 @@ export default function StaffSchedules() {
           .schedule-stat-icon {
             color:
               #ff4d4f;
+
             background:
               #fff1f0;
           }
@@ -2550,6 +2663,7 @@ export default function StaffSchedules() {
           .schedule-stat-icon {
             color:
               #722ed1;
+
             background:
               #f9f0ff;
           }
@@ -2558,8 +2672,10 @@ export default function StaffSchedules() {
             border:
               1px solid
               #edf0f5;
+
             border-radius:
               14px;
+
             box-shadow:
               0
               4px
@@ -2583,12 +2699,14 @@ export default function StaffSchedules() {
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+
             margin-bottom:
               14px;
           }
 
           .schedule-filter-grid {
             display: grid;
+
             grid-template-columns:
               minmax(
                 280px,
@@ -2606,7 +2724,9 @@ export default function StaffSchedules() {
                 145px,
                 1fr
               );
+
             gap: 10px;
+
             align-items: end;
           }
 
@@ -2616,23 +2736,31 @@ export default function StaffSchedules() {
 
           .schedule-filter-label {
             display: block;
+
             margin-bottom:
               6px;
+
             color:
               #475569;
+
             font-size:
               12px;
+
             font-weight:
               700;
           }
 
           .schedule-table-card {
-            overflow: hidden;
+            overflow:
+              hidden;
+
             border:
               1px solid
               #edf0f5;
+
             border-radius:
               14px;
+
             box-shadow:
               0
               4px
@@ -2649,10 +2777,13 @@ export default function StaffSchedules() {
             display: flex;
             align-items: center;
             justify-content: space-between;
+
             gap: 12px;
+
             padding:
               14px
               16px;
+
             border-bottom:
               1px solid
               #edf0f5;
@@ -2664,12 +2795,16 @@ export default function StaffSchedules() {
           > th {
             background:
               #f8fafc !important;
+
             color:
               #334155 !important;
+
             font-size:
               12px;
+
             font-weight:
               700 !important;
+
             border-bottom:
               1px solid
               #e8edf3 !important;
@@ -2681,8 +2816,10 @@ export default function StaffSchedules() {
           > td {
             color:
               #334155;
+
             font-size:
               12px;
+
             transition:
               background
               0.18s
@@ -2722,46 +2859,72 @@ export default function StaffSchedules() {
           .schedule-staff-avatar {
             width: 28px;
             height: 28px;
+
             display: flex;
             align-items: center;
             justify-content: center;
+
             flex-shrink: 0;
-            border-radius: 8px;
+
+            border-radius:
+              8px;
+
             color:
               #1677ff;
+
             background:
               #e6f4ff;
           }
 
           .schedule-time {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            min-width: 60px;
+            display:
+              inline-flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            gap:
+              5px;
+
+            min-width:
+              60px;
+
             color:
               #334155;
+
             font-weight:
               600;
           }
 
           .schedule-status-tag {
-            margin: 0;
+            margin:
+              0;
+
             padding:
               2px
               8px;
+
             border-radius:
               999px;
+
             font-size:
               11px;
+
             font-weight:
               700;
           }
 
           .schedule-action-edit,
           .schedule-action-delete {
-            width: 31px;
-            height: 31px;
+            width:
+              31px;
+
+            height:
+              31px;
+
             border-radius:
               8px;
           }
@@ -2774,6 +2937,7 @@ export default function StaffSchedules() {
           .schedule-action-edit:hover {
             color:
               #1677ff !important;
+
             background:
               #e6f4ff !important;
           }
@@ -2795,6 +2959,7 @@ export default function StaffSchedules() {
           .ant-modal-content {
             border-radius:
               16px;
+
             overflow:
               hidden;
           }
@@ -2806,11 +2971,15 @@ export default function StaffSchedules() {
           }
 
           .schedule-form-time-grid {
-            display: grid;
+            display:
+              grid;
+
             grid-template-columns:
               1fr
               1fr;
-            gap: 14px;
+
+            gap:
+              14px;
           }
 
           @media
@@ -2851,6 +3020,7 @@ export default function StaffSchedules() {
             .schedule-table-header {
               flex-direction:
                 column;
+
               align-items:
                 flex-start;
             }

@@ -5,19 +5,7 @@ import {
 } from "../auth/AuthContext";
 
 
-// ======================================================
-// API BASE URL
-// ======================================================
-//
-// Local:
-// VITE_API_URL=http://localhost:3000/api
-//
-// Vercel / Production:
-// VITE_API_URL=https://api-domain-cua-ban.com/api
-//
-// Nếu chưa khai báo biến môi trường thì tự fallback localhost.
-//
-// ======================================================
+
 
 const ENV_API_URL =
   String(
@@ -185,28 +173,7 @@ apiClient.interceptors.response.use(
 );
 
 
-// ======================================================
-// FETCH WRAPPER
-// ======================================================
-//
-// Một số page của MedGuard dùng fetch thay axios.
-//
-// apiFetch:
-// - tự ghép API_BASE_URL
-// - vẫn hỗ trợ URL đầy đủ http/https
-// - tự gửi cookie
-// - tự xử lý 401
-// - login sai mật khẩu không logout phiên hiện tại
-//
-// Ví dụ:
-//
-// apiFetch("/checks/run")
-//
-// =>
-//
-// http://localhost:3000/api/checks/run
-//
-// ======================================================
+
 
 export async function apiFetch(
   input:
