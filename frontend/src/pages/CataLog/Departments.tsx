@@ -1,6 +1,6 @@
 import {
+  Breadcrumb,
   Button,
-  Dropdown,
   Form,
   Input,
   Modal,
@@ -8,14 +8,22 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 
+import type {
+  TableColumnsType,
+} from "antd";
+
 import {
-  EllipsisOutlined,
+  ApartmentOutlined,
+  EditOutlined,
+  HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
+  StopOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -41,18 +49,28 @@ const {
 
 interface DepartmentItem {
   code: string;
+
   name: string;
-  description: string | null;
+
+  description:
+    | string
+    | null;
+
   active: boolean;
+
   createdAt?: string;
+
   updatedAt?: string;
 }
 
 
 interface DepartmentFormValues {
   code: string;
+
   name: string;
+
   description?: string;
+
   active: boolean;
 }
 
@@ -63,10 +81,17 @@ interface DepartmentListResponse {
   message?: string;
 
   data?: {
-    items: DepartmentItem[];
-    total: number;
-    page: number;
-    pageSize: number;
+    items:
+      DepartmentItem[];
+
+    total:
+      number;
+
+    page:
+      number;
+
+    pageSize:
+      number;
   };
 }
 
@@ -76,52 +101,92 @@ interface DepartmentListResponse {
 // ======================================================
 
 export default function Departments() {
+
+  // ====================================================
+  // FILTER
+  // ====================================================
+
   const [
     searchCode,
     setSearchCode,
-  ] = useState("");
+  ] = useState(
+    ""
+  );
+
 
   const [
     searchName,
     setSearchName,
-  ] = useState("");
+  ] = useState(
+    ""
+  );
+
+
+  // ====================================================
+  // DATA
+  // ====================================================
 
   const [
     items,
     setItems,
   ] = useState<
     DepartmentItem[]
-  >([]);
+  >(
+    []
+  );
+
 
   const [
     total,
     setTotal,
-  ] = useState(0);
+  ] = useState(
+    0
+  );
+
 
   const [
     page,
     setPage,
-  ] = useState(1);
+  ] = useState(
+    1
+  );
+
 
   const [
     pageSize,
     setPageSize,
-  ] = useState(10);
+  ] = useState(
+    10
+  );
+
 
   const [
     loading,
     setLoading,
-  ] = useState(false);
+  ] = useState(
+    false
+  );
+
+
+  // ====================================================
+  // ADD / EDIT
+  // ====================================================
 
   const [
     saving,
     setSaving,
-  ] = useState(false);
+  ] = useState(
+    false
+  );
+
 
   const [
     modalOpen,
     setModalOpen,
-  ] = useState(false);
+  ] = useState(
+    false
+  );
+
 
   const [
     editingDepartment,
@@ -129,7 +194,10 @@ export default function Departments() {
   ] = useState<
     DepartmentItem |
     null
-  >(null);
+  >(
+    null
+  );
+
 
   const [
     form,
@@ -146,22 +214,32 @@ export default function Departments() {
   const loadDepartments =
     useCallback(
       async () => {
+
         try {
-          setLoading(true);
+
+          setLoading(
+            true
+          );
+
 
           const params =
             new URLSearchParams({
               page:
-                String(page),
+                String(
+                  page
+                ),
 
               pageSize:
-                String(pageSize),
+                String(
+                  pageSize
+                ),
             });
 
 
           if (
             searchCode.trim()
           ) {
+
             params.set(
               "code",
               searchCode.trim()
@@ -172,6 +250,7 @@ export default function Departments() {
           if (
             searchName.trim()
           ) {
+
             params.set(
               "name",
               searchName.trim()
@@ -199,6 +278,7 @@ export default function Departments() {
             json.success !==
               true
           ) {
+
             throw new Error(
               json.message ||
               "Không thể tải danh mục khoa."
@@ -207,14 +287,16 @@ export default function Departments() {
 
 
           setItems(
-            json.data?.items ??
+            json.data
+              ?.items ??
             []
           );
 
 
           setTotal(
             Number(
-              json.data?.total ??
+              json.data
+                ?.total ??
               0
             )
           );
@@ -222,10 +304,12 @@ export default function Departments() {
         } catch (
           error
         ) {
+
           console.error(
             "Load departments error:",
             error
           );
+
 
           message.error(
             error instanceof
@@ -235,7 +319,10 @@ export default function Departments() {
           );
 
         } finally {
-          setLoading(false);
+
+          setLoading(
+            false
+          );
         }
       },
       [
@@ -249,7 +336,9 @@ export default function Departments() {
 
   useEffect(
     () => {
+
       void loadDepartments();
+
     },
     [
       loadDepartments,
@@ -262,20 +351,33 @@ export default function Departments() {
   // ====================================================
 
   function openAddModal() {
+
     setEditingDepartment(
       null
     );
 
+
     form.resetFields();
 
+
     form.setFieldsValue({
-      code: "",
-      name: "",
-      description: "",
-      active: true,
+      code:
+        "",
+
+      name:
+        "",
+
+      description:
+        "",
+
+      active:
+        true,
     });
 
-    setModalOpen(true);
+
+    setModalOpen(
+      true
+    );
   }
 
 
@@ -287,7 +389,9 @@ export default function Departments() {
     record:
       DepartmentItem
   ) {
+
     try {
+
       const response =
         await apiFetch(
           `/catalog/departments/${encodeURIComponent(
@@ -309,6 +413,7 @@ export default function Departments() {
         json.success !==
           true
       ) {
+
         throw new Error(
           json.message ||
           "Không thể tải thông tin khoa."
@@ -350,6 +455,7 @@ export default function Departments() {
     } catch (
       error
     ) {
+
       message.error(
         error instanceof
         Error
@@ -365,12 +471,16 @@ export default function Departments() {
   // ====================================================
 
   async function handleSave() {
+
     try {
+
       const values =
         await form.validateFields();
 
 
-      setSaving(true);
+      setSaving(
+        true
+      );
 
 
       const isEdit =
@@ -429,6 +539,7 @@ export default function Departments() {
         json.success !==
           true
       ) {
+
         throw new Error(
           json.message ||
           "Không thể lưu khoa."
@@ -447,9 +558,11 @@ export default function Departments() {
         false
       );
 
+
       setEditingDepartment(
         null
       );
+
 
       form.resetFields();
 
@@ -459,6 +572,7 @@ export default function Departments() {
     } catch (
       error
     ) {
+
       if (
         error &&
         typeof error ===
@@ -466,6 +580,7 @@ export default function Departments() {
         "errorFields" in
           error
       ) {
+
         return;
       }
 
@@ -478,7 +593,10 @@ export default function Departments() {
       );
 
     } finally {
-      setSaving(false);
+
+      setSaving(
+        false
+      );
     }
   }
 
@@ -491,6 +609,7 @@ export default function Departments() {
     record:
       DepartmentItem
   ) {
+
     Modal.confirm({
       title:
         "Ngừng sử dụng khoa?",
@@ -511,7 +630,9 @@ export default function Departments() {
 
       onOk:
         async () => {
+
           try {
+
             const response =
               await apiFetch(
                 `/catalog/departments/${encodeURIComponent(
@@ -533,6 +654,7 @@ export default function Departments() {
               json.success !==
                 true
             ) {
+
               throw new Error(
                 json.message ||
                 "Không thể ngừng sử dụng khoa."
@@ -550,6 +672,7 @@ export default function Departments() {
           } catch (
             error
           ) {
+
             message.error(
               error instanceof
               Error
@@ -567,9 +690,20 @@ export default function Departments() {
   // ====================================================
 
   function handleRefresh() {
-    setSearchCode("");
-    setSearchName("");
-    setPage(1);
+
+    setSearchCode(
+      ""
+    );
+
+
+    setSearchName(
+      ""
+    );
+
+
+    setPage(
+      1
+    );
   }
 
 
@@ -577,89 +711,37 @@ export default function Departments() {
   // TABLE
   // ====================================================
 
-  const columns = [
+  const columns:
+    TableColumnsType<
+      DepartmentItem
+    > = [
+
     {
       title:
-        "",
+        "STT",
 
       key:
-        "action",
+        "stt",
 
       width:
-        55,
+        70,
+
+      align:
+        "center",
 
       render:
         (
-          _:
-            unknown,
-
-          record:
-            DepartmentItem
-        ) => (
-          <Dropdown
-            trigger={[
-              "click",
-            ]}
-
-            menu={{
-              items: [
-                {
-                  key:
-                    "edit",
-
-                  label:
-                    "Cập nhật",
-                },
-
-                {
-                  key:
-                    "disable",
-
-                  danger:
-                    true,
-
-                  disabled:
-                    !record.active,
-
-                  label:
-                    "Ngừng sử dụng",
-                },
-              ],
-
-              onClick:
-                ({
-                  key,
-                }) => {
-                  if (
-                    key ===
-                    "edit"
-                  ) {
-                    void openEditModal(
-                      record
-                    );
-                  }
-
-
-                  if (
-                    key ===
-                    "disable"
-                  ) {
-                    confirmDisable(
-                      record
-                    );
-                  }
-                },
-            }}
-          >
-            <Button
-              type="text"
-
-              icon={
-                <EllipsisOutlined />
-              }
-            />
-          </Dropdown>
-        ),
+          _,
+          __,
+          index
+        ) =>
+          (
+            page -
+            1
+          ) *
+            pageSize +
+          index +
+          1,
     },
 
 
@@ -670,8 +752,26 @@ export default function Departments() {
       dataIndex:
         "code",
 
+      key:
+        "code",
+
       width:
-        180,
+        160,
+
+      render:
+        (
+          value:
+            string
+        ) => (
+          <Text
+            strong
+          >
+            {
+              value ||
+              "-"
+            }
+          </Text>
+        ),
     },
 
 
@@ -682,8 +782,19 @@ export default function Departments() {
       dataIndex:
         "name",
 
+      key:
+        "name",
+
       width:
         300,
+
+      render:
+        (
+          value:
+            string
+        ) =>
+          value ||
+          "-",
     },
 
 
@@ -694,14 +805,51 @@ export default function Departments() {
       dataIndex:
         "description",
 
+      key:
+        "description",
+
+      ellipsis:
+        true,
+
       render:
         (
           value:
             string |
             null
-        ) =>
+        ) => {
+
+        const text =
           value ||
-          "-",
+          "-";
+
+
+        if (
+          text ===
+          "-"
+        ) {
+
+          return "-";
+        }
+
+
+        return (
+          <Tooltip
+            title={
+              text
+            }
+
+            placement="topLeft"
+          >
+            <Text
+              ellipsis
+            >
+              {
+                text
+              }
+            </Text>
+          </Tooltip>
+        );
+      },
     },
 
 
@@ -712,11 +860,14 @@ export default function Departments() {
       dataIndex:
         "active",
 
+      key:
+        "active",
+
       width:
-        140,
+        120,
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -727,15 +878,114 @@ export default function Departments() {
             ? (
               <Tag
                 color="success"
+
+                className="departments-status"
               >
                 Đang dùng
               </Tag>
             )
             : (
-              <Tag>
+              <Tag
+                className="departments-status"
+              >
                 Ngừng dùng
               </Tag>
             ),
+    },
+
+
+    {
+      title:
+        "Thao tác",
+
+      key:
+        "actions",
+
+      width:
+        105,
+
+      align:
+        "center",
+
+      render:
+        (
+          _,
+          record
+        ) => (
+
+          <Space
+            size={
+              10
+            }
+          >
+
+            <Tooltip
+              title="Cập nhật"
+            >
+
+              <Button
+                type="text"
+
+                size="small"
+
+                icon={
+                  <EditOutlined
+                    style={{
+                      color:
+                        "#1677ff",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  void openEditModal(
+                    record
+                  )
+                }
+              />
+
+            </Tooltip>
+
+
+            <Tooltip
+              title={
+                record.active
+                  ? "Ngừng sử dụng"
+                  : "Đã ngừng sử dụng"
+              }
+            >
+
+              <Button
+                type="text"
+
+                size="small"
+
+                disabled={
+                  !record.active
+                }
+
+                icon={
+                  <StopOutlined
+                    style={{
+                      color:
+                        record.active
+                          ? "#ff4d4f"
+                          : "#bfbfbf",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  confirmDisable(
+                    record
+                  )
+                }
+              />
+
+            </Tooltip>
+
+          </Space>
+        ),
     },
   ];
 
@@ -746,219 +996,297 @@ export default function Departments() {
 
   return (
     <>
-      <Space
-        style={{
-          width:
-            "100%",
-
-          justifyContent:
-            "space-between",
-
-          marginBottom:
-            20,
-        }}
-      >
-        <Title
-          level={3}
-
-          style={{
-            margin:
-              0,
-          }}
-        >
-          Danh mục Khoa
-        </Title>
-
-
-        <Button
-          type="primary"
-
-          icon={
-            <PlusOutlined />
-          }
-
-          onClick={
-            openAddModal
-          }
-        >
-          Thêm mới
-        </Button>
-      </Space>
-
-
-      {/* FILTER */}
 
       <div
-        style={{
-          display:
-            "grid",
-
-          gridTemplateColumns:
-            "1fr 1.5fr auto",
-
-          gap:
-            10,
-
-          alignItems:
-            "end",
-
-          marginBottom:
-            16,
-        }}
+        className="departments-page"
       >
-        <div>
-          <Text>
-            Mã khoa
-          </Text>
 
-          <Input
-            value={
-              searchCode
-            }
+        {/* =================================================
+            BREADCRUMB
+        ================================================= */}
 
-            placeholder="Mã khoa"
+        <Breadcrumb
+          className="departments-breadcrumb"
 
-            allowClear
+          items={[
+            {
+              title: (
+                <HomeOutlined />
+              ),
+            },
 
-            style={{
-              marginTop:
-                5,
-            }}
+            {
+              title:
+                "Danh mục",
+            },
 
-            onChange={(
-              event
-            ) => {
-              setSearchCode(
-                event.target.value
-              );
-
-              setPage(
-                1
-              );
-            }}
-          />
-        </div>
+            {
+              title:
+                "Khoa",
+            },
+          ]}
+        />
 
 
-        <div>
-          <Text>
-            Tên khoa
-          </Text>
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-          <Input
-            value={
-              searchName
-            }
-
-            placeholder="Tên khoa"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-              setSearchName(
-                event.target.value
-              );
-
-              setPage(
-                1
-              );
-            }}
-          />
-        </div>
-
-
-        <Button
-          icon={
-            <ReloadOutlined />
-          }
-
-          onClick={
-            handleRefresh
-          }
+        <div
+          className="departments-header"
         >
-          Làm mới
-        </Button>
-      </div>
+
+          <div>
+
+            <div
+              className="departments-title-row"
+            >
+
+              <ApartmentOutlined
+                className="departments-title-icon"
+              />
 
 
-      {/* TABLE */}
+              <Title
+                level={
+                  3
+                }
 
-      <Table<DepartmentItem>
-        rowKey="code"
+                style={{
+                  margin:
+                    0,
+                }}
+              >
+                Danh mục Khoa
+              </Title>
 
-        bordered
+            </div>
 
-        loading={
-          loading
-        }
 
-        dataSource={
-          items
-        }
+            <Text
+              type="secondary"
 
-        columns={
-          columns
-        }
+              className="departments-subtitle"
+            >
+              Quản lý danh mục khoa sử dụng trong hệ thống
+            </Text>
 
-        pagination={{
-          current:
-            page,
+          </div>
 
-          pageSize,
 
-          total,
+          <Button
+            type="primary"
 
-          showSizeChanger:
-            true,
+            icon={
+              <PlusOutlined />
+            }
 
-          pageSizeOptions: [
-            "10",
-            "50",
-            "100",
-          ],
+            onClick={
+              openAddModal
+            }
+          >
+            Thêm mới
+          </Button>
 
-          showTotal:
-            (
-              value
-            ) =>
-              `Tổng số: ${value}`,
+        </div>
 
-          onChange:
-            (
-              newPage,
-              newPageSize
-            ) => {
-              if (
-                newPageSize !==
-                pageSize
-              ) {
-                setPageSize(
-                  newPageSize
+
+        {/* =================================================
+            FILTER
+        ================================================= */}
+
+        <div
+          className="departments-filter-grid"
+        >
+
+          <div
+            className="departments-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="departments-filter-label"
+            >
+              Mã khoa
+            </Text>
+
+
+            <Input
+              value={
+                searchCode
+              }
+
+              placeholder="Nhập mã khoa"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchCode(
+                  event.target.value
                 );
+
 
                 setPage(
                   1
                 );
+              }}
+            />
 
-                return;
+          </div>
+
+
+          <div
+            className="departments-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="departments-filter-label"
+            >
+              Tên khoa
+            </Text>
+
+
+            <Input
+              value={
+                searchName
               }
 
-              setPage(
-                newPage
-              );
-            },
-        }}
-      />
+              placeholder="Nhập tên khoa"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchName(
+                  event.target.value
+                );
 
 
-      {/* MODAL */}
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <Button
+            type="primary"
+
+            icon={
+              <ReloadOutlined />
+            }
+
+            onClick={
+              handleRefresh
+            }
+          >
+            Làm mới
+          </Button>
+
+        </div>
+
+
+        {/* =================================================
+            TABLE
+        ================================================= */}
+
+        <Table<DepartmentItem>
+          className="departments-table"
+
+          rowKey="code"
+
+          size="middle"
+
+          tableLayout="fixed"
+
+          loading={
+            loading
+          }
+
+          dataSource={
+            items
+          }
+
+          columns={
+            columns
+          }
+
+          pagination={{
+            current:
+              page,
+
+            pageSize,
+
+            total,
+
+            showSizeChanger:
+              true,
+
+            pageSizeOptions: [
+              "10",
+              "50",
+              "100",
+            ],
+
+            showTotal:
+              (
+                value
+              ) =>
+                `Tổng số: ${value}`,
+
+            onChange:
+              (
+                newPage,
+                newPageSize
+              ) => {
+
+                if (
+                  newPageSize !==
+                  pageSize
+                ) {
+
+                  setPageSize(
+                    newPageSize
+                  );
+
+
+                  setPage(
+                    1
+                  );
+
+
+                  return;
+                }
+
+
+                setPage(
+                  newPage
+                );
+              },
+          }}
+
+          locale={{
+            emptyText:
+              "Chưa có dữ liệu khoa",
+          }}
+        />
+
+      </div>
+
+
+      {/* =================================================
+          MODAL
+      ================================================= */}
 
       <Modal
         open={
@@ -992,23 +1320,29 @@ export default function Departments() {
         }
 
         onCancel={() => {
+
           if (
             saving
           ) {
+
             return;
           }
+
 
           setModalOpen(
             false
           );
 
+
           setEditingDepartment(
             null
           );
 
+
           form.resetFields();
         }}
       >
+
         <Form
           form={
             form
@@ -1020,57 +1354,70 @@ export default function Departments() {
             false
           }
 
-          style={{
-            marginTop:
-              20,
-          }}
+          className="departments-form"
         >
-          <Form.Item
-            label="Mã khoa"
 
-            name="code"
-
-            rules={[
-              {
-                required:
-                  true,
-
-                whitespace:
-                  true,
-
-                message:
-                  "Vui lòng nhập mã khoa.",
-              },
-            ]}
+          <div
+            className="departments-form-grid"
           >
-            <Input
-              placeholder="Ví dụ: KKB"
-            />
-          </Form.Item>
+
+            <Form.Item
+              label="Mã khoa"
+
+              name="code"
+
+              rules={[
+                {
+                  required:
+                    true,
+
+                  whitespace:
+                    true,
+
+                  message:
+                    "Vui lòng nhập mã khoa.",
+                },
+              ]}
+            >
+
+              <Input
+                placeholder="Ví dụ: KKB"
+
+                disabled={
+                  editingDepartment !==
+                  null
+                }
+              />
+
+            </Form.Item>
 
 
-          <Form.Item
-            label="Tên khoa"
+            <Form.Item
+              label="Tên khoa"
 
-            name="name"
+              name="name"
 
-            rules={[
-              {
-                required:
-                  true,
+              rules={[
+                {
+                  required:
+                    true,
 
-                whitespace:
-                  true,
+                  whitespace:
+                    true,
 
-                message:
-                  "Vui lòng nhập tên khoa.",
-              },
-            ]}
-          >
-            <Input
-              placeholder="Ví dụ: Khoa Khám bệnh"
-            />
-          </Form.Item>
+                  message:
+                    "Vui lòng nhập tên khoa.",
+                },
+              ]}
+            >
+
+              <Input
+                placeholder="Ví dụ: Khoa Khám bệnh"
+              />
+
+            </Form.Item>
+
+          </div>
 
 
           <Form.Item
@@ -1078,11 +1425,15 @@ export default function Departments() {
 
             name="description"
           >
+
             <Input.TextArea
-              rows={3}
+              rows={
+                4
+              }
 
               placeholder="Mô tả khoa"
             />
+
           </Form.Item>
 
 
@@ -1093,10 +1444,174 @@ export default function Departments() {
 
             valuePropName="checked"
           >
-            <Switch />
+
+            <Switch
+              checkedChildren="Đang dùng"
+
+              unCheckedChildren="Ngừng dùng"
+            />
+
           </Form.Item>
+
         </Form>
+
       </Modal>
+
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
+
+      <style>
+        {`
+          .departments-page {
+            width: 100%;
+          }
+
+          .departments-breadcrumb {
+            margin-bottom: 14px;
+            font-size: 12px;
+          }
+
+          .departments-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+
+          .departments-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+
+          .departments-title-row h3 {
+            margin: 0 !important;
+            color: #172033 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+          }
+
+          .departments-title-icon {
+            color: #1677ff;
+            font-size: 25px;
+          }
+
+          .departments-subtitle {
+            display: block;
+            margin-top: 3px;
+            font-size: 12px;
+          }
+
+          .departments-filter-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(220px, 1fr)
+              minmax(320px, 1.5fr)
+              auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 14px;
+          }
+
+          .departments-filter-item {
+            min-width: 0;
+          }
+
+          .departments-filter-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .departments-table {
+            overflow: hidden;
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+          }
+
+          .departments-table .ant-table {
+            border-radius: 8px;
+          }
+
+          .departments-table
+          .ant-table-container {
+            border-start-start-radius: 8px;
+            border-start-end-radius: 8px;
+          }
+
+          .departments-table
+          .ant-table-thead
+          > tr
+          > th {
+            padding: 11px 10px !important;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f3f6f9 !important;
+            border-bottom: 1px solid #e5eaf0 !important;
+          }
+
+          .departments-table
+          .ant-table-tbody
+          > tr
+          > td {
+            padding: 13px 10px !important;
+            color: #202a3b;
+            font-size: 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf0f5 !important;
+          }
+
+          .departments-table
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background: #f7fbff !important;
+          }
+
+          .departments-table
+          .ant-pagination {
+            margin: 14px 8px 6px;
+          }
+
+          .departments-status {
+            margin: 0;
+            border-radius: 6px;
+            font-size: 11px;
+          }
+
+          .departments-form {
+            margin-top: 18px;
+          }
+
+          .departments-form-grid {
+            display: grid;
+            grid-template-columns:
+              1fr 2fr;
+            gap: 16px;
+          }
+
+          @media (max-width: 800px) {
+            .departments-header {
+              flex-direction: column;
+            }
+
+            .departments-filter-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .departments-form-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}
+      </style>
+
     </>
   );
 }

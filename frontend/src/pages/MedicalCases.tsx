@@ -4,6 +4,7 @@ import {
   Card,
   DatePicker,
   Input,
+  Pagination,
   Select,
   Space,
   Table,
@@ -24,14 +25,16 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 
-import {
-  useQuery,
-} from "@apollo/client/react";
+import { useQuery } from "@apollo/client/react";
 
 import {
   useEffect,
   useRef,
   useState,
+} from "react";
+
+import type {
+  CSSProperties,
 } from "react";
 
 import {
@@ -51,6 +54,10 @@ import {
   apiFetch,
 } from "../api/apiClient";
 
+
+// ======================================================
+// TYPES
+// ======================================================
 
 interface MedicalCase {
   id: string;
@@ -108,6 +115,10 @@ interface CheckProgress {
 }
 
 
+// ======================================================
+// FORMAT DATE
+// ======================================================
+
 function formatDate(
   value?: string
 ) {
@@ -125,6 +136,10 @@ function formatDate(
 }
 
 
+// ======================================================
+// FORMAT MONEY
+// ======================================================
+
 function formatMoney(
   value?: number
 ) {
@@ -132,12 +147,15 @@ function formatMoney(
     "vi-VN"
   ).format(
     Number(
-      value ||
-      0
+      value || 0
     )
   );
 }
 
+
+// ======================================================
+// GENDER
+// ======================================================
 
 function renderGender(
   value?: string
@@ -145,8 +163,7 @@ function renderGender(
   if (
     String(
       value
-    ) ===
-    "1"
+    ) === "1"
   ) {
     return "Nam";
   }
@@ -154,8 +171,7 @@ function renderGender(
   if (
     String(
       value
-    ) ===
-    "2"
+    ) === "2"
   ) {
     return "Nữ";
   }
@@ -167,81 +183,175 @@ function renderGender(
 }
 
 
+// ======================================================
+// STYLE
+// ======================================================
+
 const pageStyle:
-  React.CSSProperties = {
-  display:
-    "flex",
+  CSSProperties = {
+    display:
+      "flex",
 
-  flexDirection:
-    "column",
+    flexDirection:
+      "column",
 
-  gap:
-    16,
-};
+    // Gọn hơn bản cũ
+    gap:
+      10,
+
+    /*
+     * MainLayout:
+     *
+     * Header: 64px
+     * Content padding: 24 + 24
+     * Container padding: 24 + 24
+     *
+     * Tổng = 160px
+     */
+    height:
+      "calc(100vh - 160px)",
+
+    minHeight:
+      0,
+
+    overflow:
+      "hidden",
+  };
 
 
 const panelStyle:
-  React.CSSProperties = {
-  borderRadius:
-    14,
+  CSSProperties = {
+    borderRadius:
+      14,
 
-  border:
-    "1px solid #edf0f5",
+    border:
+      "1px solid #edf0f5",
 
-  boxShadow:
-    "0 4px 18px rgba(15, 23, 42, 0.05)",
+    boxShadow:
+      "0 4px 18px rgba(15, 23, 42, 0.05)",
 
-  background:
-    "#ffffff",
-};
+    background:
+      "#ffffff",
+  };
 
 
 const statusTagStyle:
-  React.CSSProperties = {
-  display:
-    "inline-flex",
+  CSSProperties = {
+    display:
+      "inline-flex",
 
-  alignItems:
-    "center",
+    alignItems:
+      "center",
 
-  justifyContent:
-    "center",
+    justifyContent:
+      "center",
 
-  gap:
-    5,
+    gap:
+      5,
 
-  minWidth:
-    86,
+    minWidth:
+      86,
 
-  margin:
-    0,
+    margin:
+      0,
 
-  padding:
-    "4px 10px",
+    padding:
+      "4px 10px",
 
-  borderRadius:
-    999,
+    borderRadius:
+      999,
 
-  fontSize:
-    13,
+    fontSize:
+      13,
 
-  fontWeight:
-    700,
+    fontWeight:
+      700,
 
-  cursor:
-    "default",
+    cursor:
+      "pointer",
+  };
 
-  userSelect:
-    "none",
-};
 
+// ======================================================
+// COMPONENT
+// ======================================================
 
 export default function MedicalCases() {
+
   const [
     searchParams,
   ] =
     useSearchParams();
 
+
+  // ====================================================
+  // FIX TRANG - CHỈ TABLE ĐƯỢC SCROLL
+  // ====================================================
+
+  const tableAreaRef =
+    useRef<
+      HTMLDivElement |
+      null
+    >(
+      null
+    );
+
+
+  const [
+    tableScrollY,
+    setTableScrollY,
+  ] =
+    useState(
+      220
+    );
+
+
+  // ====================================================
+  // KHÓA SCROLL BODY
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      const html =
+        document.documentElement;
+
+      const body =
+        document.body;
+
+
+      const oldHtmlOverflow =
+        html.style.overflow;
+
+      const oldBodyOverflow =
+        body.style.overflow;
+
+
+      html.style.overflow =
+        "hidden";
+
+      body.style.overflow =
+        "hidden";
+
+
+      return () => {
+
+        html.style.overflow =
+          oldHtmlOverflow;
+
+        body.style.overflow =
+          oldBodyOverflow;
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // MODAL KẾT QUẢ
+  // ====================================================
 
   const [
     resultCase,
@@ -255,6 +365,47 @@ export default function MedicalCases() {
     );
 
 
+  // Hồ sơ vừa đóng modal: lưu theo ID, không phụ thuộc vị trí dòng.
+  const [lastViewedCase, setLastViewedCase] = useState<MedicalCase | null>(null);
+  const lastTableScroll = useRef({ top: 0, left: 0 });
+
+  function openCaseResults(record: MedicalCase) {
+    // Hồ sơ tốt không mở modal, kể cả khi nhấn vào tên bệnh nhân.
+    if (record.status === "OK") return;
+
+    const body = tableAreaRef.current?.querySelector<HTMLElement>(
+      ".medguard-case-table-fixed .ant-table-body"
+    );
+    if (body) {
+      lastTableScroll.current.top = body.scrollTop;
+      lastTableScroll.current.left = body.scrollLeft;
+    }
+    setResultCase(record);
+  }
+
+  function closeCaseResults() {
+    if (resultCase) {
+      setLastViewedCase(resultCase);
+    }
+    setResultCase(null);
+    // Đợi React render xong mới phục hồi vị trí bảng.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const body = tableAreaRef.current?.querySelector<HTMLElement>(
+          ".medguard-case-table-fixed .ant-table-body"
+        );
+        if (body) {
+          body.scrollTop = lastTableScroll.current.top;
+          body.scrollLeft = lastTableScroll.current.left;
+        }
+      });
+    });
+  }
+
+  // ====================================================
+  // PAYMENT DATE
+  // ====================================================
+
   const [
     paymentDate,
     setPaymentDate,
@@ -262,7 +413,9 @@ export default function MedicalCases() {
     useState<
       string |
       undefined
-    >();
+    >(
+      undefined
+    );
 
 
   const [
@@ -285,6 +438,30 @@ export default function MedicalCases() {
     );
 
 
+  useEffect(
+    () => {
+
+      return () => {
+
+        if (
+          clearPaymentTimer.current
+        ) {
+          clearTimeout(
+            clearPaymentTimer.current
+          );
+        }
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // CHECKING
+  // ====================================================
+
   const [
     checking,
     setChecking,
@@ -298,7 +475,9 @@ export default function MedicalCases() {
     checkProgress,
     setCheckProgress,
   ] =
-    useState<CheckProgress>({
+    useState<
+      CheckProgress
+    >({
       processedCases:
         0,
 
@@ -325,6 +504,10 @@ export default function MedicalCases() {
     );
 
 
+  // ====================================================
+  // PAGINATION
+  // ====================================================
+
   const [
     page,
     setPage,
@@ -342,6 +525,10 @@ export default function MedicalCases() {
       10
     );
 
+
+  // ====================================================
+  // FILTER
+  // ====================================================
 
   const [
     maBn,
@@ -426,26 +613,12 @@ export default function MedicalCases() {
 
   useEffect(
     () => {
-      return () => {
-        if (
-          clearPaymentTimer.current
-        ) {
-          clearTimeout(
-            clearPaymentTimer.current
-          );
-        }
-      };
-    },
-    []
-  );
 
-
-  useEffect(
-    () => {
       const yearParam =
         searchParams.get(
           "year"
         );
+
 
       const monthParam =
         searchParams.get(
@@ -456,10 +629,12 @@ export default function MedicalCases() {
       if (
         yearParam
       ) {
+
         const nextYear =
           Number(
             yearParam
           );
+
 
         if (
           !Number.isNaN(
@@ -470,16 +645,19 @@ export default function MedicalCases() {
             nextYear
           );
         }
+
       }
 
 
       if (
         monthParam
       ) {
+
         const nextMonth =
           Number(
             monthParam
           );
+
 
         if (
           !Number.isNaN(
@@ -490,16 +668,20 @@ export default function MedicalCases() {
             nextMonth
           );
         }
+
       } else {
+
         setMonth(
           undefined
         );
+
       }
 
 
       setPage(
         1
       );
+
     },
     [
       searchParams,
@@ -507,12 +689,15 @@ export default function MedicalCases() {
   );
 
 
+  // ====================================================
+  // GRAPHQL WHERE
+  // ====================================================
+
   const where:
     Record<
       string,
       unknown
-    > =
-    {};
+    > = {};
 
 
   if (
@@ -569,6 +754,7 @@ export default function MedicalCases() {
   if (
     paymentDate
   ) {
+
     const startDate =
       dayjs(
         paymentDate
@@ -607,13 +793,19 @@ export default function MedicalCases() {
   }
 
 
+  // ====================================================
+  // QUERY
+  // ====================================================
+
   const {
     data,
     loading,
     error,
     refetch,
   } =
-    useQuery<QueryResult>(
+    useQuery<
+      QueryResult
+    >(
       GET_MEDICAL_CASES,
       {
         variables: {
@@ -636,8 +828,58 @@ export default function MedicalCases() {
     );
 
 
+  // ====================================================
+  // CHIỀU CAO TABLE: TÍNH THEO KHUNG HIỂN THỊ THỰC TẾ
+  // Pagination nằm ở footer riêng, không bị table che
+  // ====================================================
+  useEffect(() => {
+    let frame = 0;
+
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const area = tableAreaRef.current;
+        const content = area?.querySelector<HTMLElement>(
+          ".medguard-case-table-content"
+        );
+        const body = content?.querySelector<HTMLElement>(".ant-table-body");
+        const head = content?.querySelector<HTMLElement>(".ant-table-header");
+        if (!area || !content) return;
+
+        // AntD gắn scroll.y vào .ant-table-body; vị trí bắt đầu
+        // phần body không thay đổi khi nội dung bảng được cập nhật.
+        const top = body?.getBoundingClientRect().top ??
+          (content.getBoundingClientRect().top + (head?.offsetHeight ?? 47));
+        const bottom = content.getBoundingClientRect().bottom;
+        const nextHeight = Math.max(48, Math.floor(bottom - top - 12));
+        setTableScrollY(old => old === nextHeight ? old : nextHeight);
+      });
+    };
+
+    const observer = new ResizeObserver(measure);
+    if (tableAreaRef.current) observer.observe(tableAreaRef.current);
+    const content = tableAreaRef.current?.querySelector<HTMLElement>(
+      ".medguard-case-table-content"
+    );
+    if (content) observer.observe(content);
+    window.addEventListener("resize", measure);
+    measure();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [loading, page, pageSize]);
+
+
+  // ====================================================
+  // RUN CHECKS
+  // ====================================================
+
   async function handleRunChecks() {
+
     try {
+
       if (
         !year
       ) {
@@ -770,17 +1012,21 @@ export default function MedicalCases() {
       });
 
 
-      await new Promise<void>(
+      await new Promise<
+        void
+      >(
         (
           resolve,
           reject
         ) => {
+
           let stopped =
             false;
 
 
           const poll =
             async () => {
+
               if (
                 stopped
               ) {
@@ -789,6 +1035,7 @@ export default function MedicalCases() {
 
 
               try {
+
                 const progressResponse =
                   await apiFetch(
                     `/checks/runs/${checkRunId}/progress`
@@ -838,8 +1085,7 @@ export default function MedicalCases() {
                 }
 
 
-                const nextProgress:
-                  CheckProgress = {
+                setCheckProgress({
                   processedCases:
                     Number(
                       progress
@@ -874,18 +1120,14 @@ export default function MedicalCases() {
                         .status ??
                       "RUNNING"
                     ),
-                };
-
-
-                setCheckProgress(
-                  nextProgress
-                );
+                });
 
 
                 if (
                   progress.status ===
                   "DONE"
                 ) {
+
                   stopped =
                     true;
 
@@ -926,6 +1168,7 @@ export default function MedicalCases() {
                   progress.status ===
                   "ERROR"
                 ) {
+
                   stopped =
                     true;
 
@@ -944,20 +1187,26 @@ export default function MedicalCases() {
                   poll,
                   400
                 );
+
               } catch (
-                pollError
+                error
               ) {
+
                 stopped =
                   true;
 
+
                 reject(
-                  pollError
+                  error
                 );
+
               }
+
             };
 
 
           void poll();
+
         }
       );
 
@@ -968,27 +1217,37 @@ export default function MedicalCases() {
 
 
       await refetch();
+
     } catch (
-      runError
+      error
     ) {
+
       console.error(
         "Run checks error:",
-        runError
+        error
       );
 
 
       message.error(
-        runError instanceof Error
-          ? runError.message
+        error instanceof
+        Error
+          ? error.message
           : "Kiểm tra dữ liệu thất bại."
       );
+
     } finally {
+
       setChecking(
         false
       );
+
     }
   }
 
+
+  // ====================================================
+  // QUERY ERROR
+  // ====================================================
 
   if (
     error
@@ -1008,6 +1267,10 @@ export default function MedicalCases() {
     );
   }
 
+
+  // ====================================================
+  // DATA
+  // ====================================================
 
   const cases =
     data
@@ -1048,7 +1311,12 @@ export default function MedicalCases() {
     0;
 
 
+  // ====================================================
+  // RESET
+  // ====================================================
+
   function handleReset() {
+
     if (
       refreshing
     ) {
@@ -1061,78 +1329,57 @@ export default function MedicalCases() {
     );
 
 
-    window.setTimeout(
+    setTimeout(
       () => {
+
         setMaBn(
           ""
         );
+
 
         setHoTen(
           ""
         );
 
+
         setStatus(
           "ALL"
         );
+
 
         setYear(
           2026
         );
 
+
         setMonth(
           undefined
         );
+
 
         setPaymentDate(
           undefined
         );
 
+
         setPage(
           1
         );
 
+
         setRefreshing(
           false
         );
+
       },
       800
     );
   }
 
 
-  function canOpenResult(
-    record:
-      MedicalCase
-  ) {
-    return (
-      record.status ===
-        "ERROR" ||
-      record.status ===
-        "WARNING" ||
-      record.status ===
-        "INCOMPLETE"
-    );
-  }
-
-
-  function openResult(
-    record:
-      MedicalCase
-  ) {
-    if (
-      !canOpenResult(
-        record
-      )
-    ) {
-      return;
-    }
-
-
-    setResultCase(
-      record
-    );
-  }
-
+  // ====================================================
+  // STATUS
+  // ====================================================
 
   function renderCaseStatus(
     statusValue:
@@ -1142,6 +1389,7 @@ export default function MedicalCases() {
     record:
       MedicalCase
   ) {
+
     if (
       statusValue ===
       "ERROR"
@@ -1154,33 +1402,17 @@ export default function MedicalCases() {
 
           color="error"
 
-          style={{
-            ...statusTagStyle,
+          style={
+            statusTagStyle
+          }
 
-            cursor:
-              "pointer",
-          }}
-
-          onClick={(
-            event
-          ) => {
-            event.stopPropagation();
-
-            openResult(
+          onClick={() =>
+            openCaseResults(
               record
-            );
-          }}
+            )
+          }
         >
           Lỗi
-          {
-            Number(
-              record.error_count ??
-              0
-            ) >
-            0
-              ? ` (${record.error_count})`
-              : ""
-          }
         </Tag>
       );
     }
@@ -1200,9 +1432,8 @@ export default function MedicalCases() {
 
           style={{
             ...statusTagStyle,
-
-            cursor:
-              "default",
+            cursor: "default",
+            pointerEvents: "none",
           }}
         >
           Tốt
@@ -1223,22 +1454,15 @@ export default function MedicalCases() {
 
           color="warning"
 
-          style={{
-            ...statusTagStyle,
+          style={
+            statusTagStyle
+          }
 
-            cursor:
-              "pointer",
-          }}
-
-          onClick={(
-            event
-          ) => {
-            event.stopPropagation();
-
-            openResult(
+          onClick={() =>
+            openCaseResults(
               record
-            );
-          }}
+            )
+          }
         >
           Cảnh báo
         </Tag>
@@ -1263,20 +1487,13 @@ export default function MedicalCases() {
 
             minWidth:
               140,
-
-            cursor:
-              "pointer",
           }}
 
-          onClick={(
-            event
-          ) => {
-            event.stopPropagation();
-
-            openResult(
+          onClick={() =>
+            openCaseResults(
               record
-            );
-          }}
+            )
+          }
         >
           Chưa đủ cấu hình
         </Tag>
@@ -1337,11 +1554,16 @@ export default function MedicalCases() {
   }
 
 
+  // ====================================================
+  // STATUS FILTER LABEL
+  // ====================================================
+
   function statusFilterLabel(
     type:
       "OK" |
       "ERROR"
   ) {
+
     if (
       type ===
       "OK"
@@ -1388,13 +1610,28 @@ export default function MedicalCases() {
   }
 
 
+  // ====================================================
+  // JSX
+  // ====================================================
+
   return (
     <div
       style={
         pageStyle
       }
     >
-      <div>
+
+      {/* ==================================================
+          HEADER
+      ================================================== */}
+
+      <div
+        style={{
+          flexShrink:
+            0,
+        }}
+      >
+
         <Typography.Title
           level={
             3
@@ -1411,7 +1648,13 @@ export default function MedicalCases() {
               "center",
 
             gap:
-              10,
+              8,
+
+            fontSize:
+              21,
+
+            lineHeight:
+              1.25,
 
             fontWeight:
               800,
@@ -1420,17 +1663,19 @@ export default function MedicalCases() {
               "#172033",
           }}
         >
+
           <FileSearchOutlined
             style={{
               color:
                 "#1677ff",
 
               fontSize:
-                23,
+                20,
             }}
           />
 
           Danh sách hồ sơ
+
         </Typography.Title>
 
 
@@ -1442,13 +1687,21 @@ export default function MedicalCases() {
               "block",
 
             marginTop:
-              4,
+              2,
+
+            fontSize:
+              12,
           }}
         >
           Theo dõi và kiểm tra dữ liệu hồ sơ khám chữa bệnh BHYT
         </Typography.Text>
+
       </div>
 
+
+      {/* ==================================================
+          THỐNG KÊ
+      ================================================== */}
 
       <div
         className="medguard-stat-grid"
@@ -1461,14 +1714,20 @@ export default function MedicalCases() {
             "repeat(4, minmax(170px, 1fr))",
 
           gap:
-            14,
+            10,
+
+          flexShrink:
+            0,
         }}
       >
+
+        {/* TỔNG HỒ SƠ */}
+
         <Card
           styles={{
             body: {
               padding:
-                "16px 18px",
+                "10px 14px",
             },
           }}
 
@@ -1479,19 +1738,26 @@ export default function MedicalCases() {
               "4px solid #ff4d4f",
           }}
         >
+
           <Typography.Text
             type="secondary"
+
+            style={{
+              fontSize:
+                12,
+            }}
           >
             Tổng hồ sơ
           </Typography.Text>
 
+
           <div
             style={{
               marginTop:
-                5,
+                2,
 
               fontSize:
-                24,
+                20,
 
               lineHeight:
                 1.2,
@@ -1505,14 +1771,17 @@ export default function MedicalCases() {
           >
             {total}
           </div>
+
         </Card>
 
+
+        {/* TỔNG CHI */}
 
         <Card
           styles={{
             body: {
               padding:
-                "16px 18px",
+                "10px 14px",
             },
           }}
 
@@ -1523,19 +1792,26 @@ export default function MedicalCases() {
               "4px solid #1677ff",
           }}
         >
+
           <Typography.Text
             type="secondary"
+
+            style={{
+              fontSize:
+                12,
+            }}
           >
             Tổng chi
           </Typography.Text>
 
+
           <div
             style={{
               marginTop:
-                5,
+                2,
 
               fontSize:
-                21,
+                19,
 
               lineHeight:
                 1.2,
@@ -1553,14 +1829,17 @@ export default function MedicalCases() {
               )
             }
           </div>
+
         </Card>
 
+
+        {/* TỔNG BHYT */}
 
         <Card
           styles={{
             body: {
               padding:
-                "16px 18px",
+                "10px 14px",
             },
           }}
 
@@ -1571,19 +1850,26 @@ export default function MedicalCases() {
               "4px solid #faad14",
           }}
         >
+
           <Typography.Text
             type="secondary"
+
+            style={{
+              fontSize:
+                12,
+            }}
           >
             Tổng BHYT
           </Typography.Text>
 
+
           <div
             style={{
               marginTop:
-                5,
+                2,
 
               fontSize:
-                21,
+                19,
 
               lineHeight:
                 1.2,
@@ -1601,14 +1887,17 @@ export default function MedicalCases() {
               )
             }
           </div>
+
         </Card>
 
+
+        {/* TỔNG BNTT */}
 
         <Card
           styles={{
             body: {
               padding:
-                "16px 18px",
+                "10px 14px",
             },
           }}
 
@@ -1619,19 +1908,26 @@ export default function MedicalCases() {
               "4px solid #52c41a",
           }}
         >
+
           <Typography.Text
             type="secondary"
+
+            style={{
+              fontSize:
+                12,
+            }}
           >
             Tổng BNTT
           </Typography.Text>
 
+
           <div
             style={{
               marginTop:
-                5,
+                2,
 
               fontSize:
-                21,
+                19,
 
               lineHeight:
                 1.2,
@@ -1649,22 +1945,32 @@ export default function MedicalCases() {
               )
             }
           </div>
+
         </Card>
+
       </div>
 
 
+      {/* ==================================================
+          FILTER
+      ================================================== */}
+
       <Card
-        style={
-          panelStyle
-        }
+        style={{
+          ...panelStyle,
+
+          flexShrink:
+            0,
+        }}
 
         styles={{
           body: {
             padding:
-              16,
+              "10px 14px",
           },
         }}
       >
+
         <div
           style={{
             display:
@@ -1677,23 +1983,26 @@ export default function MedicalCases() {
               "space-between",
 
             gap:
-              12,
+              10,
 
             marginBottom:
-              14,
+              8,
           }}
         >
+
           <div>
+
             <Typography.Text
               strong
 
               style={{
                 fontSize:
-                  15,
+                  14,
               }}
             >
               Bộ lọc hồ sơ
             </Typography.Text>
+
 
             <Typography.Text
               type="secondary"
@@ -1703,15 +2012,17 @@ export default function MedicalCases() {
                   "block",
 
                 marginTop:
-                  2,
+                  1,
 
                 fontSize:
-                  12,
+                  11,
               }}
             >
               Tìm nhanh theo bệnh nhân, trạng thái và thời gian
             </Typography.Text>
+
           </div>
+
         </div>
 
 
@@ -1719,9 +2030,10 @@ export default function MedicalCases() {
           wrap
 
           size={
-            10
+            8
           }
         >
+
           <Input
             value={
               maBn
@@ -1748,15 +2060,18 @@ export default function MedicalCases() {
             onChange={(
               event
             ) => {
+
               setMaBn(
                 event
                   .target
                   .value
               );
 
+
               setPage(
                 1
               );
+
             }}
           />
 
@@ -1787,15 +2102,18 @@ export default function MedicalCases() {
             onChange={(
               event
             ) => {
+
               setHoTen(
                 event
                   .target
                   .value
               );
 
+
               setPage(
                 1
               );
+
             }}
           />
 
@@ -1813,13 +2131,16 @@ export default function MedicalCases() {
             onChange={(
               value
             ) => {
+
               setStatus(
                 value
               );
 
+
               setPage(
                 1
               );
+
             }}
 
             options={[
@@ -1871,13 +2192,16 @@ export default function MedicalCases() {
             onChange={(
               value
             ) => {
+
               setYear(
                 value
               );
 
+
               setPage(
                 1
               );
+
             }}
 
             options={[
@@ -1925,13 +2249,16 @@ export default function MedicalCases() {
             onChange={(
               value
             ) => {
+
               setMonth(
                 value
               );
 
+
               setPage(
                 1
               );
+
             }}
 
             options={
@@ -1979,6 +2306,7 @@ export default function MedicalCases() {
                   : "scale(1)",
             }}
           >
+
             <DatePicker
               value={
                 paymentDate
@@ -2010,15 +2338,23 @@ export default function MedicalCases() {
               onChange={(
                 date
               ) => {
+
+                // ========================================
+                // CHỌN NGÀY
+                // ========================================
+
                 if (
                   date
                 ) {
+
                   if (
                     clearPaymentTimer.current
                   ) {
+
                     clearTimeout(
                       clearPaymentTimer.current
                     );
+
                   }
 
 
@@ -2038,9 +2374,14 @@ export default function MedicalCases() {
                     1
                   );
 
+
                   return;
                 }
 
+
+                // ========================================
+                // BẤM X
+                // ========================================
 
                 if (
                   !paymentDate
@@ -2057,15 +2398,18 @@ export default function MedicalCases() {
                 if (
                   clearPaymentTimer.current
                 ) {
+
                   clearTimeout(
                     clearPaymentTimer.current
                   );
+
                 }
 
 
                 clearPaymentTimer.current =
-                  window.setTimeout(
+                  setTimeout(
                     () => {
+
                       setPaymentDate(
                         undefined
                       );
@@ -2083,11 +2427,14 @@ export default function MedicalCases() {
 
                       clearPaymentTimer.current =
                         null;
+
                     },
                     1200
                   );
+
               }}
             />
+
           </div>
 
 
@@ -2147,12 +2494,8 @@ export default function MedicalCases() {
 
             icon={
               checking
-                ? (
-                  <LoadingOutlined />
-                )
-                : (
-                  <SafetyCertificateOutlined />
-                )
+                ? <LoadingOutlined />
+                : <SafetyCertificateOutlined />
             }
 
             loading={
@@ -2183,473 +2526,703 @@ export default function MedicalCases() {
                 : "Kiểm tra dữ liệu"
             }
           </Button>
+
         </Space>
+
       </Card>
 
 
-      <Card
-        style={
-          panelStyle
+      {/* ==================================================
+          TABLE
+      ================================================== */}
+
+      <div
+        ref={
+          tableAreaRef
         }
 
-        styles={{
-          body: {
-            padding:
-              0,
-          },
+        style={{
+          flex:
+            1,
+
+          minHeight:
+            0,
+
+          overflow:
+            "hidden",
         }}
       >
-        <div
+
+        <Card
           style={{
-            padding:
-              "14px 16px",
+            ...panelStyle,
 
-            display:
-              "flex",
+            height:
+              "100%",
 
-            justifyContent:
-              "space-between",
+            overflow:
+              "hidden",
+          }}
 
-            alignItems:
-              "center",
+          styles={{
+            body: {
+              padding:
+                0,
 
-            borderBottom:
-              "1px solid #f0f0f0",
+              height:
+                "100%",
+
+              display:
+                "flex",
+
+              flexDirection:
+                "column",
+
+              overflow:
+                "hidden",
+            },
           }}
         >
-          <div>
-            <Typography.Text
-              strong
 
-              style={{
-                fontSize:
-                  15,
-              }}
-            >
-              Hồ sơ khám chữa bệnh
-            </Typography.Text>
+          {/* ==============================================
+              HEADER TABLE
+          ============================================== */}
+
+          <div
+            className="medguard-case-table-header"
+            style={{
+              padding:
+                "10px 14px",
+
+              display:
+                "flex",
+
+              justifyContent:
+                "space-between",
+
+              alignItems:
+                "center",
+
+              borderBottom:
+                "1px solid #f0f0f0",
+
+              flexShrink:
+                0,
+            }}
+          >
+
+            <div>
+
+              <Typography.Text
+                strong
+
+                style={{
+                  fontSize:
+                    14,
+                }}
+              >
+                Hồ sơ khám chữa bệnh
+              </Typography.Text>
+
+
+              <Typography.Text
+                type="secondary"
+
+                style={{
+                  marginLeft:
+                    8,
+
+                  fontSize:
+                    11,
+                }}
+              >
+                {total} hồ sơ
+              </Typography.Text>
+
+            </div>
+
 
             <Typography.Text
               type="secondary"
 
               style={{
-                marginLeft:
-                  8,
-
                 fontSize:
-                  12,
+                  11,
               }}
             >
-              {total} hồ sơ
+              {lastViewedCase
+                ? `Vừa xem: ${lastViewedCase.ma_bn || "—"} - ${lastViewedCase.ho_ten || ""}`
+                : "Hồ sơ có lỗi hoặc cảnh báo có thể bấm để xem chi tiết"}
             </Typography.Text>
+
           </div>
 
 
-          <Typography.Text
-            type="secondary"
+          {/* ==============================================
+              CHỈ PHẦN TABLE ĐƯỢC CUỘN
+          ============================================== */}
 
+          <div
+            className="medguard-case-table-content"
             style={{
-              fontSize:
-                12,
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+              position: "relative",
             }}
           >
-            Hồ sơ có lỗi hoặc cảnh báo có thể bấm để xem chi tiết
-          </Typography.Text>
-        </div>
 
+            <Table<
+              MedicalCase
+            >
+              className="medguard-case-table-fixed"
 
-        <Table<MedicalCase>
-          rowKey="id"
+              rowKey="id"
 
-          loading={
-            loading
-          }
+              loading={
+                loading
+              }
 
-          dataSource={
-            cases
-          }
+              dataSource={
+                cases
+              }
 
-          size="middle"
+              size="middle"
 
-          scroll={{
-            x:
-              1500,
-          }}
+              scroll={{
+                x:
+                  1500,
 
-          rowClassName={(
-            record
-          ) => {
-            if (
-              record.status ===
-              "ERROR"
-            ) {
-              return "medguard-row-error";
-            }
+                y:
+                  tableScrollY,
+              }}
 
+              rowClassName={(record) => {
+                const classes: string[] = [];
+                if (record.status === "ERROR") classes.push("medguard-row-error");
+                if (record.status === "OK") classes.push("medguard-row-ok");
+                if (record.id === lastViewedCase?.id) classes.push("medguard-row-last-viewed");
+                return classes.join(" ");
+              }}
 
-            if (
-              record.status ===
-              "OK"
-            ) {
-              return "medguard-row-ok";
-            }
+              pagination={false}
 
+              columns={[
 
-            return "";
-          }}
+                // =========================================
+                // TRẠNG THÁI
+                // =========================================
 
-          pagination={{
-            current:
-              page,
+                {
+                  title:
+                    "Trạng thái",
 
-            pageSize,
+                  dataIndex:
+                    "status",
 
-            total,
+                  width:
+                    145,
 
-            showSizeChanger:
-              true,
+                  fixed:
+                    "left",
 
-            pageSizeOptions: [
-              "10",
-              "50",
-              "100",
-            ],
-
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
-
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
-                  setPageSize(
-                    newPageSize
-                  );
-
-                  setPage(
-                    1
-                  );
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
-          }}
-
-          columns={[
-            {
-              title:
-                "Trạng thái",
-
-              dataIndex:
-                "status",
-
-              width:
-                145,
-
-              fixed:
-                "left",
-
-              render:
-                (
-                  value,
-                  record
-                ) =>
-                  renderCaseStatus(
-                    value,
-                    record
-                  ),
-            },
-
-            {
-              title:
-                "Mã BN",
-
-              dataIndex:
-                "ma_bn",
-
-              width:
-                110,
-
-              render:
-                (
-                  value
-                ) => (
-                  <Typography.Text
-                    strong
-                  >
-                    {value}
-                  </Typography.Text>
-                ),
-            },
-
-            {
-              title:
-                "Họ và tên",
-
-              dataIndex:
-                "ho_ten",
-
-              width:
-                190,
-
-              render:
-                (
-                  value,
-                  record
-                ) => {
-                  if (
-                    !canOpenResult(
+                  render:
+                    (
+                      value,
                       record
-                    )
-                  ) {
-                    return (
+                    ) =>
+                      renderCaseStatus(
+                        value,
+                        record
+                      ),
+                },
+
+
+                // =========================================
+                // MÃ BN
+                // =========================================
+
+                {
+                  title:
+                    "Mã BN",
+
+                  dataIndex:
+                    "ma_bn",
+
+                  width:
+                    110,
+
+                  render:
+                    (
+                      value
+                    ) => (
+
                       <Typography.Text
-                        style={{
-                          fontWeight:
-                            600,
-
-                          color:
-                            "#334155",
-
-                          cursor:
-                            "default",
-                        }}
+                        strong
                       >
                         {value}
                       </Typography.Text>
-                    );
-                  }
 
-
-                  return (
-                    <Typography.Link
-                      style={{
-                        fontWeight:
-                          600,
-                      }}
-
-                      onClick={(
-                        event
-                      ) => {
-                        event.stopPropagation();
-
-                        openResult(
-                          record
-                        );
-                      }}
-                    >
-                      {value}
-                    </Typography.Link>
-                  );
+                    ),
                 },
-            },
 
-            {
-              title:
-                "Mã thẻ",
 
-              dataIndex:
-                "ma_the_bhyt",
+                // =========================================
+                // HỌ TÊN
+                // =========================================
 
-              width:
-                170,
-            },
+                {
+                  title:
+                    "Họ và tên",
 
-            {
-              title:
-                "Giới tính",
+                  dataIndex:
+                    "ho_ten",
 
-              dataIndex:
-                "gioi_tinh",
+                  width:
+                    190,
 
-              width:
-                90,
+                  render:
+                    (
+                      value,
+                      record
+                    ) => (
 
-              render:
-                renderGender,
-            },
-
-            {
-              title:
-                "Loại KCB",
-
-              dataIndex:
-                "ma_loai_kcb",
-
-              width:
-                100,
-            },
-
-            {
-              title:
-                "Ngày vào",
-
-              dataIndex:
-                "ngay_vao",
-
-              width:
-                160,
-
-              render:
-                formatDate,
-            },
-
-            {
-              title:
-                "Ngày ra",
-
-              dataIndex:
-                "ngay_ra",
-
-              width:
-                160,
-
-              render:
-                formatDate,
-            },
-
-            {
-              title:
-                "Tổng chi",
-
-              dataIndex:
-                "t_tongchi",
-
-              align:
-                "right",
-
-              width:
-                130,
-
-              render:
-                (
-                  value
-                ) => (
-                  <Typography.Text
-                    strong
-                  >
-                    {
-                      formatMoney(
-                        value
+                      record.status === "OK" ? (
+                        <Typography.Text style={{ fontWeight: 600, color: "#334155" }}>
+                          {value}
+                        </Typography.Text>
+                      ) : (
+                        <Typography.Link
+                          style={{ fontWeight: 600 }}
+                          onClick={() => openCaseResults(record)}
+                        >
+                          {value}
+                        </Typography.Link>
                       )
-                    }
-                  </Typography.Text>
-                ),
-            },
 
-            {
-              title:
-                "Bệnh nhân TT",
+                    ),
+                },
 
-              dataIndex:
-                "t_bntt",
 
-              align:
-                "right",
+                // =========================================
+                // MÃ THẺ
+                // =========================================
 
-              width:
-                130,
+                {
+                  title:
+                    "Mã thẻ",
 
-              render:
-                formatMoney,
-            },
+                  dataIndex:
+                    "ma_the_bhyt",
 
-            {
-              title:
-                "Bảo hiểm TT",
+                  width:
+                    170,
+                },
 
-              dataIndex:
-                "t_bhtt",
 
-              align:
-                "right",
+                // =========================================
+                // GIỚI TÍNH
+                // =========================================
 
-              width:
-                130,
+                {
+                  title:
+                    "Giới tính",
 
-              render:
-                (
-                  value
-                ) => (
-                  <Typography.Text
-                    style={{
-                      color:
-                        "#1677ff",
+                  dataIndex:
+                    "gioi_tinh",
 
-                      fontWeight:
-                        600,
-                    }}
-                  >
-                    {
-                      formatMoney(
-                        value
-                      )
-                    }
-                  </Typography.Text>
-                ),
-            },
+                  width:
+                    90,
 
-            {
-              title:
-                "Ngày thanh toán",
+                  render:
+                    renderGender,
+                },
 
-              dataIndex:
-                "ngay_ttoan",
 
-              width:
-                170,
+                // =========================================
+                // LOẠI KCB
+                // =========================================
 
-              render:
-                formatDate,
-            },
-          ]}
-        />
-      </Card>
+                {
+                  title:
+                    "Loại KCB",
 
+                  dataIndex:
+                    "ma_loai_kcb",
+
+                  width:
+                    100,
+                },
+
+
+                // =========================================
+                // NGÀY VÀO
+                // =========================================
+
+                {
+                  title:
+                    "Ngày vào",
+
+                  dataIndex:
+                    "ngay_vao",
+
+                  width:
+                    160,
+
+                  render:
+                    formatDate,
+                },
+
+
+                // =========================================
+                // NGÀY RA
+                // =========================================
+
+                {
+                  title:
+                    "Ngày ra",
+
+                  dataIndex:
+                    "ngay_ra",
+
+                  width:
+                    160,
+
+                  render:
+                    formatDate,
+                },
+
+
+                // =========================================
+                // TỔNG CHI
+                // =========================================
+
+                {
+                  title:
+                    "Tổng chi",
+
+                  dataIndex:
+                    "t_tongchi",
+
+                  align:
+                    "right",
+
+                  width:
+                    130,
+
+                  render:
+                    (
+                      value
+                    ) => (
+
+                      <Typography.Text
+                        strong
+                      >
+                        {
+                          formatMoney(
+                            value
+                          )
+                        }
+                      </Typography.Text>
+
+                    ),
+                },
+
+
+                // =========================================
+                // BỆNH NHÂN TT
+                // =========================================
+
+                {
+                  title:
+                    "Bệnh nhân TT",
+
+                  dataIndex:
+                    "t_bntt",
+
+                  align:
+                    "right",
+
+                  width:
+                    130,
+
+                  render:
+                    formatMoney,
+                },
+
+
+                // =========================================
+                // BẢO HIỂM TT
+                // =========================================
+
+                {
+                  title:
+                    "Bảo hiểm TT",
+
+                  dataIndex:
+                    "t_bhtt",
+
+                  align:
+                    "right",
+
+                  width:
+                    130,
+
+                  render:
+                    (
+                      value
+                    ) => (
+
+                      <Typography.Text
+                        style={{
+                          color:
+                            "#1677ff",
+
+                          fontWeight:
+                            600,
+                        }}
+                      >
+                        {
+                          formatMoney(
+                            value
+                          )
+                        }
+                      </Typography.Text>
+
+                    ),
+                },
+
+
+                // =========================================
+                // NGÀY THANH TOÁN
+                // =========================================
+
+                {
+                  title:
+                    "Ngày thanh toán",
+
+                  dataIndex:
+                    "ngay_ttoan",
+
+                  width:
+                    170,
+
+                  render:
+                    formatDate,
+                },
+
+              ]}
+            />
+
+          </div>
+
+          <div className="medguard-case-pagination-footer">
+            <Pagination
+              current={page}
+              pageSize={pageSize}
+              total={total}
+              showSizeChanger
+              pageSizeOptions={["10", "50", "100"]}
+              showTotal={value => `Tổng số: ${value}`}
+              responsive
+              onChange={(newPage, newPageSize) => {
+                if (newPageSize !== pageSize) {
+                  setPageSize(newPageSize);
+                  setPage(1);
+                } else {
+                  setPage(newPage);
+                }
+              }}
+            />
+          </div>
+
+        </Card>
+
+      </div>
+
+
+      {/* ==================================================
+          STYLE
+      ================================================== */}
 
       <style>
         {`
-          .ant-table-thead > tr > th {
-            background: #f8fafc !important;
-            color: #334155 !important;
-            font-weight: 700 !important;
-            border-bottom: 1px solid #e8edf3 !important;
+
+          /* ===============================================
+             TABLE FIXED
+          =============================================== */
+
+          .medguard-case-table-fixed {
+            min-height: 0;
           }
 
-          .ant-table-tbody > tr > td {
-            transition: background 0.18s ease;
+
+          .medguard-case-table-fixed
+          .ant-spin-nested-loading,
+
+          .medguard-case-table-fixed
+          .ant-spin-container,
+
+          .medguard-case-table-fixed
+          .ant-table,
+
+          .medguard-case-table-fixed
+          .ant-table-container {
+            min-height: 0;
           }
 
-          .ant-table-tbody > tr:hover > td {
-            background: #f5f9ff !important;
+
+          /* ===============================================
+             CHỈ BODY TABLE SCROLL
+          =============================================== */
+
+          .medguard-case-table-fixed
+          .ant-table-body {
+            overflow-y: auto !important;
+
+            overscroll-behavior:
+              contain;
           }
 
-          .medguard-row-error > td:first-child {
-            box-shadow: inset 3px 0 0 #ff4d4f;
+
+          /* ===============================================
+             HEADER TABLE
+          =============================================== */
+
+          .medguard-case-table-fixed
+          .ant-table-thead
+          > tr
+          > th {
+            background:
+              #f8fafc !important;
+
+            color:
+              #334155 !important;
+
+            font-weight:
+              700 !important;
+
+            border-bottom:
+              1px solid #e8edf3 !important;
           }
 
-          .medguard-row-ok > td:first-child {
-            box-shadow: inset 3px 0 0 #52c41a;
+
+          /* ===============================================
+             ROW
+          =============================================== */
+
+          .medguard-case-table-fixed
+          .ant-table-tbody
+          > tr
+          > td {
+            transition:
+              background 0.18s ease;
           }
 
-          .ant-pagination {
-            padding: 0 16px 12px;
+
+          .medguard-case-table-fixed
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background:
+              #f5f9ff !important;
           }
 
-          @media (max-width: 1100px) {
+
+          .medguard-case-table-fixed
+          .medguard-row-error
+          > td:first-child {
+            box-shadow:
+              inset 3px 0 0 #ff4d4f;
+          }
+
+
+          .medguard-case-table-fixed
+          .medguard-row-ok
+          > td:first-child {
+            box-shadow:
+              inset 3px 0 0 #52c41a;
+          }
+
+
+          /* Đánh dấu hồ sơ vừa đóng modal, ưu tiên cả khi di chuột. */
+          .medguard-case-table-fixed
+          .ant-table-tbody > tr.medguard-row-last-viewed > td,
+          .medguard-case-table-fixed
+          .ant-table-tbody > tr.medguard-row-last-viewed:hover > td {
+            background: #e6f4ff !important;
+            border-top: 1px solid #91caff;
+            border-bottom: 1px solid #91caff !important;
+          }
+          .medguard-case-table-fixed
+          .ant-table-tbody > tr.medguard-row-last-viewed > td:first-child {
+            box-shadow: inset 4px 0 0 #1677ff !important;
+          }
+
+          /* Footer phân trang luôn nằm ngoài vùng scroll của bảng */
+          .medguard-case-pagination-footer {
+            flex: 0 0 auto;
+            min-height: 58px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 8px 14px;
+            background: #fff;
+            border-top: 1px solid #edf0f5;
+            position: relative;
+            z-index: 2;
+          }
+          .medguard-case-pagination-footer .ant-pagination {
+            margin: 0 !important;
+          }
+          @media (max-width: 700px) {
+            .medguard-case-pagination-footer {
+              justify-content: center;
+              padding-inline: 6px;
+            }
+          }
+
+
+          /* ===============================================
+             SCROLLBAR TRONG TABLE
+          =============================================== */
+
+          .medguard-case-table-fixed
+          .ant-table-body::-webkit-scrollbar {
+            width:
+              8px;
+
+            height:
+              8px;
+          }
+
+
+          .medguard-case-table-fixed
+          .ant-table-body::-webkit-scrollbar-thumb {
+            background:
+              #cbd5e1;
+
+            border-radius:
+              999px;
+          }
+
+
+          .medguard-case-table-fixed
+          .ant-table-body::-webkit-scrollbar-track {
+            background:
+              #f8fafc;
+          }
+
+
+          /* ===============================================
+             RESPONSIVE
+          =============================================== */
+
+          @media (
+            max-width:
+              1100px
+          ) {
+
             .medguard-stat-grid {
               grid-template-columns:
                 repeat(
@@ -2660,7 +3233,13 @@ export default function MedicalCases() {
                   )
                 ) !important;
             }
+
           }
+
+
+          /* ===============================================
+             REFRESH
+          =============================================== */
 
           .medguard-refresh-spin {
             animation:
@@ -2670,7 +3249,9 @@ export default function MedicalCases() {
               infinite;
           }
 
+
           @keyframes medguardRefreshSpin {
+
             from {
               transform:
                 rotate(0deg);
@@ -2680,52 +3261,67 @@ export default function MedicalCases() {
               transform:
                 rotate(360deg);
             }
+
           }
 
-          .medguard-checking-screen {
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+          /* ===============================================
+             CHECKING OVERLAY
+          =============================================== */
+
+          .medguard-checking-screen {
+            position:
+              fixed;
+
+            inset:
+              0;
+
+            z-index:
+              99999;
+
+            display:
+              flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
 
             background:
               rgba(
                 15,
                 23,
                 42,
-                0.12
+                0.14
               );
 
             backdrop-filter:
-              blur(2px);
+              blur(4px);
 
             -webkit-backdrop-filter:
-              blur(2px);
-
-            animation:
-              medguardCheckingBackdrop
-              2.8s
-              ease-in-out
-              infinite;
+              blur(4px);
           }
 
+
           .medguard-checking-card {
-            position: relative;
+            display:
+              flex;
 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            flex-direction:
+              column;
 
-            width: 360px;
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            width:
+              360px;
 
             padding:
-              34px
-              38px
-              30px;
+              34px 38px 30px;
 
             border-radius:
               22px;
@@ -2735,7 +3331,7 @@ export default function MedicalCases() {
                 255,
                 255,
                 255,
-                0.96
+                0.97
               );
 
             border:
@@ -2748,49 +3344,43 @@ export default function MedicalCases() {
               );
 
             box-shadow:
-              0
-              28px
-              80px
+              0 28px 80px
               rgba(
                 15,
                 23,
                 42,
                 0.22
-              ),
-              0
-              8px
-              24px
-              rgba(
-                15,
-                23,
-                42,
-                0.08
               );
-
-            animation:
-              medguardCheckingCard
-              2.4s
-              ease-in-out
-              infinite;
           }
 
-          .medguard-checking-orbit {
-            position: relative;
 
-            width: 90px;
-            height: 90px;
+          .medguard-checking-orbit {
+            position:
+              relative;
+
+            width:
+              90px;
+
+            height:
+              90px;
 
             margin-bottom:
               20px;
           }
 
+
           .medguard-checking-ring {
-            position: absolute;
-            border-radius: 50%;
+            position:
+              absolute;
+
+            border-radius:
+              50%;
           }
 
+
           .medguard-checking-ring-a {
-            inset: 0;
+            inset:
+              0;
 
             border:
               4px solid
@@ -2814,8 +3404,10 @@ export default function MedicalCases() {
               infinite;
           }
 
+
           .medguard-checking-ring-b {
-            inset: 11px;
+            inset:
+              11px;
 
             border:
               3px solid
@@ -2839,16 +3431,25 @@ export default function MedicalCases() {
               infinite;
           }
 
+
           .medguard-checking-core {
-            position: absolute;
+            position:
+              absolute;
 
-            inset: 23px;
+            inset:
+              23px;
 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display:
+              flex;
 
-            border-radius: 50%;
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            border-radius:
+              50%;
 
             color:
               #ffffff;
@@ -2865,89 +3466,139 @@ export default function MedicalCases() {
               );
 
             box-shadow:
-              0
-              10px
-              25px
+              0 10px 25px
               rgba(
                 22,
                 119,
                 255,
                 0.34
               );
-
-            animation:
-              medguardCheckingCore
-              1.8s
-              ease-in-out
-              infinite;
           }
+
 
           .medguard-checking-title {
-            font-size: 19px;
-            font-weight: 800;
-            color: #172033;
+            font-size:
+              19px;
+
+            font-weight:
+              800;
+
+            color:
+              #172033;
           }
+
 
           .medguard-checking-subtitle {
-            margin-top: 7px;
-            font-size: 13px;
-            color: #64748b;
+            margin-top:
+              7px;
+
+            font-size:
+              13px;
+
+            color:
+              #64748b;
           }
+
 
           .medguard-checking-count {
-            margin-top: 16px;
+            margin-top:
+              16px;
 
-            display: flex;
-            align-items: baseline;
-            justify-content: center;
+            display:
+              flex;
 
-            gap: 5px;
+            align-items:
+              baseline;
 
-            color: #334155;
+            justify-content:
+              center;
 
-            font-size: 15px;
-            font-weight: 700;
+            gap:
+              5px;
+
+            color:
+              #334155;
+
+            font-size:
+              15px;
+
+            font-weight:
+              700;
           }
+
 
           .medguard-checking-count-current {
-            color: #1677ff;
-            font-size: 18px;
-            font-weight: 800;
+            color:
+              #1677ff;
+
+            font-size:
+              18px;
+
+            font-weight:
+              800;
           }
+
 
           .medguard-checking-percent {
-            margin-top: 5px;
+            margin-top:
+              5px;
 
-            color: #1677ff;
+            color:
+              #1677ff;
 
-            font-size: 28px;
-            font-weight: 800;
+            font-size:
+              28px;
+
+            line-height:
+              1.2;
+
+            font-weight:
+              800;
           }
 
+
           .medguard-checking-progress {
-            position: relative;
+            position:
+              relative;
 
-            width: 240px;
-            height: 7px;
+            width:
+              240px;
 
-            margin-top: 15px;
+            height:
+              7px;
 
-            overflow: hidden;
+            margin-top:
+              15px;
 
-            border-radius: 999px;
+            overflow:
+              hidden;
+
+            border-radius:
+              999px;
 
             background:
               #e8eef7;
           }
 
+
           .medguard-checking-progress-bar {
-            position: absolute;
+            position:
+              absolute;
 
-            top: 0;
-            left: 0;
-            bottom: 0;
+            top:
+              0;
 
-            border-radius: 999px;
+            left:
+              0;
+
+            bottom:
+              0;
+
+            width:
+              0%;
+
+            border-radius:
+              999px;
 
             background:
               linear-gradient(
@@ -2958,38 +3609,55 @@ export default function MedicalCases() {
               );
 
             transition:
-              width
-              0.35s
-              ease;
+              width 0.35s ease;
           }
+
 
           .medguard-checking-remaining {
-            margin-top: 9px;
+            margin-top:
+              9px;
 
-            color: #64748b;
+            color:
+              #64748b;
 
-            font-size: 12px;
-            font-weight: 500;
+            font-size:
+              12px;
+
+            font-weight:
+              500;
           }
+
 
           .medguard-checking-remaining strong {
-            color: #334155;
-            font-weight: 800;
+            color:
+              #334155;
+
+            font-weight:
+              800;
           }
+
 
           .medguard-checking-dots {
-            display: flex;
+            display:
+              flex;
 
-            gap: 6px;
+            gap:
+              6px;
 
-            margin-top: 15px;
+            margin-top:
+              15px;
           }
 
-          .medguard-checking-dots span {
-            width: 7px;
-            height: 7px;
 
-            border-radius: 50%;
+          .medguard-checking-dots span {
+            width:
+              7px;
+
+            height:
+              7px;
+
+            border-radius:
+              50%;
 
             background:
               #1677ff;
@@ -3001,89 +3669,35 @@ export default function MedicalCases() {
               infinite;
           }
 
-          .medguard-checking-dots span:nth-child(2) {
+
+          .medguard-checking-dots
+          span:nth-child(2) {
             animation-delay:
               0.15s;
           }
 
-          .medguard-checking-dots span:nth-child(3) {
+
+          .medguard-checking-dots
+          span:nth-child(3) {
             animation-delay:
               0.3s;
           }
 
-          .medguard-checking-note {
-            margin-top: 10px;
 
-            font-size: 12px;
+          .medguard-checking-note {
+            margin-top:
+              10px;
+
+            font-size:
+              12px;
 
             color:
               #94a3b8;
           }
 
-          @keyframes medguardCheckingBackdrop {
-            0%,
-            100% {
-              background:
-                rgba(
-                  15,
-                  23,
-                  42,
-                  0.10
-                );
-
-              backdrop-filter:
-                blur(1px);
-
-              -webkit-backdrop-filter:
-                blur(1px);
-            }
-
-            50% {
-              background:
-                rgba(
-                  15,
-                  23,
-                  42,
-                  0.42
-                );
-
-              backdrop-filter:
-                blur(6px);
-
-              -webkit-backdrop-filter:
-                blur(6px);
-            }
-          }
-
-          @keyframes medguardCheckingCard {
-            0%,
-            100% {
-              transform:
-                translateY(0)
-                scale(1);
-            }
-
-            50% {
-              transform:
-                translateY(-5px)
-                scale(1.015);
-            }
-          }
-
-          @keyframes medguardCheckingCore {
-            0%,
-            100% {
-              transform:
-                scale(1);
-            }
-
-            50% {
-              transform:
-                scale(1.12);
-            }
-          }
 
           @keyframes medguardCheckingSpin {
+
             from {
               transform:
                 rotate(0deg);
@@ -3093,9 +3707,12 @@ export default function MedicalCases() {
               transform:
                 rotate(360deg);
             }
+
           }
+
 
           @keyframes medguardCheckingSpinReverse {
+
             from {
               transform:
                 rotate(360deg);
@@ -3105,13 +3722,17 @@ export default function MedicalCases() {
               transform:
                 rotate(0deg);
             }
+
           }
 
+
           @keyframes medguardCheckingDot {
+
             0%,
             80%,
             100% {
-              opacity: 0.25;
+              opacity:
+                0.25;
 
               transform:
                 translateY(0)
@@ -3119,16 +3740,23 @@ export default function MedicalCases() {
             }
 
             40% {
-              opacity: 1;
+              opacity:
+                1;
 
               transform:
                 translateY(-5px)
                 scale(1);
             }
+
           }
+
         `}
       </style>
 
+
+      {/* ==================================================
+          MODAL CHI TIẾT
+      ================================================== */}
 
       <CaseCheckResultsModal
         open={
@@ -3137,168 +3765,203 @@ export default function MedicalCases() {
         }
 
         caseId={
-          resultCase?.id ??
+          resultCase
+            ?.id ??
           null
         }
 
         patientCode={
-          resultCase?.ma_bn ??
+          resultCase
+            ?.ma_bn ??
           ""
         }
 
         patientName={
-          resultCase?.ho_ten ??
+          resultCase
+            ?.ho_ten ??
           ""
         }
 
-        onClose={() =>
-          setResultCase(
-            null
-          )
-        }
+        onClose={closeCaseResults}
       />
 
 
-      {checking && (
-        <div
-          className="medguard-checking-screen"
-        >
+      {/* ==================================================
+          OVERLAY CHECKING
+      ================================================== */}
+
+      {
+        checking && (
+
           <div
-            className="medguard-checking-card"
+            className="medguard-checking-screen"
           >
+
             <div
-              className="medguard-checking-orbit"
+              className="medguard-checking-card"
             >
-              <div
-                className="medguard-checking-ring medguard-checking-ring-a"
-              />
 
               <div
-                className="medguard-checking-ring medguard-checking-ring-b"
-              />
-
-              <div
-                className="medguard-checking-core"
+                className="medguard-checking-orbit"
               >
-                <SafetyCertificateOutlined />
+
+                <div
+                  className="
+                    medguard-checking-ring
+                    medguard-checking-ring-a
+                  "
+                />
+
+
+                <div
+                  className="
+                    medguard-checking-ring
+                    medguard-checking-ring-b
+                  "
+                />
+
+
+                <div
+                  className="medguard-checking-core"
+                >
+                  <SafetyCertificateOutlined />
+                </div>
+
               </div>
-            </div>
 
 
-            <div
-              className="medguard-checking-title"
-            >
-              Đang kiểm tra dữ liệu
-            </div>
+              <div
+                className="medguard-checking-title"
+              >
+                Đang kiểm tra dữ liệu
+              </div>
 
 
-            <div
-              className="medguard-checking-subtitle"
-            >
-              Hệ thống đang đối chiếu hồ sơ BHYT
-            </div>
+              <div
+                className="medguard-checking-subtitle"
+              >
+                Hệ thống đang đối chiếu hồ sơ BHYT
+              </div>
 
 
-            <div
-              className="medguard-checking-count"
-            >
-              <span
-                className="medguard-checking-count-current"
+              <div
+                className="medguard-checking-count"
+              >
+
+                <span
+                  className="medguard-checking-count-current"
+                >
+                  {
+                    checkProgress
+                      .processedCases
+                  }
+                </span>
+
+
+                <span>
+                  /
+                </span>
+
+
+                <span>
+                  {
+                    checkProgress
+                      .totalCases
+                  }
+                </span>
+
+
+                <span>
+                  hồ sơ
+                </span>
+
+              </div>
+
+
+              <div
+                className="medguard-checking-percent"
               >
                 {
-                  checkProgress
-                    .processedCases
-                }
-              </span>
+                  Math.max(
+                    0,
 
-              <span>
-                /
-              </span>
+                    Math.min(
+                      100,
 
-              <span>
-                {
-                  checkProgress
-                    .totalCases
-                }
-              </span>
-
-              <span>
-                hồ sơ
-              </span>
-            </div>
-
-
-            <div
-              className="medguard-checking-percent"
-            >
-              {
-                Math.max(
-                  0,
-                  Math.min(
-                    100,
-                    checkProgress
-                      .percent
+                      checkProgress
+                        .percent
+                    )
                   )
-                )
-              }
-              %
-            </div>
-
-
-            <div
-              className="medguard-checking-progress"
-            >
-              <div
-                className="medguard-checking-progress-bar"
-
-                style={{
-                  width:
-                    `${Math.max(
-                      0,
-                      Math.min(
-                        100,
-                        checkProgress
-                          .percent
-                      )
-                    )}%`,
-                }}
-              />
-            </div>
-
-
-            <div
-              className="medguard-checking-remaining"
-            >
-              Còn lại{" "}
-
-              <strong>
-                {
-                  checkProgress
-                    .remainingCases
                 }
-              </strong>
+                %
+              </div>
 
-              {" "}hồ sơ
+
+              <div
+                className="medguard-checking-progress"
+              >
+
+                <div
+                  className="medguard-checking-progress-bar"
+
+                  style={{
+                    width:
+                      `${Math.max(
+                        0,
+
+                        Math.min(
+                          100,
+
+                          checkProgress
+                            .percent
+                        )
+                      )}%`,
+                  }}
+                />
+
+              </div>
+
+
+              <div
+                className="medguard-checking-remaining"
+              >
+
+                Còn lại{" "}
+
+                <strong>
+                  {
+                    checkProgress
+                      .remainingCases
+                  }
+                </strong>
+
+                {" "}hồ sơ
+
+              </div>
+
+
+              <div
+                className="medguard-checking-dots"
+              >
+                <span />
+                <span />
+                <span />
+              </div>
+
+
+              <div
+                className="medguard-checking-note"
+              >
+                Vui lòng chờ trong giây lát
+              </div>
+
             </div>
 
-
-            <div
-              className="medguard-checking-dots"
-            >
-              <span />
-              <span />
-              <span />
-            </div>
-
-
-            <div
-              className="medguard-checking-note"
-            >
-              Vui lòng chờ trong giây lát
-            </div>
           </div>
-        </div>
-      )}
+
+        )
+      }
+
     </div>
   );
 }

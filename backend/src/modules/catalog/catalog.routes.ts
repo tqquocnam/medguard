@@ -2,6 +2,9 @@ import {
   Router,
 } from "express";
 
+import multer
+  from "multer";
+
 import {
   getCatalogRules,
   addCatalogRule,
@@ -13,32 +16,30 @@ import {
   addMachine,
   editMachine,
   removeMachine,
+
   getServices,
-getServiceByCode,
-addService,
-editService,
-removeService,
+  getServiceByCode,
+  addService,
+  editService,
+  removeService,
 
-getDepartments,
-getDepartmentByCode,
-addDepartment,
-editDepartment,
-removeDepartment,
+  getDepartments,
+  getDepartmentByCode,
+  addDepartment,
+  editDepartment,
+  removeDepartment,
 
+  getMedicalStaffList,
+  getMedicalStaffById,
+  addMedicalStaff,
+  editMedicalStaff,
+  removeMedicalStaff,
 
-
-getMedicalStaffList,
-getMedicalStaffById,
-addMedicalStaff,
-editMedicalStaff,
-removeMedicalStaff,
-
-
-getDrugs,
-getDrugByCode,
-addDrug,
-editDrug,
-removeDrug,
+  getDrugs,
+  getDrugByCode,
+  addDrug,
+  editDrug,
+  removeDrug,
 } from "./catalog.controller.js";
 
 import {
@@ -48,9 +49,6 @@ import {
 import {
   requireAdmin,
 } from "../auth/admin.middleware.js";
-
-import multer
-  from "multer";
 
 import {
   importDrugsExcel,
@@ -67,7 +65,7 @@ import {
 import examinationServiceRouter
   from "./examination-service.routes.js";
 
-  import staffScheduleRoutes
+import staffScheduleRoutes
   from "./staff-schedule.routes.js";
 
 import {
@@ -76,16 +74,33 @@ import {
   previewServiceStaffExcel,
 } from "./service-staff-import.controller.js";
 
+
+// ======================================================
+// ICD WARNING
+// ======================================================
+
+import {
+  getIcdWarningsList,
+  createIcdWarningController,
+  updateIcdWarningController,
+  toggleIcdWarningActiveController,
+} from "./icd-warning.controller.js";
+
+import {
+  importIcdWarningsExcel,
+} from "./icd-warning-import.controller.js";
+
+
+// ======================================================
+// ROUTER
+// ======================================================
+
 const router =
   Router();
 
 
 // ======================================================
-// AUTH
-// ======================================================
-//
-// Toàn bộ catalog chỉ ADMIN.
-//
+// EXCEL UPLOAD
 // ======================================================
 
 const excelUpload =
@@ -101,6 +116,7 @@ const excelUpload =
     },
   });
 
+
 const medicalStaffExcelUpload =
   multer({
     storage:
@@ -113,6 +129,7 @@ const medicalStaffExcelUpload =
         1024,
     },
   });
+
 
 const serviceExcelUpload =
   multer({
@@ -127,6 +144,7 @@ const serviceExcelUpload =
     },
   });
 
+
 const drugExcelUpload =
   multer({
     storage:
@@ -140,25 +158,32 @@ const drugExcelUpload =
     },
   });
 
+
+// ======================================================
+// AUTH
+//
+// Toàn bộ catalog chỉ ADMIN
+// ======================================================
+
 router.use(
   requireAuth,
   requireAdmin
 );
 
 
+// ======================================================
+// EXAMINATION SERVICES
+// ======================================================
+
 router.use(
   "/examination-services",
   examinationServiceRouter
 );
 
+
 // ======================================================
 // MACHINES
-//
-// PHẢI đặt trước /:type
 // ======================================================
-
-
-// GET /api/catalog/machines
 
 router.get(
   "/machines",
@@ -166,15 +191,11 @@ router.get(
 );
 
 
-// GET /api/catalog/machines/:code
-
 router.get(
   "/machines/:code",
   getMachineByCode
 );
 
-
-// POST /api/catalog/machines
 
 router.post(
   "/machines",
@@ -182,18 +203,11 @@ router.post(
 );
 
 
-// PUT /api/catalog/machines/:code
-
 router.put(
   "/machines/:code",
   editMachine
 );
 
-
-// DELETE /api/catalog/machines/:code
-//
-// Thực tế là active = false
-//
 
 router.delete(
   "/machines/:code",
@@ -202,14 +216,8 @@ router.delete(
 
 
 // ======================================================
-// EXISTING RULE CATALOG
+// SERVICES / DVKT
 // ======================================================
-//
-// Các route tổng quát phải nằm SAU machines.
-//
-// ======================================================
-
-
 
 router.get(
   "/services",
@@ -225,20 +233,24 @@ router.post(
   importServicesExcel
 );
 
+
 router.get(
   "/services/:code",
   getServiceByCode
 );
+
 
 router.post(
   "/services",
   addService
 );
 
+
 router.put(
   "/services/:code",
   editService
 );
+
 
 router.delete(
   "/services/:code",
@@ -248,12 +260,7 @@ router.delete(
 
 // ======================================================
 // DEPARTMENTS / KHOA
-//
-// PHẢI đặt trước route tổng quát /:type
 // ======================================================
-
-
-// GET /api/catalog/departments
 
 router.get(
   "/departments",
@@ -261,15 +268,11 @@ router.get(
 );
 
 
-// GET /api/catalog/departments/:code
-
 router.get(
   "/departments/:code",
   getDepartmentByCode
 );
 
-
-// POST /api/catalog/departments
 
 router.post(
   "/departments",
@@ -277,18 +280,11 @@ router.post(
 );
 
 
-// PUT /api/catalog/departments/:code
-
 router.put(
   "/departments/:code",
   editDepartment
 );
 
-
-// DELETE /api/catalog/departments/:code
-//
-// Thực tế là active = false
-//
 
 router.delete(
   "/departments/:code",
@@ -296,24 +292,15 @@ router.delete(
 );
 
 
-
-
 // ======================================================
 // MEDICAL STAFF / NHÂN VIÊN Y TẾ
 // ======================================================
-
-
-// GET /api/catalog/medical-staff
 
 router.get(
   "/medical-staff",
   getMedicalStaffList
 );
 
-router.use(
-  "/staff-schedules",
-  staffScheduleRoutes
-);
 
 router.post(
   "/medical-staff/import",
@@ -323,7 +310,6 @@ router.post(
   importMedicalStaffExcel
 );
 
-// GET /api/catalog/medical-staff/:id
 
 router.get(
   "/medical-staff/:id",
@@ -331,26 +317,17 @@ router.get(
 );
 
 
-// POST /api/catalog/medical-staff
-
 router.post(
   "/medical-staff",
   addMedicalStaff
 );
 
 
-// PUT /api/catalog/medical-staff/:id
-
 router.put(
   "/medical-staff/:id",
   editMedicalStaff
 );
 
-
-// DELETE /api/catalog/medical-staff/:id
-//
-// Thực tế active = false
-//
 
 router.delete(
   "/medical-staff/:id",
@@ -359,10 +336,17 @@ router.delete(
 
 
 // ======================================================
+// STAFF SCHEDULES
+// ======================================================
+
+router.use(
+  "/staff-schedules",
+  staffScheduleRoutes
+);
+
+
+// ======================================================
 // DRUGS / THUỐC
-// ======================================================
-// ======================================================
-// IMPORT DRUG EXCEL
 // ======================================================
 
 router.post(
@@ -374,10 +358,6 @@ router.post(
 );
 
 
-// ======================================================
-// DRUG CRUD
-// ======================================================
-
 router.get(
   "/drugs",
   getDrugs
@@ -408,47 +388,18 @@ router.delete(
 );
 
 
-router.get(
-  "/drugs",
-  getDrugs
-);
-
-
-router.get(
-  "/drugs/:code",
-  getDrugByCode
-);
-
-
-router.post(
-  "/drugs",
-  addDrug
-);
-
-
-router.put(
-  "/drugs/:code",
-  editDrug
-);
-
-
-router.delete(
-  "/drugs/:code",
-  removeDrug
-);
+// ======================================================
+// SERVICE STAFF
+// ======================================================
 
 router.get(
   "/service-staff/template",
-  requireAuth,
-  requireAdmin,
   downloadServiceStaffTemplate
 );
 
 
 router.post(
   "/service-staff/import/preview",
-  requireAuth,
-  requireAdmin,
   excelUpload.single(
     "file"
   ),
@@ -458,13 +409,95 @@ router.post(
 
 router.post(
   "/service-staff/import",
-  requireAuth,
-  requireAdmin,
   excelUpload.single(
     "file"
   ),
   importServiceStaffExcelController
 );
+
+
+// ======================================================
+// ICD WARNING / ICD CẢNH BÁO
+// ======================================================
+//
+// GET
+// /api/catalog/icd-warnings
+//
+// POST
+// /api/catalog/icd-warnings
+//
+// PUT
+// /api/catalog/icd-warnings/:id
+//
+// PATCH
+// /api/catalog/icd-warnings/:id/toggle-active
+//
+// POST IMPORT
+// /api/catalog/icd-warnings/import
+//
+// ======================================================
+
+
+// ======================================================
+// GET ICD WARNING LIST
+// ======================================================
+
+router.get(
+  "/icd-warnings",
+  getIcdWarningsList
+);
+
+
+// ======================================================
+// IMPORT ICD WARNING EXCEL
+//
+// PHẢI đặt route /import trước các route động.
+// ======================================================
+
+router.post(
+  "/icd-warnings/import",
+  excelUpload.single(
+    "file"
+  ),
+  importIcdWarningsExcel
+);
+
+
+// ======================================================
+// CREATE ICD WARNING
+// ======================================================
+
+router.post(
+  "/icd-warnings",
+  createIcdWarningController
+);
+
+
+// ======================================================
+// UPDATE ICD WARNING
+// ======================================================
+
+router.put(
+  "/icd-warnings/:id",
+  updateIcdWarningController
+);
+
+
+// ======================================================
+// TOGGLE ACTIVE ICD WARNING
+// ======================================================
+
+router.patch(
+  "/icd-warnings/:id/toggle-active",
+  toggleIcdWarningActiveController
+);
+
+
+// ======================================================
+// GENERIC CATALOG
+//
+// CÁC ROUTE NÀY PHẢI ĐỂ CUỐI
+// ======================================================
 
 router.get(
   "/:type",
@@ -489,5 +522,9 @@ router.delete(
   removeCatalogRule
 );
 
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 export default router;

@@ -1,6 +1,6 @@
 import {
+  Breadcrumb,
   Button,
-  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -9,14 +9,22 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 
+import type {
+  TableColumnsType,
+} from "antd";
+
 import {
-  EllipsisOutlined,
+  EditOutlined,
+  HomeOutlined,
+  MedicineBoxOutlined,
   PlusOutlined,
   ReloadOutlined,
+  StopOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -50,8 +58,8 @@ interface ExaminationServiceItem {
   unitPrice: number;
 
   note:
-    string |
-    null;
+    | string
+    | null;
 
   active: boolean;
 
@@ -719,96 +727,37 @@ export default function ExaminationServices() {
   // TABLE COLUMNS
   // ====================================================
 
-  const columns = [
+  const columns:
+    TableColumnsType<
+      ExaminationServiceItem
+    > = [
 
     {
       title:
-        "",
+        "STT",
 
       key:
-        "action",
+        "stt",
 
       width:
-        55,
+        70,
+
+      align:
+        "center",
 
       render:
         (
-          _:
-            unknown,
-
-          record:
-            ExaminationServiceItem
-        ) => (
-
-          <Dropdown
-            trigger={[
-              "click",
-            ]}
-
-            menu={{
-              items: [
-                {
-                  key:
-                    "edit",
-
-                  label:
-                    "Cập nhật",
-                },
-
-                {
-                  key:
-                    "disable",
-
-                  label:
-                    "Ngừng sử dụng",
-
-                  danger:
-                    true,
-
-                  disabled:
-                    !record.active,
-                },
-              ],
-
-              onClick:
-                ({
-                  key,
-                }) => {
-
-                  if (
-                    key ===
-                    "edit"
-                  ) {
-
-                    void openEditModal(
-                      record
-                    );
-                  }
-
-
-                  if (
-                    key ===
-                    "disable"
-                  ) {
-
-                    confirmDisable(
-                      record
-                    );
-                  }
-                },
-            }}
-          >
-
-            <Button
-              type="text"
-
-              icon={
-                <EllipsisOutlined />
-              }
-            />
-
-          </Dropdown>
-        ),
+          _,
+          __,
+          index
+        ) =>
+          (
+            page -
+            1
+          ) *
+            pageSize +
+          index +
+          1,
     },
 
 
@@ -819,11 +768,14 @@ export default function ExaminationServices() {
       dataIndex:
         "id",
 
+      key:
+        "id",
+
       width:
-        90,
+        80,
 
       align:
-        "center" as const,
+        "center",
     },
 
 
@@ -834,8 +786,26 @@ export default function ExaminationServices() {
       dataIndex:
         "code",
 
+      key:
+        "code",
+
       width:
-        190,
+        180,
+
+      render:
+        (
+          value:
+            string
+        ) => (
+          <Text
+            strong
+          >
+            {
+              value ||
+              "-"
+            }
+          </Text>
+        ),
     },
 
 
@@ -846,8 +816,22 @@ export default function ExaminationServices() {
       dataIndex:
         "name",
 
+      key:
+        "name",
+
       width:
-        350,
+        340,
+
+      ellipsis:
+        true,
+
+      render:
+        (
+          value:
+            string
+        ) =>
+          value ||
+          "-",
     },
 
 
@@ -858,11 +842,14 @@ export default function ExaminationServices() {
       dataIndex:
         "unitPrice",
 
+      key:
+        "unitPrice",
+
       width:
-        160,
+        150,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         (
@@ -885,17 +872,52 @@ export default function ExaminationServices() {
       dataIndex:
         "note",
 
+      key:
+        "note",
+
       width:
-        300,
+        280,
+
+      ellipsis:
+        true,
 
       render:
         (
           value:
             string |
             null
-        ) =>
+        ) => {
+
+        const text =
           value ||
-          "-",
+          "-";
+
+
+        if (
+          text ===
+          "-"
+        ) {
+
+          return "-";
+        }
+
+
+        return (
+          <Tooltip
+            title={
+              text
+            }
+          >
+            <Text
+              ellipsis
+            >
+              {
+                text
+              }
+            </Text>
+          </Tooltip>
+        );
+      },
     },
 
 
@@ -906,11 +928,14 @@ export default function ExaminationServices() {
       dataIndex:
         "active",
 
+      key:
+        "active",
+
       width:
-        130,
+        115,
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -921,15 +946,114 @@ export default function ExaminationServices() {
             ? (
               <Tag
                 color="success"
+
+                className="examination-status"
               >
                 Đang dùng
               </Tag>
             )
             : (
-              <Tag>
+              <Tag
+                className="examination-status"
+              >
                 Ngừng dùng
               </Tag>
             ),
+    },
+
+
+    {
+      title:
+        "Thao tác",
+
+      key:
+        "actions",
+
+      width:
+        105,
+
+      align:
+        "center",
+
+      render:
+        (
+          _,
+          record
+        ) => (
+
+          <Space
+            size={
+              10
+            }
+          >
+
+            <Tooltip
+              title="Cập nhật"
+            >
+
+              <Button
+                type="text"
+
+                size="small"
+
+                icon={
+                  <EditOutlined
+                    style={{
+                      color:
+                        "#1677ff",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  void openEditModal(
+                    record
+                  )
+                }
+              />
+
+            </Tooltip>
+
+
+            <Tooltip
+              title={
+                record.active
+                  ? "Ngừng sử dụng"
+                  : "Đã ngừng sử dụng"
+              }
+            >
+
+              <Button
+                type="text"
+
+                size="small"
+
+                disabled={
+                  !record.active
+                }
+
+                icon={
+                  <StopOutlined
+                    style={{
+                      color:
+                        record.active
+                          ? "#ff4d4f"
+                          : "#bfbfbf",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  confirmDisable(
+                    record
+                  )
+                }
+              />
+
+            </Tooltip>
+
+          </Space>
+        ),
     },
   ];
 
@@ -941,249 +1065,301 @@ export default function ExaminationServices() {
   return (
     <>
 
-      {/* HEADER */}
-
-      <Space
-        style={{
-          width:
-            "100%",
-
-          justifyContent:
-            "space-between",
-
-          marginBottom:
-            20,
-        }}
-      >
-
-        <Title
-          level={
-            3
-          }
-
-          style={{
-            margin:
-              0,
-          }}
-        >
-          Công khám
-        </Title>
-
-
-        <Button
-          type="primary"
-
-          icon={
-            <PlusOutlined />
-          }
-
-          onClick={
-            openAddModal
-          }
-        >
-          Thêm mới
-        </Button>
-
-      </Space>
-
-
-      {/* FILTER */}
-
       <div
-        style={{
-          display:
-            "grid",
-
-          gridTemplateColumns:
-            "1fr 1.4fr auto",
-
-          gap:
-            10,
-
-          alignItems:
-            "end",
-
-          marginBottom:
-            16,
-        }}
+        className="examination-page"
       >
 
-        <div>
+        {/* =================================================
+            BREADCRUMB
+        ================================================= */}
 
-          <Text>
-            Mã công khám
-          </Text>
+        <Breadcrumb
+          className="examination-breadcrumb"
 
+          items={[
+            {
+              title: (
+                <HomeOutlined />
+              ),
+            },
 
-          <Input
-            value={
-              searchCode
-            }
+            {
+              title:
+                "Danh mục",
+            },
 
-            placeholder="Mã công khám"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchCode(
-                event.target.value
-              );
+            {
+              title:
+                "Công khám",
+            },
+          ]}
+        />
 
 
-              setPage(
-                1
-              );
-            }}
-          />
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-        </div>
-
-
-        <div>
-
-          <Text>
-            Tên công khám
-          </Text>
-
-
-          <Input
-            value={
-              searchName
-            }
-
-            placeholder="Tên công khám"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchName(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <Button
-          icon={
-            <ReloadOutlined />
-          }
-
-          onClick={
-            handleRefresh
-          }
+        <div
+          className="examination-header"
         >
-          Làm mới
-        </Button>
 
-      </div>
+          <div>
+
+            <div
+              className="examination-title-row"
+            >
+
+              <MedicineBoxOutlined
+                className="examination-title-icon"
+              />
 
 
-      {/* TABLE */}
+              <Title
+                level={
+                  3
+                }
 
-      <Table<ExaminationServiceItem>
-        rowKey="id"
+                style={{
+                  margin:
+                    0,
+                }}
+              >
+                Công khám
+              </Title>
 
-        bordered
+            </div>
 
-        size="middle"
 
-        loading={
-          loading
-        }
+            <Text
+              type="secondary"
 
-        dataSource={
-          items
-        }
+              className="examination-subtitle"
+            >
+              Quản lý danh mục công khám và đơn giá khám bệnh
+            </Text>
 
-        columns={
-          columns
-        }
+          </div>
 
-        scroll={{
-          x:
-            1300,
-        }}
 
-        pagination={{
-          current:
-            page,
+          <Button
+            type="primary"
 
-          pageSize,
+            icon={
+              <PlusOutlined />
+            }
 
-          total,
+            onClick={
+              openAddModal
+            }
+          >
+            Thêm mới
+          </Button>
 
-          showSizeChanger:
-            true,
+        </div>
 
-          pageSizeOptions: [
-            "10",
-            "50",
-            "100",
-          ],
 
-          showTotal:
-            (
-              value
-            ) =>
-              `Tổng số: ${value}`,
+        {/* =================================================
+            FILTER
+        ================================================= */}
 
-          onChange:
-            (
-              newPage,
-              newPageSize
-            ) => {
+        <div
+          className="examination-filter-grid"
+        >
 
-              if (
-                newPageSize !==
-                pageSize
-              ) {
+          <div
+            className="examination-filter-item"
+          >
 
-                setPageSize(
-                  newPageSize
+            <Text
+              strong
+
+              className="examination-filter-label"
+            >
+              Mã công khám
+            </Text>
+
+
+            <Input
+              value={
+                searchCode
+              }
+
+              placeholder="Nhập mã công khám"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchCode(
+                  event.target.value
                 );
 
 
                 setPage(
                   1
                 );
+              }}
+            />
+
+          </div>
 
 
-                return;
+          <div
+            className="examination-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="examination-filter-label"
+            >
+              Tên công khám
+            </Text>
+
+
+            <Input
+              value={
+                searchName
               }
 
+              placeholder="Nhập tên công khám"
 
-              setPage(
-                newPage
-              );
-            },
-        }}
-      />
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchName(
+                  event.target.value
+                );
 
 
-      {/* ADD / EDIT */}
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <Button
+            type="primary"
+
+            icon={
+              <ReloadOutlined />
+            }
+
+            onClick={
+              handleRefresh
+            }
+          >
+            Làm mới
+          </Button>
+
+        </div>
+
+
+        {/* =================================================
+            TABLE
+        ================================================= */}
+
+        <Table<ExaminationServiceItem>
+          className="examination-table"
+
+          rowKey="id"
+
+          size="middle"
+
+          tableLayout="fixed"
+
+          loading={
+            loading
+          }
+
+          dataSource={
+            items
+          }
+
+          columns={
+            columns
+          }
+
+          scroll={{
+            x:
+              1250,
+          }}
+
+          pagination={{
+            current:
+              page,
+
+            pageSize,
+
+            total,
+
+            showSizeChanger:
+              true,
+
+            pageSizeOptions: [
+              "10",
+              "50",
+              "100",
+            ],
+
+            showTotal:
+              (
+                value
+              ) =>
+                `Tổng số: ${value}`,
+
+            onChange:
+              (
+                newPage,
+                newPageSize
+              ) => {
+
+                if (
+                  newPageSize !==
+                  pageSize
+                ) {
+
+                  setPageSize(
+                    newPageSize
+                  );
+
+
+                  setPage(
+                    1
+                  );
+
+
+                  return;
+                }
+
+
+                setPage(
+                  newPage
+                );
+              },
+          }}
+
+          locale={{
+            emptyText:
+              "Chưa có dữ liệu công khám",
+          }}
+        />
+
+      </div>
+
+
+      {/* =================================================
+          ADD / EDIT
+      ================================================= */}
 
       <Modal
         open={
@@ -1251,23 +1427,11 @@ export default function ExaminationServices() {
             false
           }
 
-          style={{
-            marginTop:
-              20,
-          }}
+          className="examination-form"
         >
 
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="examination-form-grid"
           >
 
             <Form.Item
@@ -1328,79 +1492,81 @@ export default function ExaminationServices() {
               ]}
             >
 
-         <InputNumber<number>
-  min={0}
+              <InputNumber<number>
+                min={
+                  0
+                }
 
-  style={{
-    width:
-      "100%",
-  }}
+                style={{
+                  width:
+                    "100%",
+                }}
 
-  placeholder="36500"
+                placeholder="36500"
 
-  formatter={(
-    value
-  ) => {
+                formatter={(
+                  value
+                ) => {
 
-    if (
-      value ===
-        undefined ||
-      value ===
-        null
-    ) {
+                  if (
+                    value ===
+                      undefined ||
+                    value ===
+                      null
+                  ) {
 
-      return "";
-    }
-
-
-    return Number(
-      value
-    ).toLocaleString(
-      "vi-VN"
-    );
-  }}
-
-  parser={(
-    value
-  ) => {
-
-    const text =
-      String(
-        value ??
-        ""
-      )
-        .replace(
-          /\./g,
-          ""
-        )
-        .replace(
-          /,/g,
-          ""
-        )
-        .trim();
+                    return "";
+                  }
 
 
-    if (
-      !text
-    ) {
+                  return Number(
+                    value
+                  ).toLocaleString(
+                    "vi-VN"
+                  );
+                }}
 
-      return 0;
-    }
+                parser={(
+                  value
+                ) => {
+
+                  const text =
+                    String(
+                      value ??
+                      ""
+                    )
+                      .replace(
+                        /\./g,
+                        ""
+                      )
+                      .replace(
+                        /,/g,
+                        ""
+                      )
+                      .trim();
 
 
-    const parsed =
-      Number(
-        text
-      );
+                  if (
+                    !text
+                  ) {
+
+                    return 0;
+                  }
 
 
-    return Number.isFinite(
-      parsed
-    )
-      ? parsed
-      : 0;
-  }}
-/>
+                  const parsed =
+                    Number(
+                      text
+                    );
+
+
+                  return Number.isFinite(
+                    parsed
+                  )
+                    ? parsed
+                    : 0;
+                }}
+              />
 
             </Form.Item>
 
@@ -1458,13 +1624,164 @@ export default function ExaminationServices() {
             valuePropName="checked"
           >
 
-            <Switch />
+            <Switch
+              checkedChildren="Đang dùng"
+
+              unCheckedChildren="Ngừng dùng"
+            />
 
           </Form.Item>
 
         </Form>
 
       </Modal>
+
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
+
+      <style>
+        {`
+          .examination-page {
+            width: 100%;
+          }
+
+          .examination-breadcrumb {
+            margin-bottom: 14px;
+            font-size: 12px;
+          }
+
+          .examination-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+
+          .examination-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+
+          .examination-title-row h3 {
+            margin: 0 !important;
+            color: #172033 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+          }
+
+          .examination-title-icon {
+            color: #1677ff;
+            font-size: 25px;
+          }
+
+          .examination-subtitle {
+            display: block;
+            margin-top: 3px;
+            font-size: 12px;
+          }
+
+          .examination-filter-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(260px, 1fr)
+              minmax(380px, 1.4fr)
+              auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 14px;
+          }
+
+          .examination-filter-item {
+            min-width: 0;
+          }
+
+          .examination-filter-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .examination-table {
+            overflow: hidden;
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+          }
+
+          .examination-table
+          .ant-table {
+            border-radius: 8px;
+          }
+
+          .examination-table
+          .ant-table-thead
+          > tr
+          > th {
+            padding: 11px 10px !important;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f3f6f9 !important;
+            border-bottom: 1px solid #e5eaf0 !important;
+          }
+
+          .examination-table
+          .ant-table-tbody
+          > tr
+          > td {
+            padding: 13px 10px !important;
+            color: #202a3b;
+            font-size: 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf0f5 !important;
+          }
+
+          .examination-table
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background: #f7fbff !important;
+          }
+
+          .examination-table
+          .ant-pagination {
+            margin: 14px 8px 6px;
+          }
+
+          .examination-status {
+            margin: 0;
+            border-radius: 6px;
+            font-size: 11px;
+          }
+
+          .examination-form {
+            margin-top: 18px;
+          }
+
+          .examination-form-grid {
+            display: grid;
+            grid-template-columns:
+              1fr 1fr;
+            gap: 16px;
+          }
+
+          @media (max-width: 800px) {
+            .examination-header {
+              flex-direction: column;
+            }
+
+            .examination-filter-grid,
+            .examination-form-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}
+      </style>
 
     </>
   );

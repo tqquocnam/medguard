@@ -56,6 +56,10 @@ import ServiceDiagnosis from "./pages/CataLog/ServiceDiagnosis";
 import ServiceStaff
   from "./pages/CataLog/ServiceStaff";
 
+
+import IcdWarnings
+  from "./pages/CataLog/IcdWarnings";
+
 export default function App() {
 
   return (
@@ -260,9 +264,18 @@ export default function App() {
   path="/catalog/drugs"
   element={
     <Drugs />
+
+  
   }
 />
           </Route>
+
+          <Route
+  path="/catalog/icd-warnings"
+  element={
+    <IcdWarnings />
+  }
+/>
 
 
           {/* ============================================= */}

@@ -1,7 +1,7 @@
 import {
   Alert,
+  Breadcrumb,
   Button,
-  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -12,19 +12,24 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message,
 } from "antd";
 
 import type {
+  TableColumnsType,
   UploadFile,
 } from "antd";
 
 import {
-  EllipsisOutlined,
+  EditOutlined,
+  HomeOutlined,
+  MedicineBoxOutlined,
   PlusOutlined,
   ReloadOutlined,
+  StopOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 
@@ -64,14 +69,14 @@ interface ServiceItem {
   name: string;
 
   groupCode:
-    string |
-    null;
+    | string
+    | null;
 
   unitPrice: number;
 
   decisionNo:
-    string |
-    null;
+    | string
+    | null;
 
   requiresResult: boolean;
 
@@ -86,8 +91,8 @@ interface ServiceItem {
   nextExecutionDays: number;
 
   note:
-    string |
-    null;
+    | string
+    | null;
 
   active: boolean;
 
@@ -157,17 +162,13 @@ interface MachineListResponse {
   data?: {
     items:
       Array<{
-        code:
-          string;
+        code: string;
 
-        name:
-          string;
+        name: string;
 
-        warnTimeOverlap:
-          boolean;
+        warnTimeOverlap: boolean;
 
-        active:
-          boolean;
+        active: boolean;
       }>;
   };
 }
@@ -565,9 +566,9 @@ export default function Services() {
             [];
 
 
-          // =================================================
-          // Lọc Quyết định tại frontend
-          // =================================================
+          // =============================================
+          // LỌC QUYẾT ĐỊNH TẠI FRONTEND
+          // =============================================
 
           if (
             searchDecision.trim()
@@ -645,7 +646,7 @@ export default function Services() {
 
 
   // ====================================================
-  // LOAD
+  // INITIAL LOAD
   // ====================================================
 
   useEffect(
@@ -1336,8 +1337,6 @@ export default function Services() {
             method:
               "POST",
 
-            // Không tự gắn Content-Type.
-            // Browser tự tạo multipart boundary.
             body:
               formData,
           }
@@ -1359,10 +1358,6 @@ export default function Services() {
         // Backend không trả JSON.
       }
 
-
-      // ==================================================
-      // ERROR
-      // ==================================================
 
       if (
         !response.ok ||
@@ -1398,10 +1393,6 @@ export default function Services() {
         return;
       }
 
-
-      // ==================================================
-      // SUCCESS
-      // ==================================================
 
       const result:
         ServiceImportResult = {
@@ -1500,113 +1491,10 @@ export default function Services() {
   // TABLE COLUMNS
   // ====================================================
 
-  const columns = [
-
-    {
-      title:
-        "",
-
-      key:
-        "action",
-
-      width:
-        55,
-
-      fixed:
-        "left" as const,
-
-      render:
-        (
-          _:
-            unknown,
-
-          record:
-            ServiceItem
-        ) => (
-
-          <Dropdown
-            trigger={[
-              "click",
-            ]}
-
-            menu={{
-              items: [
-                {
-                  key:
-                    "edit",
-
-                  label:
-                    "Cập nhật",
-                },
-
-                {
-                  key:
-                    "disable",
-
-                  danger:
-                    true,
-
-                  disabled:
-                    !record.active,
-
-                  label: (
-                    <Popconfirm
-                      title="Ngừng sử dụng DVKT?"
-
-                      description={
-                        `${record.code} - ${record.name}`
-                      }
-
-                      okText="Đồng ý"
-
-                      cancelText="Hủy"
-
-                      onConfirm={() =>
-                        void handleDisable(
-                          record
-                        )
-                      }
-                    >
-
-                      <span>
-                        Ngừng sử dụng
-                      </span>
-
-                    </Popconfirm>
-                  ),
-                },
-              ],
-
-              onClick:
-                ({
-                  key,
-                }) => {
-
-                  if (
-                    key ===
-                    "edit"
-                  ) {
-
-                    void openEditModal(
-                      record
-                    );
-                  }
-                },
-            }}
-          >
-
-            <Button
-              type="text"
-
-              icon={
-                <EllipsisOutlined />
-              }
-            />
-
-          </Dropdown>
-        ),
-    },
-
+  const columns:
+    TableColumnsType<
+      ServiceItem
+    > = [
 
     {
       title:
@@ -1616,27 +1504,25 @@ export default function Services() {
         "stt",
 
       width:
-        70,
+        60,
 
       align:
-        "center" as const,
+        "center",
+
+      fixed:
+        "left",
 
       render:
         (
-          _:
-            unknown,
-
-          __:
-            ServiceItem,
-
-          index:
-            number
+          _,
+          __,
+          index
         ) =>
           (
             page -
             1
           ) *
-          pageSize +
+            pageSize +
           index +
           1,
     },
@@ -1649,8 +1535,29 @@ export default function Services() {
       dataIndex:
         "code",
 
+      key:
+        "code",
+
       width:
-        160,
+        150,
+
+      fixed:
+        "left",
+
+      render:
+        (
+          value:
+            string
+        ) => (
+          <Text
+            strong
+          >
+            {
+              value ||
+              "-"
+            }
+          </Text>
+        ),
     },
 
 
@@ -1661,8 +1568,14 @@ export default function Services() {
       dataIndex:
         "name",
 
+      key:
+        "name",
+
       width:
         300,
+
+      ellipsis:
+        true,
     },
 
 
@@ -1673,8 +1586,14 @@ export default function Services() {
       dataIndex:
         "groupCode",
 
+      key:
+        "groupCode",
+
       width:
         100,
+
+      align:
+        "center",
 
       render:
         (
@@ -1694,11 +1613,14 @@ export default function Services() {
       dataIndex:
         "unitPrice",
 
+      key:
+        "unitPrice",
+
       width:
-        130,
+        120,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         (
@@ -1721,8 +1643,14 @@ export default function Services() {
       dataIndex:
         "decisionNo",
 
+      key:
+        "decisionNo",
+
       width:
         220,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1742,11 +1670,14 @@ export default function Services() {
       dataIndex:
         "requiresMachine",
 
+      key:
+        "requiresMachine",
+
       width:
         110,
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -1755,21 +1686,19 @@ export default function Services() {
         ) =>
           value
             ? (
-              <Text
-                style={{
-                  color:
-                    "#1677ff",
-                }}
+              <Tag
+                color="blue"
+                className="services-pill"
               >
                 Bắt buộc
-              </Text>
+              </Tag>
             )
             : (
-              <Text
-                type="danger"
+              <Tag
+                className="services-pill"
               >
                 Không
-              </Text>
+              </Tag>
             ),
     },
 
@@ -1781,8 +1710,14 @@ export default function Services() {
       dataIndex:
         "machines",
 
+      key:
+        "machines",
+
       width:
-        300,
+        210,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1790,53 +1725,47 @@ export default function Services() {
             MachineOption[]
         ) => {
 
-          if (
-            !Array.isArray(
-              machines
-            ) ||
-            machines.length ===
-              0
-          ) {
+        if (
+          !Array.isArray(
+            machines
+          ) ||
+          machines.length ===
+            0
+        ) {
 
-            return "-";
-          }
+          return "-";
+        }
 
 
-          return (
+        const text =
+          machines
+            .map(
+              (
+                machine
+              ) =>
+                machine.code
+            )
+            .join(
+              ", "
+            );
 
-            <Space
-              direction="vertical"
 
-              size={
-                2
-              }
+        return (
+          <Tooltip
+            title={
+              text
+            }
+          >
+            <Text
+              ellipsis
             >
-
               {
-                machines.map(
-                  (
-                    machine
-                  ) => (
-
-                    <Text
-                      key={
-                        machine.code
-                      }
-
-                      style={{
-                        fontSize:
-                          12,
-                      }}
-                    >
-                      {machine.code}
-                    </Text>
-                  )
-                )
+                text
               }
-
-            </Space>
-          );
-        },
+            </Text>
+          </Tooltip>
+        );
+      },
     },
 
 
@@ -1848,21 +1777,25 @@ export default function Services() {
         "duration",
 
       width:
-        190,
+        170,
+
+      align:
+        "center",
 
       render:
         (
-          _:
-            unknown,
-
-          record:
-            ServiceItem
+          _,
+          record
         ) => (
-
           <Text>
-            Min: {record.minDurationMinutes}
+            {
+              record.minDurationMinutes
+            }
             {" - "}
-            Max: {record.maxDurationMinutes}
+            {
+              record.maxDurationMinutes
+            }
+            {" phút"}
           </Text>
         ),
     },
@@ -1870,16 +1803,19 @@ export default function Services() {
 
     {
       title:
-        "Số ngày TH tiếp theo",
+        "Số ngày TH tiếp",
 
       dataIndex:
         "nextExecutionDays",
 
+      key:
+        "nextExecutionDays",
+
       width:
-        160,
+        130,
 
       align:
-        "center" as const,
+        "center",
     },
 
 
@@ -1890,11 +1826,14 @@ export default function Services() {
       dataIndex:
         "allowSimultaneous",
 
+      key:
+        "allowSimultaneous",
+
       width:
-        160,
+        145,
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -1903,21 +1842,20 @@ export default function Services() {
         ) =>
           value
             ? (
-              <Text
-                type="danger"
+              <Tag
+                color="warning"
+                className="services-pill"
               >
                 Có
-              </Text>
+              </Tag>
             )
             : (
-              <Text
-                style={{
-                  color:
-                    "#1677ff",
-                }}
+              <Tag
+                color="blue"
+                className="services-pill"
               >
                 Không
-              </Text>
+              </Tag>
             ),
     },
 
@@ -1929,14 +1867,17 @@ export default function Services() {
       dataIndex:
         "active",
 
+      key:
+        "active",
+
       width:
-        120,
+        105,
 
       fixed:
-        "right" as const,
+        "right",
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -1947,15 +1888,128 @@ export default function Services() {
             ? (
               <Tag
                 color="success"
+                className="services-pill"
               >
                 Đang dùng
               </Tag>
             )
             : (
-              <Tag>
+              <Tag
+                className="services-pill"
+              >
                 Ngừng dùng
               </Tag>
             ),
+    },
+
+
+    {
+      title:
+        "Thao tác",
+
+      key:
+        "actions",
+
+      width:
+        100,
+
+      fixed:
+        "right",
+
+      align:
+        "center",
+
+      render:
+        (
+          _,
+          record
+        ) => (
+
+          <Space
+            size={
+              8
+            }
+          >
+
+            <Tooltip
+              title="Cập nhật"
+            >
+              <Button
+                type="text"
+
+                size="small"
+
+                icon={
+                  <EditOutlined
+                    style={{
+                      color:
+                        "#1677ff",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  void openEditModal(
+                    record
+                  )
+                }
+              />
+            </Tooltip>
+
+
+            <Tooltip
+              title={
+                record.active
+                  ? "Ngừng sử dụng"
+                  : "Đã ngừng sử dụng"
+              }
+            >
+              <Popconfirm
+                title="Ngừng sử dụng DVKT?"
+
+                description={
+                  `${record.code} - ${record.name}`
+                }
+
+                okText="Đồng ý"
+
+                cancelText="Hủy"
+
+                disabled={
+                  !record.active
+                }
+
+                onConfirm={() =>
+                  void handleDisable(
+                    record
+                  )
+                }
+              >
+                <Button
+                  type="text"
+
+                  size="small"
+
+                  disabled={
+                    !record.active
+                  }
+
+                  icon={
+                    <StopOutlined
+                      style={{
+                        color:
+                          record.active
+                            ? "#ff4d4f"
+                            : "#bfbfbf",
+                      }}
+                    />
+                  }
+                />
+              </Popconfirm>
+            </Tooltip>
+
+          </Space>
+        ),
     },
   ];
 
@@ -1967,343 +2021,397 @@ export default function Services() {
   return (
     <>
 
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <Space
-        style={{
-          width:
-            "100%",
-
-          justifyContent:
-            "space-between",
-
-          marginBottom:
-            20,
-        }}
-      >
-
-        <Title
-          level={
-            3
-          }
-
-          style={{
-            margin:
-              0,
-          }}
-        >
-          Dịch vụ kỹ thuật
-        </Title>
-
-
-        <Space>
-
-          <Button
-            icon={
-              <UploadOutlined />
-            }
-
-            onClick={
-              openImportModal
-            }
-          >
-            Import Excel
-          </Button>
-
-
-          <Button
-            type="primary"
-
-            icon={
-              <PlusOutlined />
-            }
-
-            onClick={
-              openAddModal
-            }
-          >
-            Thêm mới
-          </Button>
-
-        </Space>
-
-      </Space>
-
-
-      {/* =================================================
-          FILTER
-      ================================================= */}
-
       <div
-        style={{
-          display:
-            "grid",
-
-          gridTemplateColumns:
-            "1.2fr 1.2fr 1fr 0.7fr auto",
-
-          gap:
-            10,
-
-          alignItems:
-            "end",
-
-          marginBottom:
-            16,
-        }}
+        className="services-page"
       >
 
-        <div>
+        {/* =================================================
+            BREADCRUMB
+        ================================================= */}
 
-          <Text>
-            Tên dịch vụ
-          </Text>
+        <Breadcrumb
+          className="services-breadcrumb"
 
-          <Input
-            value={
-              searchName
-            }
+          items={[
+            {
+              title: (
+                <HomeOutlined />
+              ),
+            },
 
-            placeholder="Tên dịch vụ"
+            {
+              title:
+                "Danh mục",
+            },
 
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchName(
-                event.target.value
-              );
+            {
+              title:
+                "Dịch vụ kỹ thuật",
+            },
+          ]}
+        />
 
 
-              setPage(
-                1
-              );
-            }}
-          />
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-        </div>
-
-
-        <div>
-
-          <Text>
-            Mã dịch vụ
-          </Text>
-
-          <Input
-            value={
-              searchCode
-            }
-
-            placeholder="Mã dịch vụ"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchCode(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <div>
-
-          <Text>
-            Quyết định
-          </Text>
-
-          <Input
-            value={
-              searchDecision
-            }
-
-            placeholder="Quyết định"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchDecision(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <div>
-
-          <Text>
-            Mã nhóm 5937
-          </Text>
-
-          <Input
-            value={
-              searchGroupCode
-            }
-
-            placeholder="Mã nhóm"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchGroupCode(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <Button
-          icon={
-            <ReloadOutlined />
-          }
-
-          onClick={
-            handleRefresh
-          }
+        <div
+          className="services-header"
         >
-          Làm mới
-        </Button>
 
-      </div>
+          <div>
+
+            <div
+              className="services-title-row"
+            >
+
+              <MedicineBoxOutlined
+                className="services-title-icon"
+              />
 
 
-      {/* =================================================
-          TABLE
-      ================================================= */}
+              <Title
+                level={
+                  3
+                }
 
-      <Table<ServiceItem>
-        rowKey="code"
+                style={{
+                  margin:
+                    0,
+                }}
+              >
+                Dịch vụ kỹ thuật
+              </Title>
 
-        bordered
+            </div>
 
-        size="middle"
 
-        loading={
-          loading
-        }
+            <Text
+              type="secondary"
 
-        dataSource={
-          items
-        }
+              className="services-subtitle"
+            >
+              Quản lý danh mục dịch vụ kỹ thuật và cấu hình kiểm tra
+            </Text>
 
-        columns={
-          columns
-        }
+          </div>
 
-        scroll={{
-          x:
-            2100,
-        }}
 
-        pagination={{
-          current:
-            page,
+          <Space
+            size={
+              8
+            }
+          >
 
-          pageSize,
+            <Button
+              icon={
+                <UploadOutlined />
+              }
 
-          total,
+              onClick={
+                openImportModal
+              }
+            >
+              Import Excel
+            </Button>
 
-          showSizeChanger:
-            true,
 
-          pageSizeOptions: [
-            "10",
-            "50",
-            "100",
-          ],
+            <Button
+              type="primary"
 
-          showTotal:
-            (
-              value
-            ) =>
-              `Tổng số: ${value}`,
+              icon={
+                <PlusOutlined />
+              }
 
-          onChange:
-            (
-              newPage,
-              newPageSize
-            ) => {
+              onClick={
+                openAddModal
+              }
+            >
+              Thêm mới
+            </Button>
 
-              if (
-                newPageSize !==
-                pageSize
-              ) {
+          </Space>
 
-                setPageSize(
-                  newPageSize
+        </div>
+
+
+        {/* =================================================
+            FILTER
+        ================================================= */}
+
+        <div
+          className="services-filter-grid"
+        >
+
+          <div
+            className="services-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="services-filter-label"
+            >
+              Tên dịch vụ
+            </Text>
+
+
+            <Input
+              value={
+                searchName
+              }
+
+              placeholder="Nhập tên dịch vụ"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchName(
+                  event.target.value
                 );
 
 
                 setPage(
                   1
                 );
+              }}
+            />
+
+          </div>
 
 
-                return;
+          <div
+            className="services-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="services-filter-label"
+            >
+              Mã dịch vụ
+            </Text>
+
+
+            <Input
+              value={
+                searchCode
               }
 
+              placeholder="Nhập mã dịch vụ"
 
-              setPage(
-                newPage
-              );
-            },
-        }}
-      />
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchCode(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="services-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="services-filter-label"
+            >
+              Quyết định
+            </Text>
+
+
+            <Input
+              value={
+                searchDecision
+              }
+
+              placeholder="Nhập quyết định"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchDecision(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="services-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="services-filter-label"
+            >
+              Mã nhóm 5937
+            </Text>
+
+
+            <Input
+              value={
+                searchGroupCode
+              }
+
+              placeholder="Mã nhóm"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchGroupCode(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <Button
+            type="primary"
+
+            icon={
+              <ReloadOutlined />
+            }
+
+            onClick={
+              handleRefresh
+            }
+          >
+            Làm mới
+          </Button>
+
+        </div>
+
+
+        {/* =================================================
+            TABLE
+        ================================================= */}
+
+        <Table<ServiceItem>
+          className="services-table"
+
+          rowKey="code"
+
+          size="middle"
+
+          tableLayout="fixed"
+
+          loading={
+            loading
+          }
+
+          dataSource={
+            items
+          }
+
+          columns={
+            columns
+          }
+
+          scroll={{
+            x:
+              1850,
+          }}
+
+          pagination={{
+            current:
+              page,
+
+            pageSize,
+
+            total,
+
+            showSizeChanger:
+              true,
+
+            pageSizeOptions: [
+              "10",
+              "50",
+              "100",
+            ],
+
+            showTotal:
+              (
+                value
+              ) =>
+                `Tổng số: ${value}`,
+
+            onChange:
+              (
+                newPage,
+                newPageSize
+              ) => {
+
+                if (
+                  newPageSize !==
+                  pageSize
+                ) {
+
+                  setPageSize(
+                    newPageSize
+                  );
+
+
+                  setPage(
+                    1
+                  );
+
+
+                  return;
+                }
+
+
+                setPage(
+                  newPage
+                );
+              },
+          }}
+
+          locale={{
+            emptyText:
+              "Chưa có dữ liệu dịch vụ kỹ thuật",
+          }}
+        />
+
+      </div>
 
 
       {/* =================================================
@@ -2376,10 +2484,7 @@ export default function Services() {
             false
           }
 
-          style={{
-            marginTop:
-              20,
-          }}
+          className="services-form"
         >
 
           {/* =============================================
@@ -2387,16 +2492,7 @@ export default function Services() {
           ============================================= */}
 
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="services-form-grid services-form-grid-2"
           >
 
             <Form.Item
@@ -2419,6 +2515,8 @@ export default function Services() {
             >
 
               <Input
+                placeholder="Mã dịch vụ"
+
                 disabled={
                   editingService !==
                   null
@@ -2434,7 +2532,9 @@ export default function Services() {
               name="groupCode"
             >
 
-              <Input />
+              <Input
+                placeholder="Mã nhóm 5937"
+              />
 
             </Form.Item>
 
@@ -2464,7 +2564,9 @@ export default function Services() {
             ]}
           >
 
-            <Input />
+            <Input
+              placeholder="Tên dịch vụ kỹ thuật"
+            />
 
           </Form.Item>
 
@@ -2474,16 +2576,7 @@ export default function Services() {
           ============================================= */}
 
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1.4fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="services-form-grid services-form-grid-3"
           >
 
             <Form.Item
@@ -2525,7 +2618,9 @@ export default function Services() {
               name="decisionNo"
             >
 
-              <Input />
+              <Input
+                placeholder="Số quyết định"
+              />
 
             </Form.Item>
 
@@ -2557,16 +2652,7 @@ export default function Services() {
           ============================================= */}
 
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr 1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="services-form-grid services-form-grid-4"
           >
 
             <Form.Item
@@ -2604,7 +2690,7 @@ export default function Services() {
 
 
             <Form.Item
-              label="Min TG thực hiện (Phút)"
+              label="Min TG thực hiện (phút)"
 
               name="minDurationMinutes"
             >
@@ -2624,7 +2710,7 @@ export default function Services() {
 
 
             <Form.Item
-              label="Max TG thực hiện (Phút)"
+              label="Max TG thực hiện (phút)"
 
               name="maxDurationMinutes"
             >
@@ -2706,6 +2792,8 @@ export default function Services() {
               rows={
                 2
               }
+
+              placeholder="Ghi chú"
             />
 
           </Form.Item>
@@ -2788,19 +2876,43 @@ export default function Services() {
 
             description={
               <>
-                Hệ thống tự nhận diện sheet có cột <b>MA_TUONG_DUONG</b>.
+                Hệ thống tự nhận diện sheet có cột{" "}
+                <b>
+                  MA_TUONG_DUONG
+                </b>.
                 {" "}
+
                 File mẫu hiện tại có 791 DVKT.
                 {" "}
-                Hệ thống sử dụng <b>TEN_DVKT_PHEDUYET</b> làm tên dịch vụ,
-                <b> DON_GIA</b> làm đơn giá và <b>QUYET_DINH</b> làm số quyết định.
+
+                Hệ thống sử dụng{" "}
+                <b>
+                  TEN_DVKT_PHEDUYET
+                </b>{" "}
+                làm tên dịch vụ,{" "}
+
+                <b>
+                  DON_GIA
+                </b>{" "}
+                làm đơn giá và{" "}
+
+                <b>
+                  QUYET_DINH
+                </b>{" "}
+                làm số quyết định.
                 {" "}
-                Mã đã tồn tại sẽ được cập nhật, mã mới sẽ được thêm.
+
+                Mã đã tồn tại sẽ được cập nhật,
+                mã mới sẽ được thêm.
                 {" "}
-                Các cấu hình riêng của MedGuard như Mã 5937, mã máy,
-                thời gian thực hiện và thực hiện cùng lúc sẽ được giữ nguyên.
+
+                Các cấu hình riêng của MedGuard như
+                Mã 5937, mã máy, thời gian thực hiện
+                và thực hiện cùng lúc sẽ được giữ nguyên.
                 {" "}
-                Nếu file có lỗi thì toàn bộ lần import sẽ bị hủy.
+
+                Nếu file có lỗi thì toàn bộ lần import
+                sẽ bị hủy.
               </>
             }
 
@@ -2908,10 +3020,7 @@ export default function Services() {
 
               showIcon
 
-              style={{
-                marginTop:
-                  20,
-              }}
+              className="services-import-alert"
 
               message={
                 importMessage ||
@@ -2921,44 +3030,57 @@ export default function Services() {
               description={
 
                 <div
-                  style={{
-                    lineHeight:
-                      2,
-                  }}
+                  className="services-import-summary"
                 >
 
                   <div>
-                    Tổng số DVKT:
-                    {" "}
+                    <span>
+                      Tổng số DVKT
+                    </span>
+
                     <b>
-                      {importResult.totalRows}
+                      {
+                        importResult.totalRows
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Thêm mới:
-                    {" "}
+                    <span>
+                      Thêm mới
+                    </span>
+
                     <b>
-                      {importResult.inserted}
+                      {
+                        importResult.inserted
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Cập nhật:
-                    {" "}
+                    <span>
+                      Cập nhật
+                    </span>
+
                     <b>
-                      {importResult.updated}
+                      {
+                        importResult.updated
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Bỏ qua:
-                    {" "}
+                    <span>
+                      Bỏ qua
+                    </span>
+
                     <b>
-                      {importResult.skipped}
+                      {
+                        importResult.skipped
+                      }
                     </b>
                   </div>
 
@@ -3003,110 +3125,352 @@ export default function Services() {
           {importErrors.length >
             0 && (
 
-              <div
+            <div
+              style={{
+                marginTop:
+                  20,
+              }}
+            >
+
+              <Alert
+                type="error"
+
+                showIcon
+
+                message={
+                  importMessage ||
+                  `File có ${importErrors.length} lỗi.`
+                }
+
+                description="Không có DVKT nào được import. Hãy sửa các dòng lỗi rồi import lại."
+
                 style={{
-                  marginTop:
-                    20,
+                  marginBottom:
+                    12,
                 }}
-              >
-
-                <Alert
-                  type="error"
-
-                  showIcon
-
-                  message={
-                    importMessage ||
-                    `File có ${importErrors.length} lỗi.`
-                  }
-
-                  description="Không có DVKT nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
-                  style={{
-                    marginBottom:
-                      12,
-                  }}
-                />
+              />
 
 
-                <Table<ServiceImportError>
-                  size="small"
+              <Table<ServiceImportError>
+                className="services-import-table"
 
-                  bordered
+                size="small"
 
-                  rowKey={(
-                    record,
-                    index
-                  ) =>
-                    `${record.row}-${record.field}-${index}`
-                  }
+                rowKey={(
+                  record,
+                  index
+                ) =>
+                  `${record.row}-${record.field}-${index}`
+                }
 
-                  dataSource={
-                    importErrors
-                  }
+                dataSource={
+                  importErrors
+                }
 
-                  pagination={{
-                    pageSize:
-                      10,
+                pagination={{
+                  pageSize:
+                    10,
 
-                    showSizeChanger:
-                      false,
+                  showSizeChanger:
+                    false,
 
-                    showTotal:
-                      (
-                        value
-                      ) =>
-                        `Tổng lỗi: ${value}`,
-                  }}
+                  showTotal:
+                    (
+                      value
+                    ) =>
+                      `Tổng lỗi: ${value}`,
+                }}
 
-                  scroll={{
-                    y:
-                      320,
-                  }}
+                scroll={{
+                  y:
+                    320,
+                }}
 
-                  columns={[
-                    {
-                      title:
-                        "Dòng",
+                columns={[
+                  {
+                    title:
+                      "Dòng",
 
-                      dataIndex:
-                        "row",
+                    dataIndex:
+                      "row",
 
-                      width:
-                        80,
+                    width:
+                      80,
 
-                      align:
-                        "center",
-                    },
+                    align:
+                      "center",
+                  },
 
-                    {
-                      title:
-                        "Cột",
+                  {
+                    title:
+                      "Cột",
 
-                      dataIndex:
-                        "field",
+                    dataIndex:
+                      "field",
 
-                      width:
-                        220,
-                    },
+                    width:
+                      220,
+                  },
 
-                    {
-                      title:
-                        "Lỗi",
+                  {
+                    title:
+                      "Lỗi",
 
-                      dataIndex:
-                        "message",
-                    },
-                  ]}
-                />
+                    dataIndex:
+                      "message",
+                  },
+                ]}
+              />
 
-              </div>
+            </div>
 
-            )}
+          )}
 
         </div>
 
       </Modal>
+
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
+
+      <style>
+        {`
+          .services-page {
+            width: 100%;
+          }
+
+          .services-breadcrumb {
+            margin-bottom: 14px;
+            font-size: 12px;
+          }
+
+          .services-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+
+          .services-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+
+          .services-title-row h3 {
+            margin: 0 !important;
+            color: #172033 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+          }
+
+          .services-title-icon {
+            color: #1677ff;
+            font-size: 25px;
+          }
+
+          .services-subtitle {
+            display: block;
+            margin-top: 3px;
+            font-size: 12px;
+          }
+
+          .services-filter-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(230px, 1.25fr)
+              minmax(190px, 1fr)
+              minmax(210px, 1fr)
+              minmax(150px, 0.7fr)
+              auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 14px;
+          }
+
+          .services-filter-item {
+            min-width: 0;
+          }
+
+          .services-filter-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .services-table {
+            overflow: hidden;
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+          }
+
+          .services-table .ant-table {
+            border-radius: 8px;
+          }
+
+          .services-table
+          .ant-table-container {
+            border-start-start-radius: 8px;
+            border-start-end-radius: 8px;
+          }
+
+          .services-table
+          .ant-table-thead
+          > tr
+          > th {
+            padding: 11px 10px !important;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f3f6f9 !important;
+            border-bottom: 1px solid #e5eaf0 !important;
+          }
+
+          .services-table
+          .ant-table-tbody
+          > tr
+          > td {
+            padding: 11px 10px !important;
+            color: #202a3b;
+            font-size: 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf0f5 !important;
+          }
+
+          .services-table
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background: #f7fbff !important;
+          }
+
+          .services-table
+          .ant-table-cell-fix-left,
+          .services-table
+          .ant-table-cell-fix-right {
+            background: #ffffff;
+          }
+
+          .services-table
+          .ant-table-thead
+          .ant-table-cell-fix-left,
+          .services-table
+          .ant-table-thead
+          .ant-table-cell-fix-right {
+            background: #f3f6f9 !important;
+          }
+
+          .services-table
+          .ant-pagination {
+            margin: 14px 8px 6px;
+          }
+
+          .services-pill {
+            margin: 0;
+            border-radius: 6px;
+            font-size: 11px;
+          }
+
+          .services-form {
+            margin-top: 18px;
+          }
+
+          .services-form-grid {
+            display: grid;
+            gap: 16px;
+          }
+
+          .services-form-grid-2 {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+
+          .services-form-grid-3 {
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+          }
+
+          .services-form-grid-4 {
+            grid-template-columns:
+              repeat(4, minmax(0, 1fr));
+          }
+
+          .services-import-alert {
+            margin-top: 20px;
+          }
+
+          .services-import-summary {
+            display: grid;
+            grid-template-columns:
+              repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+          }
+
+          .services-import-summary > div {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.65);
+            border-radius: 7px;
+          }
+
+          .services-import-summary span {
+            color: #667085;
+            font-size: 12px;
+          }
+
+          .services-import-summary b {
+            color: #172033;
+            font-size: 18px;
+          }
+
+          .services-import-table {
+            overflow: hidden;
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+          }
+
+          @media (max-width: 1150px) {
+            .services-filter-grid {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+
+            .services-form-grid-4 {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+          }
+
+          @media (max-width: 800px) {
+            .services-header {
+              flex-direction: column;
+            }
+
+            .services-filter-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .services-form-grid-2,
+            .services-form-grid-3,
+            .services-form-grid-4 {
+              grid-template-columns: 1fr;
+            }
+
+            .services-import-summary {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+          }
+        `}
+      </style>
 
     </>
   );

@@ -21,17 +21,22 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
 import dayjs, {
-  Dayjs,
+  type Dayjs,
 } from "dayjs";
 
 import {
   apiFetch,
 } from "../api/apiClient";
 
+
+// ======================================================
+// TYPES
+// ======================================================
 
 interface MedicalStaff {
   id: string;
@@ -71,7 +76,444 @@ interface DoctorVisitItem {
 }
 
 
+// ======================================================
+// PAGE
+// ======================================================
+
 export default function DoctorVisits() {
+
+  // ====================================================
+  // RESPONSIVE PAGE
+  // ====================================================
+
+  const pageRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+
+  const tableAreaRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+
+  const [
+    pageHeight,
+    setPageHeight,
+  ] =
+    useState<number | undefined>(
+      undefined
+    );
+
+
+  const [
+    tableScrollY,
+    setTableScrollY,
+  ] =
+    useState(
+      220
+    );
+
+
+  // ====================================================
+  // KHÓA SCROLL TOÀN TRANG
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      const html =
+        document.documentElement;
+
+
+      const body =
+        document.body;
+
+
+      const oldHtmlOverflow =
+        html.style.overflow;
+
+
+      const oldBodyOverflow =
+        body.style.overflow;
+
+
+      html.style.overflow =
+        "hidden";
+
+
+      body.style.overflow =
+        "hidden";
+
+
+      return () => {
+
+        html.style.overflow =
+          oldHtmlOverflow;
+
+
+        body.style.overflow =
+          oldBodyOverflow;
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // TÍNH CHIỀU CAO PAGE THEO VIEWPORT THỰC
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      let rafId =
+        0;
+
+
+      const updatePageHeight =
+        () => {
+
+          window.cancelAnimationFrame(
+            rafId
+          );
+
+
+          rafId =
+            window.requestAnimationFrame(
+              () => {
+
+                const element =
+                  pageRef.current;
+
+
+                if (
+                  !element
+                ) {
+                  return;
+                }
+
+
+                const rect =
+                  element.getBoundingClientRect();
+
+
+                const bottomGap =
+                  20;
+
+
+                const availableHeight =
+                  window.innerHeight -
+                  rect.top -
+                  bottomGap;
+
+
+                setPageHeight(
+                  Math.max(
+                    300,
+
+                    Math.floor(
+                      availableHeight
+                    )
+                  )
+                );
+
+              }
+            );
+
+        };
+
+
+      updatePageHeight();
+
+
+      window.addEventListener(
+        "resize",
+        updatePageHeight
+      );
+
+
+      const observer =
+        new ResizeObserver(
+          updatePageHeight
+        );
+
+
+      const parent =
+        pageRef.current
+          ?.parentElement;
+
+
+      if (
+        parent
+      ) {
+
+        observer.observe(
+          parent
+        );
+
+      }
+
+
+      return () => {
+
+        window.cancelAnimationFrame(
+          rafId
+        );
+
+
+        window.removeEventListener(
+          "resize",
+          updatePageHeight
+        );
+
+
+        observer.disconnect();
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // TÍNH CHIỀU CAO BODY TABLE
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      let rafId =
+        0;
+
+
+      const updateTableHeight =
+        () => {
+
+          window.cancelAnimationFrame(
+            rafId
+          );
+
+
+          rafId =
+            window.requestAnimationFrame(
+              () => {
+
+                const area =
+                  tableAreaRef.current;
+
+
+                if (
+                  !area
+                ) {
+                  return;
+                }
+
+
+                const tableCardHeader =
+                  area.querySelector<HTMLElement>(
+                    ".doctor-table-header"
+                  );
+
+
+                const antTableHeader =
+                  area.querySelector<HTMLElement>(
+                    ".ant-table-thead"
+                  );
+
+
+                const pagination =
+                  area.querySelector<HTMLElement>(
+                    ".ant-pagination"
+                  );
+
+
+                const tableCardHeaderHeight =
+                  tableCardHeader
+                    ?.offsetHeight ??
+                  0;
+
+
+                const antTableHeaderHeight =
+                  antTableHeader
+                    ?.offsetHeight ??
+                  0;
+
+
+                let paginationHeight =
+                  0;
+
+
+                if (
+                  pagination
+                ) {
+
+                  const paginationStyle =
+                    window.getComputedStyle(
+                      pagination
+                    );
+
+
+                  paginationHeight =
+                    pagination.offsetHeight +
+                    (
+                      parseFloat(
+                        paginationStyle.marginTop
+                      ) ||
+                      0
+                    ) +
+                    (
+                      parseFloat(
+                        paginationStyle.marginBottom
+                      ) ||
+                      0
+                    );
+
+                }
+
+
+                /*
+                 * Chừa một ít cho scrollbar ngang
+                 * và mép an toàn dưới bảng.
+                 */
+
+                const extraSpace =
+                  18;
+
+
+                const availableHeight =
+                  area.clientHeight -
+                  tableCardHeaderHeight -
+                  antTableHeaderHeight -
+                  paginationHeight -
+                  extraSpace;
+
+
+                setTableScrollY(
+                  Math.max(
+                    80,
+
+                    Math.floor(
+                      availableHeight
+                    )
+                  )
+                );
+
+              }
+            );
+
+        };
+
+
+      const timer1 =
+        window.setTimeout(
+          updateTableHeight,
+          0
+        );
+
+
+      const timer2 =
+        window.setTimeout(
+          updateTableHeight,
+          120
+        );
+
+
+      window.addEventListener(
+        "resize",
+        updateTableHeight
+      );
+
+
+      const resizeObserver =
+        new ResizeObserver(
+          updateTableHeight
+        );
+
+
+      if (
+        tableAreaRef.current
+      ) {
+
+        resizeObserver.observe(
+          tableAreaRef.current
+        );
+
+      }
+
+
+      /*
+       * Khi Ant Table render data / pagination,
+       * tính lại chiều cao.
+       */
+
+      const mutationObserver =
+        new MutationObserver(
+          updateTableHeight
+        );
+
+
+      if (
+        tableAreaRef.current
+      ) {
+
+        mutationObserver.observe(
+          tableAreaRef.current,
+          {
+            childList:
+              true,
+
+            subtree:
+              true,
+          }
+        );
+
+      }
+
+
+      return () => {
+
+        window.cancelAnimationFrame(
+          rafId
+        );
+
+
+        window.clearTimeout(
+          timer1
+        );
+
+
+        window.clearTimeout(
+          timer2
+        );
+
+
+        window.removeEventListener(
+          "resize",
+          updateTableHeight
+        );
+
+
+        resizeObserver.disconnect();
+
+
+        mutationObserver.disconnect();
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // DATA STATE
+  // ====================================================
+
   const [
     staffList,
     setStaffList,
@@ -108,6 +550,10 @@ export default function DoctorVisits() {
     );
 
 
+  // ====================================================
+  // FILTER
+  // ====================================================
+
   const [
     staffId,
     setStaffId,
@@ -133,7 +579,7 @@ export default function DoctorVisits() {
   ] =
     useState(
       dayjs().month() +
-        1
+      1
     );
 
 
@@ -146,6 +592,10 @@ export default function DoctorVisits() {
       undefined
     >();
 
+
+  // ====================================================
+  // PAGINATION
+  // ====================================================
 
   const [
     page,
@@ -165,8 +615,14 @@ export default function DoctorVisits() {
     );
 
 
+  // ====================================================
+  // LOAD STAFF
+  // ====================================================
+
   async function loadStaff() {
+
     try {
+
       const response =
         await apiFetch(
           "/catalog/medical-staff?page=1&pageSize=500&active=true",
@@ -184,12 +640,14 @@ export default function DoctorVisits() {
       if (
         !response.ok ||
         json.success !==
-          true
+        true
       ) {
+
         throw new Error(
           json.message ||
-            "Không thể tải danh sách nhân viên."
+          "Không thể tải danh sách nhân viên."
         );
+
       }
 
 
@@ -204,17 +662,26 @@ export default function DoctorVisits() {
     } catch (
       error
     ) {
+
       message.error(
         error instanceof Error
           ? error.message
           : "Không thể tải danh sách nhân viên."
       );
+
     }
+
   }
 
 
+  // ====================================================
+  // LOAD DOCTOR VISITS
+  // ====================================================
+
   async function loadDoctorVisits() {
+
     try {
+
       setLoading(
         true
       );
@@ -243,44 +710,52 @@ export default function DoctorVisits() {
       if (
         staffId
       ) {
+
         params.set(
           "staffId",
           staffId
         );
+
       }
 
 
       if (
         year
       ) {
+
         params.set(
           "year",
           String(
             year
           )
         );
+
       }
 
 
       if (
         month
       ) {
+
         params.set(
           "month",
           String(
             month
           )
         );
+
       }
 
 
       if (
         paymentDate
       ) {
+
         params.set(
           "paymentDate",
           paymentDate
         );
+
       }
 
 
@@ -301,12 +776,14 @@ export default function DoctorVisits() {
       if (
         !response.ok ||
         json.success !==
-          true
+        true
       ) {
+
         throw new Error(
           json.message ||
-            "Không thể tải lượt khám bác sĩ."
+          "Không thể tải lượt khám bác sĩ."
         );
+
       }
 
 
@@ -322,13 +799,14 @@ export default function DoctorVisits() {
       setTotal(
         Number(
           json?.data?.total ??
-            0
+          0
         )
       );
 
     } catch (
       error
     ) {
+
       message.error(
         error instanceof Error
           ? error.message
@@ -336,16 +814,25 @@ export default function DoctorVisits() {
       );
 
     } finally {
+
       setLoading(
         false
       );
+
     }
+
   }
 
 
+  // ====================================================
+  // EFFECT LOAD
+  // ====================================================
+
   useEffect(
     () => {
+
       void loadStaff();
+
     },
     []
   );
@@ -353,7 +840,9 @@ export default function DoctorVisits() {
 
   useEffect(
     () => {
+
       void loadDoctorVisits();
+
     },
     [
       staffId,
@@ -366,13 +855,19 @@ export default function DoctorVisits() {
   );
 
 
+  // ====================================================
+  // STAFF OPTIONS
+  // ====================================================
+
   const staffOptions =
     useMemo(
       () => {
+
         return staffList.map(
           (
             staff
           ) => {
+
             const code =
               staff.licenseNumber ||
               staff.socialInsuranceCode ||
@@ -388,8 +883,10 @@ export default function DoctorVisits() {
                   ? `${staff.fullName} - ${code}`
                   : staff.fullName,
             };
+
           }
         );
+
       },
       [
         staffList,
@@ -397,9 +894,14 @@ export default function DoctorVisits() {
     );
 
 
+  // ====================================================
+  // SUMMARY
+  // ====================================================
+
   const summary =
     useMemo(
       () => {
+
         const uniqueStaff =
           new Set(
             items.map(
@@ -407,17 +909,6 @@ export default function DoctorVisits() {
                 item
               ) =>
                 item.staffId
-            )
-          ).size;
-
-
-        const uniqueDates =
-          new Set(
-            items.map(
-              (
-                item
-              ) =>
-                item.examDate
             )
           ).size;
 
@@ -431,7 +922,7 @@ export default function DoctorVisits() {
               sum +
               Number(
                 item.visitCount ||
-                  0
+                0
               ),
             0
           );
@@ -439,9 +930,9 @@ export default function DoctorVisits() {
 
         return {
           uniqueStaff,
-          uniqueDates,
           totalVisits,
         };
+
       },
       [
         items,
@@ -449,31 +940,46 @@ export default function DoctorVisits() {
     );
 
 
+  // ====================================================
+  // RESET
+  // ====================================================
+
   function handleReset() {
+
     setStaffId(
       undefined
     );
+
 
     setYear(
       dayjs().year()
     );
 
+
     setMonth(
       dayjs().month() +
-        1
+      1
     );
+
 
     setPaymentDate(
       undefined
     );
 
+
     setPage(
       1
     );
+
   }
 
 
+  // ====================================================
+  // COLUMNS
+  // ====================================================
+
   const columns = [
+
     {
       title:
         "Nhân viên",
@@ -498,6 +1004,7 @@ export default function DoctorVisits() {
           record:
             DoctorVisitItem
         ) => {
+
           const code =
             record.licenseNumber ||
             record.socialInsuranceCode ||
@@ -508,6 +1015,7 @@ export default function DoctorVisits() {
             <div
               className="doctor-staff-cell"
             >
+
               <div
                 className="doctor-staff-avatar"
               >
@@ -521,6 +1029,7 @@ export default function DoctorVisits() {
                     0,
                 }}
               >
+
                 <Typography.Text
                   strong
 
@@ -539,29 +1048,37 @@ export default function DoctorVisits() {
                 </Typography.Text>
 
 
-                {code && (
-                  <Typography.Text
-                    type="secondary"
+                {
+                  code && (
 
-                    style={{
-                      display:
-                        "block",
+                    <Typography.Text
+                      type="secondary"
 
-                      marginTop:
-                        2,
+                      style={{
+                        display:
+                          "block",
 
-                      fontSize:
-                        11,
-                    }}
-                  >
-                    {code}
-                  </Typography.Text>
-                )}
+                        marginTop:
+                          2,
+
+                        fontSize:
+                          11,
+                      }}
+                    >
+                      {code}
+                    </Typography.Text>
+
+                  )
+                }
+
               </div>
+
             </div>
           );
+
         },
     },
+
 
     {
       title:
@@ -586,6 +1103,7 @@ export default function DoctorVisits() {
           "-",
     },
 
+
     {
       title:
         "Mã CCHN/GPHN",
@@ -609,6 +1127,7 @@ export default function DoctorVisits() {
           "-",
     },
 
+
     {
       title:
         "Tháng",
@@ -630,13 +1149,16 @@ export default function DoctorVisits() {
           value:
             number
         ) => (
+
           <span
             className="doctor-month-pill"
           >
             {value}
           </span>
+
         ),
     },
+
 
     {
       title:
@@ -659,13 +1181,16 @@ export default function DoctorVisits() {
           value:
             number
         ) => (
+
           <Typography.Text
             strong
           >
             {value}
           </Typography.Text>
+
         ),
     },
+
 
     {
       title:
@@ -685,6 +1210,7 @@ export default function DoctorVisits() {
           value:
             string
         ) => (
+
           <span
             className="doctor-date-cell"
           >
@@ -698,8 +1224,10 @@ export default function DoctorVisits() {
               )
             }
           </span>
+
         ),
     },
+
 
     {
       title:
@@ -722,6 +1250,7 @@ export default function DoctorVisits() {
           value:
             number
         ) => (
+
           <Tag
             color="success"
 
@@ -733,21 +1262,47 @@ export default function DoctorVisits() {
           >
             {value}
           </Tag>
+
         ),
     },
+
   ];
 
 
+  // ====================================================
+  // RENDER
+  // ====================================================
+
   return (
     <div
+      ref={
+        pageRef
+      }
+
       className="doctor-page"
+
+      style={{
+        height:
+          pageHeight
+            ? `${pageHeight}px`
+            : "calc(100dvh - 160px)",
+      }}
     >
+
+      {/* ==================================================
+          HEADER
+      ================================================== */}
+
       <div
         className="doctor-header"
       >
+
         <div>
+
           <Typography.Title
-            level={3}
+            level={
+              3
+            }
 
             style={{
               margin:
@@ -756,10 +1311,17 @@ export default function DoctorVisits() {
               color:
                 "#172033",
 
+              fontSize:
+                21,
+
+              lineHeight:
+                1.25,
+
               fontWeight:
                 800,
             }}
           >
+
             <MedicineBoxOutlined
               style={{
                 marginRight:
@@ -767,10 +1329,14 @@ export default function DoctorVisits() {
 
                 color:
                   "#1677ff",
+
+                fontSize:
+                  20,
               }}
             />
 
             Bác sĩ khám
+
           </Typography.Title>
 
 
@@ -782,45 +1348,27 @@ export default function DoctorVisits() {
                 "block",
 
               marginTop:
-                4,
+                2,
+
+              fontSize:
+                12,
             }}
           >
             Thống kê lượt khám theo bác sĩ và ngày khám
           </Typography.Text>
+
         </div>
+
       </div>
 
+
+      {/* ==================================================
+          THỐNG KÊ
+      ================================================== */}
 
       <div
         className="doctor-stat-grid"
       >
-        {/* <Card
-          className="
-            doctor-stat-card
-            doctor-stat-total
-          "
-        >
-          <div
-            className="doctor-stat-icon"
-          >
-            <MedicineBoxOutlined />
-          </div>
-
-          <div>
-            <div
-              className="doctor-stat-label"
-            >
-             Danh sách lượt khám
-            </div>
-
-            <div
-              className="doctor-stat-value"
-            >
-              {total}
-            </div>
-          </div>
-        </Card> */}
-
 
         <Card
           className="
@@ -828,18 +1376,22 @@ export default function DoctorVisits() {
             doctor-stat-doctor
           "
         >
+
           <div
             className="doctor-stat-icon"
           >
             <TeamOutlined />
           </div>
 
+
           <div>
+
             <div
               className="doctor-stat-label"
             >
               Bác sĩ khám
             </div>
+
 
             <div
               className="doctor-stat-value"
@@ -849,7 +1401,9 @@ export default function DoctorVisits() {
                   .uniqueStaff
               }
             </div>
+
           </div>
+
         </Card>
 
 
@@ -859,18 +1413,22 @@ export default function DoctorVisits() {
             doctor-stat-visits
           "
         >
+
           <div
             className="doctor-stat-icon"
           >
             <CheckCircleFilled />
           </div>
 
+
           <div>
+
             <div
               className="doctor-stat-label"
             >
               Số lượt khám
             </div>
+
 
             <div
               className="doctor-stat-value"
@@ -880,54 +1438,34 @@ export default function DoctorVisits() {
                   .totalVisits
               }
             </div>
+
           </div>
+
         </Card>
 
-
-        {/* <Card
-          className="
-            doctor-stat-card
-            doctor-stat-date
-          "
-        >
-          <div
-            className="doctor-stat-icon"
-          >
-            <CalendarOutlined />
-          </div>
-
-          <div>
-            <div
-              className="doctor-stat-label"
-            >
-              Tổng số ngày khám trên tháng
-            </div>
-
-            <div
-              className="doctor-stat-value"
-            >
-              {
-                summary
-                  .uniqueDates
-              }
-            </div>
-          </div>
-        </Card> */}
       </div>
 
+
+      {/* ==================================================
+          FILTER
+      ================================================== */}
 
       <Card
         className="doctor-filter-card"
       >
+
         <div
           className="doctor-filter-header"
         >
+
           <div>
+
             <Typography.Text
               strong
             >
               Bộ lọc lượt khám
             </Typography.Text>
+
 
             <Typography.Text
               type="secondary"
@@ -945,6 +1483,7 @@ export default function DoctorVisits() {
             >
               Lọc theo bác sĩ, thời gian và ngày thanh toán
             </Typography.Text>
+
           </div>
 
 
@@ -971,18 +1510,21 @@ export default function DoctorVisits() {
           >
             Làm mới
           </Button>
+
         </div>
 
 
         <div
           className="doctor-filter-grid"
         >
+
           <div
             className="
               doctor-filter-field
               doctor-filter-staff
             "
           >
+
             <Typography.Text
               className="doctor-filter-label"
             >
@@ -1015,21 +1557,26 @@ export default function DoctorVisits() {
               onChange={(
                 value
               ) => {
+
                 setStaffId(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
 
 
           <div
             className="doctor-filter-field"
           >
+
             <Typography.Text
               className="doctor-filter-label"
             >
@@ -1068,21 +1615,26 @@ export default function DoctorVisits() {
               onChange={(
                 value
               ) => {
+
                 setYear(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
 
 
           <div
             className="doctor-filter-field"
           >
+
             <Typography.Text
               className="doctor-filter-label"
             >
@@ -1124,21 +1676,26 @@ export default function DoctorVisits() {
               onChange={(
                 value
               ) => {
+
                 setMonth(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
 
 
           <div
             className="doctor-filter-field"
           >
+
             <Typography.Text
               className="doctor-filter-label"
             >
@@ -1171,6 +1728,7 @@ export default function DoctorVisits() {
                   Dayjs |
                   null
               ) => {
+
                 setPaymentDate(
                   value
                     ? value.format(
@@ -1179,180 +1737,271 @@ export default function DoctorVisits() {
                     : undefined
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
+
         </div>
+
       </Card>
 
 
-      <Card
-        className="doctor-table-card"
+      {/* ==================================================
+          TABLE AREA
+      ================================================== */}
 
-        styles={{
-          body: {
-            padding:
-              0,
-          },
-        }}
+      <div
+        ref={
+          tableAreaRef
+        }
+
+        className="doctor-table-area"
       >
-        <div
-          className="doctor-table-header"
-        >
-          <div>
-            <Typography.Text
-              strong
 
-              style={{
-                fontSize:
-                  15,
-              }}
-            >
-              Danh sách lượt khám
-            </Typography.Text>
+        <Card
+          className="doctor-table-card"
+
+          styles={{
+            body: {
+              padding:
+                0,
+
+              height:
+                "100%",
+
+              display:
+                "flex",
+
+              flexDirection:
+                "column",
+
+              overflow:
+                "hidden",
+            },
+          }}
+        >
+
+          {/* ==============================================
+              TABLE TITLE
+          ============================================== */}
+
+          <div
+            className="doctor-table-header"
+          >
+
+            <div>
+
+              <Typography.Text
+                strong
+
+                style={{
+                  fontSize:
+                    14,
+                }}
+              >
+                Danh sách lượt khám
+              </Typography.Text>
+
+
+              <Typography.Text
+                type="secondary"
+
+                style={{
+                  marginLeft:
+                    8,
+
+                  fontSize:
+                    11,
+                }}
+              >
+                Tổng {total} dòng
+              </Typography.Text>
+
+            </div>
+
 
             <Typography.Text
               type="secondary"
 
               style={{
-                marginLeft:
-                  8,
-
                 fontSize:
-                  12,
+                  11,
               }}
             >
-              Tổng {total} dòng
+              Thống kê số lượt khám theo từng bác sĩ
             </Typography.Text>
+
           </div>
 
 
-          <Typography.Text
-            type="secondary"
+          {/* ==============================================
+              TABLE
+          ============================================== */}
 
-            style={{
-              fontSize:
-                12,
-            }}
+          <Table<
+            DoctorVisitItem
           >
-            Thống kê số lượt khám theo từng bác sĩ
-          </Typography.Text>
-        </div>
+            rowKey={(
+              record
+            ) =>
+              `${record.staffId}-${record.examDate}`
+            }
+
+            loading={
+              loading
+            }
+
+            dataSource={
+              items
+            }
+
+            columns={
+              columns
+            }
+
+            size="middle"
+
+            scroll={{
+              x:
+                1150,
+
+              y:
+                tableScrollY,
+            }}
+
+            pagination={{
+              current:
+                page,
+
+              pageSize,
+
+              total,
+
+              showSizeChanger:
+                true,
+
+              pageSizeOptions: [
+                "10",
+                "50",
+                "100",
+              ],
+
+              showTotal:
+                (
+                  value
+                ) =>
+                  `Tổng số: ${value}`,
+
+              onChange:
+                (
+                  newPage,
+                  newPageSize
+                ) => {
+
+                  if (
+                    newPageSize !==
+                    pageSize
+                  ) {
+
+                    setPageSize(
+                      newPageSize
+                    );
 
 
-        <Table<
-          DoctorVisitItem
-        >
-          rowKey={(
-            record
-          ) =>
-            `${record.staffId}-${record.examDate}`
-          }
+                    setPage(
+                      1
+                    );
 
-          loading={
-            loading
-          }
 
-          dataSource={
-            items
-          }
+                    return;
+                  }
 
-          columns={
-            columns
-          }
-
-          size="middle"
-
-          scroll={{
-            x:
-              1150,
-          }}
-
-          pagination={{
-            current:
-              page,
-
-            pageSize,
-
-            total,
-
-            showSizeChanger:
-              true,
-
-            pageSizeOptions: [
-              "10",
-              "50",
-              "100",
-            ],
-
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
-
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
-                  setPageSize(
-                    newPageSize
-                  );
 
                   setPage(
-                    1
+                    newPage
                   );
 
-                  return;
-                }
+                },
+            }}
+          />
+
+        </Card>
+
+      </div>
 
 
-                setPage(
-                  newPage
-                );
-              },
-          }}
-        />
-      </Card>
-
+      {/* ==================================================
+          STYLE
+      ================================================== */}
 
       <style>
         {`
+
+          /* ===============================================
+             PAGE
+          =============================================== */
+
           .doctor-page {
             display: flex;
+
             flex-direction: column;
-            gap: 16px;
+
+            gap: 10px;
+
+            width: 100%;
+
+            min-height: 0;
+
+            overflow: hidden;
+
+            box-sizing: border-box;
           }
+
+
+          /* ===============================================
+             HEADER
+          =============================================== */
 
           .doctor-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
-            gap: 16px;
+
+            gap: 12px;
+
+            flex-shrink: 0;
           }
+
+
+          /* ===============================================
+             STAT
+          =============================================== */
 
           .doctor-stat-grid {
             display: grid;
 
             grid-template-columns:
               repeat(
-                4,
+                2,
                 minmax(
                   160px,
                   1fr
                 )
               );
 
-            gap: 14px;
+            gap: 10px;
+
+            flex-shrink: 0;
           }
+
 
           .doctor-stat-card {
             border:
@@ -1379,72 +2028,82 @@ export default function DoctorVisits() {
               ease;
           }
 
+
           .doctor-stat-card:hover {
             transform:
               translateY(
-                -2px
+                -1px
               );
 
             box-shadow:
               0
-              8px
-              24px
+              6px
+              20px
               rgba(
                 15,
                 23,
                 42,
-                0.08
+                0.07
               );
           }
+
 
           .doctor-stat-card
           .ant-card-body {
             display: flex;
+
             align-items: center;
-            gap: 13px;
+
+            gap: 10px;
 
             padding:
-              16px
-              17px;
+              10px
+              14px;
           }
 
+
           .doctor-stat-icon {
-            width: 40px;
-            height: 40px;
+            width: 34px;
+
+            height: 34px;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             flex-shrink: 0;
 
             border-radius:
-              11px;
+              9px;
 
             font-size:
-              18px;
+              16px;
           }
+
 
           .doctor-stat-label {
             color:
               #64748b;
 
             font-size:
-              12px;
+              11px;
 
             font-weight:
               500;
           }
 
+
           .doctor-stat-value {
             margin-top:
-              2px;
+              1px;
 
             color:
               #172033;
 
             font-size:
-              23px;
+              19px;
 
             line-height:
               1.2;
@@ -1453,26 +2112,13 @@ export default function DoctorVisits() {
               800;
           }
 
-          .doctor-stat-total {
-            border-left:
-              4px solid
-              #1677ff;
-          }
-
-          .doctor-stat-total
-          .doctor-stat-icon {
-            color:
-              #1677ff;
-
-            background:
-              #e6f4ff;
-          }
 
           .doctor-stat-doctor {
             border-left:
               4px solid
               #722ed1;
           }
+
 
           .doctor-stat-doctor
           .doctor-stat-icon {
@@ -1483,11 +2129,13 @@ export default function DoctorVisits() {
               #f9f0ff;
           }
 
+
           .doctor-stat-visits {
             border-left:
               4px solid
               #52c41a;
           }
+
 
           .doctor-stat-visits
           .doctor-stat-icon {
@@ -1498,22 +2146,14 @@ export default function DoctorVisits() {
               #f6ffed;
           }
 
-          .doctor-stat-date {
-            border-left:
-              4px solid
-              #faad14;
-          }
 
-          .doctor-stat-date
-          .doctor-stat-icon {
-            color:
-              #d48806;
-
-            background:
-              #fffbe6;
-          }
+          /* ===============================================
+             FILTER
+          =============================================== */
 
           .doctor-filter-card {
+            flex-shrink: 0;
+
             border:
               1px solid
               #edf0f5;
@@ -1533,22 +2173,35 @@ export default function DoctorVisits() {
               );
           }
 
+
           .doctor-filter-card
           .ant-card-body {
             padding:
-              15px;
+              10px
+              14px;
           }
+
 
           .doctor-filter-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
 
-            gap: 12px;
+            gap: 10px;
 
             margin-bottom:
-              14px;
+              8px;
           }
+
+
+          .doctor-filter-header
+          .ant-typography {
+            font-size:
+              13px;
+          }
+
 
           .doctor-filter-grid {
             display: grid;
@@ -1571,34 +2224,51 @@ export default function DoctorVisits() {
                 1fr
               );
 
-            gap: 10px;
+            gap: 8px;
 
             align-items: end;
           }
+
 
           .doctor-filter-field {
             min-width: 0;
           }
 
+
           .doctor-filter-label {
             display: block;
 
             margin-bottom:
-              6px;
+              4px;
 
             color:
               #475569;
 
             font-size:
-              12px;
+              11px;
 
             font-weight:
               700;
           }
 
+
+          /* ===============================================
+             TABLE AREA
+          =============================================== */
+
+          .doctor-table-area {
+            flex: 1;
+
+            min-height: 0;
+
+            overflow: hidden;
+          }
+
+
           .doctor-table-card {
-            overflow:
-              hidden;
+            height: 100%;
+
+            overflow: hidden;
 
             border:
               1px solid
@@ -1619,21 +2289,99 @@ export default function DoctorVisits() {
               );
           }
 
+
+          .doctor-table-card
+          .ant-card-body {
+            height: 100%;
+
+            padding: 0 !important;
+
+            display: flex;
+
+            flex-direction: column;
+
+            overflow: hidden;
+          }
+
+
           .doctor-table-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
 
-            gap: 12px;
+            gap: 10px;
 
             padding:
-              14px
-              16px;
+              10px
+              14px;
+
+            flex-shrink: 0;
 
             border-bottom:
               1px solid
               #edf0f5;
           }
+
+
+          /* ===============================================
+             ANT TABLE FLEX
+          =============================================== */
+
+          .doctor-table-card
+          .ant-table-wrapper {
+            flex: 1;
+
+            min-height: 0;
+
+            display: flex;
+
+            flex-direction: column;
+          }
+
+
+          .doctor-table-card
+          .ant-spin-nested-loading {
+            flex: 1;
+
+            min-height: 0;
+          }
+
+
+          .doctor-table-card
+          .ant-spin-container {
+            height: 100%;
+
+            min-height: 0;
+
+            display: flex;
+
+            flex-direction: column;
+          }
+
+
+          .doctor-table-card
+          .ant-table {
+            flex: 1;
+
+            min-height: 0;
+          }
+
+
+          /* ===============================================
+             TABLE BODY SCROLL
+          =============================================== */
+
+          .doctor-table-card
+          .ant-table-body {
+            overflow-y:
+              auto !important;
+
+            overscroll-behavior:
+              contain;
+          }
+
 
           .doctor-table-card
           .ant-table-thead
@@ -1656,6 +2404,7 @@ export default function DoctorVisits() {
               #e8edf3 !important;
           }
 
+
           .doctor-table-card
           .ant-table-tbody
           > tr
@@ -1672,6 +2421,7 @@ export default function DoctorVisits() {
               ease;
           }
 
+
           .doctor-table-card
           .ant-table-tbody
           > tr:hover
@@ -1680,19 +2430,29 @@ export default function DoctorVisits() {
               #f5f9ff !important;
           }
 
+
+          /* ===============================================
+             STAFF
+          =============================================== */
+
           .doctor-staff-cell {
             display: flex;
+
             align-items: center;
 
             gap: 9px;
           }
 
+
           .doctor-staff-avatar {
             width: 30px;
+
             height: 30px;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             flex-shrink: 0;
@@ -1707,13 +2467,19 @@ export default function DoctorVisits() {
               #e6f4ff;
           }
 
+
+          /* ===============================================
+             MONTH
+          =============================================== */
+
           .doctor-month-pill {
             display: inline-flex;
+
             align-items: center;
+
             justify-content: center;
 
-            min-width:
-              34px;
+            min-width: 34px;
 
             padding:
               2px
@@ -1732,8 +2498,14 @@ export default function DoctorVisits() {
               700;
           }
 
+
+          /* ===============================================
+             DATE
+          =============================================== */
+
           .doctor-date-cell {
             display: inline-flex;
+
             align-items: center;
 
             gap: 6px;
@@ -1745,11 +2517,17 @@ export default function DoctorVisits() {
               600;
           }
 
+
           .doctor-date-cell
           .anticon {
             color:
               #1677ff;
           }
+
+
+          /* ===============================================
+             VISIT TAG
+          =============================================== */
 
           .doctor-visit-tag {
             min-width:
@@ -1775,19 +2553,224 @@ export default function DoctorVisits() {
               800;
           }
 
+
+          /* ===============================================
+             PAGINATION
+          =============================================== */
+
           .doctor-table-card
           .ant-pagination {
+            flex-shrink:
+              0;
+
+            margin-top:
+              8px;
+
+            margin-bottom:
+              0;
+
             padding:
               0
-              16px
-              12px;
+              14px
+              6px;
           }
 
-          @media
-          (
-            max-width:
-              1100px
-          ) {
+
+          /* ===============================================
+             SCROLLBAR
+          =============================================== */
+
+          .doctor-table-card
+          .ant-table-body::-webkit-scrollbar {
+            width:
+              8px;
+
+            height:
+              8px;
+          }
+
+
+          .doctor-table-card
+          .ant-table-body::-webkit-scrollbar-thumb {
+            background:
+              #cbd5e1;
+
+            border-radius:
+              999px;
+          }
+
+
+          .doctor-table-card
+          .ant-table-body::-webkit-scrollbar-track {
+            background:
+              #f8fafc;
+          }
+
+
+          /* ===============================================
+             MÀN HÌNH THẤP <= 820PX
+          =============================================== */
+
+          @media (max-height: 820px) {
+
+            .doctor-page {
+              gap:
+                8px;
+            }
+
+
+            .doctor-header h3 {
+              font-size:
+                19px !important;
+            }
+
+
+            .doctor-header
+            .ant-typography-secondary {
+              font-size:
+                11px !important;
+            }
+
+
+            .doctor-stat-card
+            .ant-card-body {
+              padding:
+                7px
+                12px;
+            }
+
+
+            .doctor-stat-icon {
+              width:
+                30px;
+
+              height:
+                30px;
+
+              font-size:
+                14px;
+            }
+
+
+            .doctor-stat-label {
+              font-size:
+                10px;
+            }
+
+
+            .doctor-stat-value {
+              font-size:
+                17px;
+            }
+
+
+            .doctor-filter-card
+            .ant-card-body {
+              padding:
+                7px
+                12px;
+            }
+
+
+            .doctor-filter-header {
+              margin-bottom:
+                5px;
+            }
+
+
+            .doctor-filter-label {
+              margin-bottom:
+                3px;
+
+              font-size:
+                10px;
+            }
+
+
+            .doctor-table-header {
+              padding:
+                8px
+                12px;
+            }
+
+          }
+
+
+          /* ===============================================
+             MÀN HÌNH THẤP <= 700PX
+          =============================================== */
+
+          @media (max-height: 700px) {
+
+            .doctor-page {
+              gap:
+                6px;
+            }
+
+
+            .doctor-header
+            .ant-typography-secondary {
+              display:
+                none !important;
+            }
+
+
+            .doctor-stat-card
+            .ant-card-body {
+              padding:
+                5px
+                10px;
+            }
+
+
+            .doctor-stat-icon {
+              width:
+                28px;
+
+              height:
+                28px;
+
+              font-size:
+                13px;
+            }
+
+
+            .doctor-stat-value {
+              font-size:
+                16px;
+            }
+
+
+            .doctor-filter-header
+            .ant-typography-secondary {
+              display:
+                none !important;
+            }
+
+
+            .doctor-filter-card
+            .ant-card-body {
+              padding:
+                6px
+                10px;
+            }
+
+
+            .doctor-table-header {
+              padding:
+                6px
+                10px;
+            }
+
+          }
+
+
+          /* ===============================================
+             RESPONSIVE WIDTH
+          =============================================== */
+
+          @media (max-width: 1100px) {
+
             .doctor-stat-grid {
               grid-template-columns:
                 repeat(
@@ -1799,6 +2782,7 @@ export default function DoctorVisits() {
                 );
             }
 
+
             .doctor-filter-grid {
               grid-template-columns:
                 repeat(
@@ -1809,13 +2793,12 @@ export default function DoctorVisits() {
                   )
                 );
             }
+
           }
 
-          @media
-          (
-            max-width:
-              700px
-          ) {
+
+          @media (max-width: 700px) {
+
             .doctor-header,
             .doctor-filter-header,
             .doctor-table-header {
@@ -1826,14 +2809,18 @@ export default function DoctorVisits() {
                 flex-start;
             }
 
+
             .doctor-stat-grid,
             .doctor-filter-grid {
               grid-template-columns:
                 1fr;
             }
+
           }
+
         `}
       </style>
+
     </div>
   );
 }

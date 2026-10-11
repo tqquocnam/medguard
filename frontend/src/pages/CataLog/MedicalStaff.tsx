@@ -23,6 +23,7 @@ import {
   EllipsisOutlined,
   PlusOutlined,
   ReloadOutlined,
+  TeamOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 
@@ -49,33 +50,38 @@ const {
 
 function formatDate(
   value:
-    string |
-    null |
-    undefined
+    | string
+    | null
+    | undefined
 ) {
-  if (!value) {
+
+  if (
+    !value
+  ) {
+
     return "-";
   }
+
 
   const text =
     String(
       value
     ).trim();
 
-  const yyyyMmDd =
+
+  const match =
     text.match(
       /^(\d{4})-(\d{2})-(\d{2})/
     );
 
+
   if (
-    yyyyMmDd
+    match
   ) {
-    return (
-      `${yyyyMmDd[3]}/` +
-      `${yyyyMmDd[2]}/` +
-      `${yyyyMmDd[1]}`
-    );
+
+    return `${match[3]}/${match[2]}/${match[1]}`;
   }
+
 
   return text;
 }
@@ -87,6 +93,7 @@ function formatDate(
 
 interface DepartmentOption {
   code: string;
+
   name: string;
 }
 
@@ -97,52 +104,52 @@ interface MedicalStaffItem {
   fullName: string;
 
   socialInsuranceCode:
-    string |
-    null;
+    | string
+    | null;
 
   licenseNumber:
-    string |
-    null;
+    | string
+    | null;
 
   gender:
-    string |
-    null;
+    | string
+    | null;
 
   licenseIssueDate:
-    string |
-    null;
+    | string
+    | null;
 
   professionalTitle:
-    string |
-    null;
+    | string
+    | null;
 
   licenseIssuer:
-    string |
-    null;
+    | string
+    | null;
 
   professionalScope:
-    string |
-    null;
+    | string
+    | null;
 
   registrationTime:
-    string |
-    null;
+    | string
+    | null;
 
   dailyTime:
-    string |
-    null;
+    | string
+    | null;
 
   weeklyTime:
-    string |
-    null;
+    | string
+    | null;
 
   position:
-    string |
-    null;
+    | string
+    | null;
 
   note:
-    string |
-    null;
+    | string
+    | null;
 
   active:
     boolean;
@@ -204,15 +211,20 @@ interface MedicalStaffFormValues {
 
 interface MedicalStaffImportError {
   row: number;
+
   field: string;
+
   message: string;
 }
 
 
 interface MedicalStaffImportResult {
   totalRows: number;
+
   inserted: number;
+
   updated: number;
+
   skipped: number;
 }
 
@@ -1177,7 +1189,7 @@ export default function MedicalStaff() {
 
 
   // ====================================================
-  // IMPORT - OPEN
+  // IMPORT OPEN / CLOSE
   // ====================================================
 
   function openImportModal() {
@@ -1208,15 +1220,12 @@ export default function MedicalStaff() {
   }
 
 
-  // ====================================================
-  // IMPORT - CLOSE
-  // ====================================================
-
   function closeImportModal() {
 
     if (
       importing
     ) {
+
       return;
     }
 
@@ -1325,8 +1334,6 @@ export default function MedicalStaff() {
             method:
               "POST",
 
-            // Không tự gắn Content-Type.
-            // Browser tự tạo multipart/form-data + boundary.
             body:
               formData,
           }
@@ -1348,10 +1355,6 @@ export default function MedicalStaff() {
         // Backend không trả JSON.
       }
 
-
-      // ==================================================
-      // ERROR
-      // ==================================================
 
       if (
         !response.ok ||
@@ -1387,10 +1390,6 @@ export default function MedicalStaff() {
         return;
       }
 
-
-      // ==================================================
-      // SUCCESS
-      // ==================================================
 
       const result:
         MedicalStaffImportResult = {
@@ -1491,10 +1490,6 @@ export default function MedicalStaff() {
 
   const columns = [
 
-    // ==================================================
-    // ACTION
-    // ==================================================
-
     {
       title:
         "",
@@ -1503,10 +1498,13 @@ export default function MedicalStaff() {
         "action",
 
       width:
-        50,
+        46,
 
       fixed:
         "left" as const,
+
+      align:
+        "center" as const,
 
       render:
         (
@@ -1579,6 +1577,8 @@ export default function MedicalStaff() {
             <Button
               type="text"
 
+              size="small"
+
               icon={
                 <EllipsisOutlined />
               }
@@ -1589,10 +1589,6 @@ export default function MedicalStaff() {
     },
 
 
-    // ==================================================
-    // STT
-    // ==================================================
-
     {
       title:
         "STT",
@@ -1601,7 +1597,7 @@ export default function MedicalStaff() {
         "stt",
 
       width:
-        70,
+        58,
 
       align:
         "center" as const,
@@ -1621,15 +1617,11 @@ export default function MedicalStaff() {
             page -
             1
           ) *
-          pageSize +
+            pageSize +
           index +
           1,
     },
 
-
-    // ==================================================
-    // HỌ TÊN
-    // ==================================================
 
     {
       title:
@@ -1639,13 +1631,12 @@ export default function MedicalStaff() {
         "fullName",
 
       width:
-        200,
+        180,
+
+      ellipsis:
+        true,
     },
 
-
-    // ==================================================
-    // MÃ BHXH
-    // ==================================================
 
     {
       title:
@@ -1655,7 +1646,7 @@ export default function MedicalStaff() {
         "socialInsuranceCode",
 
       width:
-        150,
+        135,
 
       render:
         (
@@ -1667,10 +1658,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // MÃ CCHN
-    // ==================================================
 
     {
       title:
@@ -1680,7 +1667,7 @@ export default function MedicalStaff() {
         "licenseNumber",
 
       width:
-        170,
+        165,
 
       render:
         (
@@ -1692,10 +1679,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // MÃ KHOA
-    // ==================================================
 
     {
       title:
@@ -1705,7 +1688,10 @@ export default function MedicalStaff() {
         "departmentCodes",
 
       width:
-        150,
+        120,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1716,35 +1702,31 @@ export default function MedicalStaff() {
             MedicalStaffItem
         ) => {
 
-          if (
-            !Array.isArray(
-              record.departments
-            ) ||
-            record.departments.length ===
-              0
-          ) {
+        if (
+          !Array.isArray(
+            record.departments
+          ) ||
+          record.departments.length ===
+            0
+        ) {
 
-            return "-";
-          }
+          return "-";
+        }
 
 
-          return record.departments
-            .map(
-              (
-                department
-              ) =>
-                department.code
-            )
-            .join(
-              "; "
-            );
-        },
+        return record.departments
+          .map(
+            (
+              department
+            ) =>
+              department.code
+          )
+          .join(
+            "; "
+          );
+      },
     },
 
-
-    // ==================================================
-    // KHOA
-    // ==================================================
 
     {
       title:
@@ -1754,7 +1736,10 @@ export default function MedicalStaff() {
         "departmentNames",
 
       width:
-        210,
+        190,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1765,35 +1750,31 @@ export default function MedicalStaff() {
             MedicalStaffItem
         ) => {
 
-          if (
-            !Array.isArray(
-              record.departments
-            ) ||
-            record.departments.length ===
-              0
-          ) {
+        if (
+          !Array.isArray(
+            record.departments
+          ) ||
+          record.departments.length ===
+            0
+        ) {
 
-            return "-";
-          }
+          return "-";
+        }
 
 
-          return record.departments
-            .map(
-              (
-                department
-              ) =>
-                department.name
-            )
-            .join(
-              "; "
-            );
-        },
+        return record.departments
+          .map(
+            (
+              department
+            ) =>
+              department.name
+          )
+          .join(
+            "; "
+          );
+      },
     },
 
-
-    // ==================================================
-    // GIỚI TÍNH
-    // ==================================================
 
     {
       title:
@@ -1803,7 +1784,10 @@ export default function MedicalStaff() {
         "gender",
 
       width:
-        100,
+        90,
+
+      align:
+        "center" as const,
 
       render:
         (
@@ -1816,10 +1800,6 @@ export default function MedicalStaff() {
     },
 
 
-    // ==================================================
-    // NGÀY CẤP
-    // ==================================================
-
     {
       title:
         "Ngày cấp CCHN",
@@ -1828,7 +1808,7 @@ export default function MedicalStaff() {
         "licenseIssueDate",
 
       width:
-        145,
+        125,
 
       render:
         (
@@ -1842,10 +1822,6 @@ export default function MedicalStaff() {
     },
 
 
-    // ==================================================
-    // CHỨC DANH
-    // ==================================================
-
     {
       title:
         "Chức danh NN",
@@ -1854,7 +1830,10 @@ export default function MedicalStaff() {
         "professionalTitle",
 
       width:
-        150,
+        135,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1866,10 +1845,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // NƠI CẤP
-    // ==================================================
 
     {
       title:
@@ -1879,7 +1854,10 @@ export default function MedicalStaff() {
         "licenseIssuer",
 
       width:
-        180,
+        170,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1891,10 +1869,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // PHẠM VI
-    // ==================================================
 
     {
       title:
@@ -1906,6 +1880,9 @@ export default function MedicalStaff() {
       width:
         200,
 
+      ellipsis:
+        true,
+
       render:
         (
           value:
@@ -1916,10 +1893,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // THỜI GIAN ĐK
-    // ==================================================
 
     {
       title:
@@ -1929,7 +1902,7 @@ export default function MedicalStaff() {
         "registrationTime",
 
       width:
-        130,
+        120,
 
       render:
         (
@@ -1941,10 +1914,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // THỜI GIAN NGÀY
-    // ==================================================
 
     {
       title:
@@ -1954,7 +1923,7 @@ export default function MedicalStaff() {
         "dailyTime",
 
       width:
-        150,
+        145,
 
       render:
         (
@@ -1966,10 +1935,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // THỜI GIAN TUẦN
-    // ==================================================
 
     {
       title:
@@ -1979,7 +1944,10 @@ export default function MedicalStaff() {
         "weeklyTime",
 
       width:
-        180,
+        165,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -1991,10 +1959,6 @@ export default function MedicalStaff() {
           "-",
     },
 
-
-    // ==================================================
-    // VỊ TRÍ
-    // ==================================================
 
     {
       title:
@@ -2004,7 +1968,10 @@ export default function MedicalStaff() {
         "position",
 
       width:
-        140,
+        125,
+
+      ellipsis:
+        true,
 
       render:
         (
@@ -2017,10 +1984,6 @@ export default function MedicalStaff() {
     },
 
 
-    // ==================================================
-    // STATUS
-    // ==================================================
-
     {
       title:
         "Trạng thái",
@@ -2029,7 +1992,7 @@ export default function MedicalStaff() {
         "active",
 
       width:
-        120,
+        110,
 
       fixed:
         "right" as const,
@@ -2046,12 +2009,16 @@ export default function MedicalStaff() {
             ? (
               <Tag
                 color="success"
+
+                className="medical-staff-status"
               >
                 Đang dùng
               </Tag>
             )
             : (
-              <Tag>
+              <Tag
+                className="medical-staff-status"
+              >
                 Ngừng dùng
               </Tag>
             ),
@@ -2066,374 +2033,410 @@ export default function MedicalStaff() {
   return (
     <>
 
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <Space
-        style={{
-          width:
-            "100%",
-
-          justifyContent:
-            "space-between",
-
-          marginBottom:
-            18,
-        }}
-      >
-
-        <Title
-          level={
-            3
-          }
-
-          style={{
-            margin:
-              0,
-          }}
-        >
-          Nhân viên y tế
-        </Title>
-
-
-        <Space>
-
-          <Button
-            icon={
-              <UploadOutlined />
-            }
-
-            onClick={
-              openImportModal
-            }
-          >
-            Import Excel
-          </Button>
-
-
-          <Button
-            type="primary"
-
-            icon={
-              <PlusOutlined />
-            }
-
-            onClick={
-              openAddModal
-            }
-          >
-            Thêm mới
-          </Button>
-
-        </Space>
-
-      </Space>
-
-
-      {/* =================================================
-          FILTER
-      ================================================= */}
-
       <div
-        style={{
-          display:
-            "grid",
-
-          gridTemplateColumns:
-            "1.4fr 1fr 1fr 1.2fr auto",
-
-          gap:
-            10,
-
-          alignItems:
-            "end",
-
-          marginBottom:
-            16,
-        }}
+        className="medical-staff-page"
       >
 
-        {/* HỌ TÊN */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-        <div>
-
-          <Text>
-            Họ tên
-          </Text>
-
-          <Input
-            value={
-              searchName
-            }
-
-            placeholder="Họ tên"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchName(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        {/* MÃ CCHN */}
-
-        <div>
-
-          <Text>
-            Mã CCHN
-          </Text>
-
-          <Input
-            value={
-              searchLicense
-            }
-
-            placeholder="Mã CCHN"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchLicense(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        {/* MÃ BHXH */}
-
-        <div>
-
-          <Text>
-            Mã BHXH
-          </Text>
-
-          <Input
-            value={
-              searchBhxh
-            }
-
-            placeholder="Mã BHXH"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchBhxh(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        {/* KHOA */}
-
-        <div>
-
-          <Text>
-            Khoa
-          </Text>
-
-          <Select
-            value={
-              searchDepartment
-            }
-
-            allowClear
-
-            showSearch
-
-            optionFilterProp="label"
-
-            placeholder="Tất cả khoa"
-
-            style={{
-              width:
-                "100%",
-
-              marginTop:
-                5,
-            }}
-
-            options={
-              departments.map(
-                (
-                  item
-                ) => ({
-                  value:
-                    item.code,
-
-                  label:
-                    `${item.code} - ${item.name}`,
-                })
-              )
-            }
-
-            onChange={(
-              value
-            ) => {
-
-              setSearchDepartment(
-                value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        {/* REFRESH */}
-
-        <Button
-          icon={
-            <ReloadOutlined />
-          }
-
-          onClick={
-            handleRefresh
-          }
+        <div
+          className="medical-staff-header"
         >
-          Làm mới
-        </Button>
 
-      </div>
+          <div>
+
+            <div
+              style={{
+                display:
+                  "flex",
+
+                alignItems:
+                  "center",
+
+                gap:
+                  10,
+              }}
+            >
+
+              <TeamOutlined
+                style={{
+                  fontSize:
+                    25,
+
+                  color:
+                    "#1677ff",
+                }}
+              />
 
 
-      {/* =================================================
-          TABLE
-      ================================================= */}
+              <Title
+                level={
+                  3
+                }
 
-      <Table<MedicalStaffItem>
-        rowKey="id"
+                style={{
+                  margin:
+                    0,
+                }}
+              >
+                Nhân viên y tế
+              </Title>
 
-        bordered
+            </div>
 
-        size="middle"
 
-        loading={
-          loading
-        }
+            <Text
+              type="secondary"
 
-        dataSource={
-          items
-        }
+              className="medical-staff-subtitle"
+            >
+              Quản lý danh mục bác sĩ và nhân viên y tế
+            </Text>
 
-        columns={
-          columns
-        }
+          </div>
 
-        scroll={{
-          x:
-            2600,
-        }}
 
-        pagination={{
-          current:
-            page,
+          <Space
+            size={
+              8
+            }
+          >
 
-          pageSize,
+            <Button
+              icon={
+                <UploadOutlined />
+              }
 
-          total,
+              onClick={
+                openImportModal
+              }
+            >
+              Import Excel
+            </Button>
 
-          showSizeChanger:
-            true,
 
-          pageSizeOptions: [
-            "10",
-            "50",
-            "100",
-          ],
+            <Button
+              type="primary"
 
-          showTotal:
-            (
-              value
-            ) =>
-              `Tổng số: ${value}`,
+              icon={
+                <PlusOutlined />
+              }
 
-          onChange:
-            (
-              newPage,
-              newPageSize
-            ) => {
+              onClick={
+                openAddModal
+              }
+            >
+              Thêm mới
+            </Button>
 
-              if (
-                newPageSize !==
-                pageSize
-              ) {
+          </Space>
 
-                setPageSize(
-                  newPageSize
+        </div>
+
+
+        {/* =================================================
+            FILTER
+        ================================================= */}
+
+        <div
+          className="medical-staff-filters"
+        >
+
+          <div
+            className="medical-staff-filter"
+          >
+
+            <Text
+              strong
+
+              className="medical-staff-filter-label"
+            >
+              Họ tên
+            </Text>
+
+
+            <Input
+              value={
+                searchName
+              }
+
+              placeholder="Họ tên"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchName(
+                  event.target.value
                 );
 
 
                 setPage(
                   1
                 );
+              }}
+            />
+
+          </div>
 
 
-                return;
+          <div
+            className="medical-staff-filter"
+          >
+
+            <Text
+              strong
+
+              className="medical-staff-filter-label"
+            >
+              Mã CCHN
+            </Text>
+
+
+            <Input
+              value={
+                searchLicense
               }
 
+              placeholder="Mã CCHN"
 
-              setPage(
-                newPage
-              );
-            },
-        }}
-      />
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchLicense(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="medical-staff-filter"
+          >
+
+            <Text
+              strong
+
+              className="medical-staff-filter-label"
+            >
+              Mã BHXH
+            </Text>
+
+
+            <Input
+              value={
+                searchBhxh
+              }
+
+              placeholder="Mã BHXH"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchBhxh(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="medical-staff-filter"
+          >
+
+            <Text
+              strong
+
+              className="medical-staff-filter-label"
+            >
+              Khoa
+            </Text>
+
+
+            <Select
+              value={
+                searchDepartment
+              }
+
+              allowClear
+
+              showSearch
+
+              optionFilterProp="label"
+
+              placeholder="Tất cả khoa"
+
+              style={{
+                width:
+                  "100%",
+              }}
+
+              options={
+                departments.map(
+                  (
+                    item
+                  ) => ({
+                    value:
+                      item.code,
+
+                    label:
+                      `${item.code} - ${item.name}`,
+                  })
+                )
+              }
+
+              onChange={(
+                value
+              ) => {
+
+                setSearchDepartment(
+                  value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <Button
+            type="primary"
+
+            ghost
+
+            icon={
+              <ReloadOutlined />
+            }
+
+            onClick={
+              handleRefresh
+            }
+          >
+            Làm mới
+          </Button>
+
+        </div>
+
+
+        {/* =================================================
+            TABLE
+        ================================================= */}
+
+        <Table<MedicalStaffItem>
+          className="medical-staff-table"
+
+          rowKey="id"
+
+          size="middle"
+
+          loading={
+            loading
+          }
+
+          dataSource={
+            items
+          }
+
+          columns={
+            columns
+          }
+
+          tableLayout="fixed"
+
+          scroll={{
+            x:
+              2350,
+          }}
+
+          pagination={{
+            current:
+              page,
+
+            pageSize,
+
+            total,
+
+            showSizeChanger:
+              true,
+
+            pageSizeOptions: [
+              "10",
+              "50",
+              "100",
+            ],
+
+            showTotal:
+              (
+                value
+              ) =>
+                `Tổng số: ${value}`,
+
+            onChange:
+              (
+                newPage,
+                newPageSize
+              ) => {
+
+                if (
+                  newPageSize !==
+                  pageSize
+                ) {
+
+                  setPageSize(
+                    newPageSize
+                  );
+
+
+                  setPage(
+                    1
+                  );
+
+
+                  return;
+                }
+
+
+                setPage(
+                  newPage
+                );
+              },
+          }}
+
+          locale={{
+            emptyText:
+              "Chưa có dữ liệu nhân viên y tế",
+          }}
+        />
+
+      </div>
 
 
       {/* =================================================
@@ -2476,6 +2479,7 @@ export default function MedicalStaff() {
           if (
             saving
           ) {
+
             return;
           }
 
@@ -2505,25 +2509,11 @@ export default function MedicalStaff() {
             false
           }
 
-          style={{
-            marginTop:
-              18,
-          }}
+          className="medical-staff-form"
         >
 
-          {/* ROW 1 */}
-
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1.4fr 1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="medical-staff-form-grid medical-staff-form-grid-3"
           >
 
             <Form.Item
@@ -2580,19 +2570,8 @@ export default function MedicalStaff() {
           </div>
 
 
-          {/* ROW 2 */}
-
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr 1.4fr",
-
-              gap:
-                16,
-            }}
+            className="medical-staff-form-grid medical-staff-form-grid-3"
           >
 
             <Form.Item
@@ -2655,26 +2634,17 @@ export default function MedicalStaff() {
               name="professionalTitle"
             >
 
-              <Input />
+              <Input
+                placeholder="Chức danh nghề nghiệp"
+              />
 
             </Form.Item>
 
           </div>
 
 
-          {/* ROW 3 */}
-
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="medical-staff-form-grid medical-staff-form-grid-2"
           >
 
             <Form.Item
@@ -2683,7 +2653,9 @@ export default function MedicalStaff() {
               name="licenseIssuer"
             >
 
-              <Input />
+              <Input
+                placeholder="Nơi cấp CCHN"
+              />
 
             </Form.Item>
 
@@ -2694,14 +2666,14 @@ export default function MedicalStaff() {
               name="position"
             >
 
-              <Input />
+              <Input
+                placeholder="Vị trí"
+              />
 
             </Form.Item>
 
           </div>
 
-
-          {/* KHOA */}
 
           <Form.Item
             label="Khoa"
@@ -2738,8 +2710,6 @@ export default function MedicalStaff() {
           </Form.Item>
 
 
-          {/* PHẠM VI */}
-
           <Form.Item
             label="Phạm vi chuyên môn"
 
@@ -2750,24 +2720,15 @@ export default function MedicalStaff() {
               rows={
                 2
               }
+
+              placeholder="Phạm vi chuyên môn"
             />
 
           </Form.Item>
 
 
-          {/* TIME */}
-
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="medical-staff-form-grid medical-staff-form-grid-3"
           >
 
             <Form.Item
@@ -2811,8 +2772,6 @@ export default function MedicalStaff() {
           </div>
 
 
-          {/* NOTE */}
-
           <Form.Item
             label="Ghi chú"
 
@@ -2823,12 +2782,12 @@ export default function MedicalStaff() {
               rows={
                 2
               }
+
+              placeholder="Ghi chú"
             />
 
           </Form.Item>
 
-
-          {/* ACTIVE */}
 
           <Form.Item
             label="Đang sử dụng"
@@ -2903,13 +2862,22 @@ export default function MedicalStaff() {
 
             description={
               <>
-                Hệ thống tự nhận diện sheet có các cột <b>MA_BHXH</b>, <b>HO_TEN</b> và <b>MACCHN</b>.
+                Hệ thống tự nhận diện sheet có các cột{" "}
+                <b>MA_BHXH</b>,{" "}
+                <b>HO_TEN</b>{" "}
+                và{" "}
+                <b>MACCHN</b>.
                 {" "}
-                MA_KHOA hỗ trợ nhiều khoa, phân cách bằng dấu chấm phẩy.
+                MA_KHOA hỗ trợ nhiều khoa,
+                phân cách bằng dấu chấm phẩy.
                 {" "}
-                Nhân viên đã tồn tại sẽ được nhận diện theo MA_BHXH hoặc MACCHN và được cập nhật.
+                Nhân viên đã tồn tại sẽ được
+                nhận diện theo MA_BHXH hoặc
+                MACCHN và được cập nhật.
                 {" "}
-                Nếu có mã khoa chưa tồn tại hoặc file có dữ liệu lỗi thì toàn bộ lần import sẽ bị hủy.
+                Nếu có mã khoa chưa tồn tại
+                hoặc file có dữ liệu lỗi thì
+                toàn bộ lần import sẽ bị hủy.
               </>
             }
 
@@ -3006,10 +2974,6 @@ export default function MedicalStaff() {
           </Upload>
 
 
-          {/* =================================================
-              SUCCESS
-          ================================================= */}
-
           {importResult && (
 
             <Alert
@@ -3017,10 +2981,7 @@ export default function MedicalStaff() {
 
               showIcon
 
-              style={{
-                marginTop:
-                  20,
-              }}
+              className="medical-staff-import-alert"
 
               message={
                 importMessage ||
@@ -3028,46 +2989,58 @@ export default function MedicalStaff() {
               }
 
               description={
-
                 <div
-                  style={{
-                    lineHeight:
-                      2,
-                  }}
+                  className="medical-staff-import-summary"
                 >
 
                   <div>
-                    Tổng số nhân viên:
-                    {" "}
+                    <span>
+                      Tổng số nhân viên
+                    </span>
+
                     <b>
-                      {importResult.totalRows}
+                      {
+                        importResult.totalRows
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Thêm mới:
-                    {" "}
+                    <span>
+                      Thêm mới
+                    </span>
+
                     <b>
-                      {importResult.inserted}
+                      {
+                        importResult.inserted
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Cập nhật:
-                    {" "}
+                    <span>
+                      Cập nhật
+                    </span>
+
                     <b>
-                      {importResult.updated}
+                      {
+                        importResult.updated
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Bỏ qua:
-                    {" "}
+                    <span>
+                      Bỏ qua
+                    </span>
+
                     <b>
-                      {importResult.skipped}
+                      {
+                        importResult.skipped
+                      }
                     </b>
                   </div>
 
@@ -3077,10 +3050,6 @@ export default function MedicalStaff() {
 
           )}
 
-
-          {/* =================================================
-              GENERAL ERROR
-          ================================================= */}
 
           {!importResult &&
             importMessage &&
@@ -3105,117 +3074,333 @@ export default function MedicalStaff() {
             )}
 
 
-          {/* =================================================
-              ROW ERRORS
-          ================================================= */}
-
           {importErrors.length >
             0 && (
 
-              <div
+            <div
+              style={{
+                marginTop:
+                  20,
+              }}
+            >
+
+              <Alert
+                type="error"
+
+                showIcon
+
+                message={
+                  importMessage ||
+                  `File có ${importErrors.length} lỗi.`
+                }
+
+                description="Không có nhân viên nào được import. Hãy sửa các dòng lỗi rồi import lại."
+
                 style={{
-                  marginTop:
-                    20,
+                  marginBottom:
+                    12,
                 }}
-              >
-
-                <Alert
-                  type="error"
-
-                  showIcon
-
-                  message={
-                    importMessage ||
-                    `File có ${importErrors.length} lỗi.`
-                  }
-
-                  description="Không có nhân viên nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
-                  style={{
-                    marginBottom:
-                      12,
-                  }}
-                />
+              />
 
 
-                <Table<MedicalStaffImportError>
-                  size="small"
+              <Table<MedicalStaffImportError>
+                className="medical-staff-import-table"
 
-                  bordered
+                size="small"
 
-                  rowKey={(
-                    record,
-                    index
-                  ) =>
-                    `${record.row}-${record.field}-${index}`
-                  }
+                rowKey={(
+                  record,
+                  index
+                ) =>
+                  `${record.row}-${record.field}-${index}`
+                }
 
-                  dataSource={
-                    importErrors
-                  }
+                dataSource={
+                  importErrors
+                }
 
-                  pagination={{
-                    pageSize:
-                      10,
+                pagination={{
+                  pageSize:
+                    10,
 
-                    showSizeChanger:
-                      false,
+                  showSizeChanger:
+                    false,
 
-                    showTotal:
-                      (
-                        value
-                      ) =>
-                        `Tổng lỗi: ${value}`,
-                  }}
+                  showTotal:
+                    (
+                      value
+                    ) =>
+                      `Tổng lỗi: ${value}`,
+                }}
 
-                  scroll={{
-                    y:
-                      320,
-                  }}
+                scroll={{
+                  y:
+                    320,
+                }}
 
-                  columns={[
-                    {
-                      title:
-                        "Dòng",
+                columns={[
+                  {
+                    title:
+                      "Dòng",
 
-                      dataIndex:
-                        "row",
+                    dataIndex:
+                      "row",
 
-                      width:
-                        80,
+                    width:
+                      80,
 
-                      align:
-                        "center",
-                    },
+                    align:
+                      "center",
+                  },
 
-                    {
-                      title:
-                        "Cột",
+                  {
+                    title:
+                      "Cột",
 
-                      dataIndex:
-                        "field",
+                    dataIndex:
+                      "field",
 
-                      width:
-                        180,
-                    },
+                    width:
+                      180,
+                  },
 
-                    {
-                      title:
-                        "Lỗi",
+                  {
+                    title:
+                      "Lỗi",
 
-                      dataIndex:
-                        "message",
-                    },
-                  ]}
-                />
+                    dataIndex:
+                      "message",
+                  },
+                ]}
+              />
 
-              </div>
+            </div>
 
-            )}
+          )}
 
         </div>
 
       </Modal>
+
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
+
+      <style>
+        {`
+          .medical-staff-page {
+            width: 100%;
+          }
+
+          .medical-staff-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+
+          .medical-staff-header h3 {
+            color: #172033 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+          }
+
+          .medical-staff-subtitle {
+            display: block;
+            margin-top: 3px;
+            font-size: 12px;
+          }
+
+          .medical-staff-filters {
+            display: grid;
+            grid-template-columns:
+              minmax(220px, 1.4fr)
+              minmax(170px, 1fr)
+              minmax(170px, 1fr)
+              minmax(220px, 1.2fr)
+              auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 14px;
+          }
+
+          .medical-staff-filter {
+            min-width: 0;
+          }
+
+          .medical-staff-filter-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .medical-staff-table {
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+
+          .medical-staff-table
+          .ant-table {
+            border-radius: 8px;
+          }
+
+          .medical-staff-table
+          .ant-table-container {
+            border-start-start-radius: 8px;
+            border-start-end-radius: 8px;
+          }
+
+          .medical-staff-table
+          .ant-table-thead
+          > tr
+          > th {
+            background: #f3f6f9 !important;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 11px 10px !important;
+            border-bottom: 1px solid #e5eaf0 !important;
+          }
+
+          .medical-staff-table
+          .ant-table-tbody
+          > tr
+          > td {
+            padding: 11px 10px !important;
+            color: #202a3b;
+            font-size: 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf0f5 !important;
+          }
+
+          .medical-staff-table
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background: #f7fbff !important;
+          }
+
+          .medical-staff-table
+          .ant-table-cell-fix-left,
+          .medical-staff-table
+          .ant-table-cell-fix-right {
+            background: #ffffff;
+          }
+
+          .medical-staff-table
+          .ant-table-thead
+          .ant-table-cell-fix-left,
+          .medical-staff-table
+          .ant-table-thead
+          .ant-table-cell-fix-right {
+            background: #f3f6f9 !important;
+          }
+
+          .medical-staff-table
+          .ant-pagination {
+            margin: 14px 8px 6px;
+          }
+
+          .medical-staff-status {
+            margin: 0;
+            border-radius: 6px;
+            font-size: 11px;
+          }
+
+          .medical-staff-form {
+            margin-top: 18px;
+          }
+
+          .medical-staff-form-grid {
+            display: grid;
+            gap: 16px;
+          }
+
+          .medical-staff-form-grid-3 {
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+          }
+
+          .medical-staff-form-grid-2 {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+
+          .medical-staff-import-alert {
+            margin-top: 20px;
+          }
+
+          .medical-staff-import-summary {
+            display: grid;
+            grid-template-columns:
+              repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+          }
+
+          .medical-staff-import-summary > div {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.65);
+            border-radius: 7px;
+          }
+
+          .medical-staff-import-summary span {
+            font-size: 12px;
+            color: #667085;
+          }
+
+          .medical-staff-import-summary b {
+            font-size: 18px;
+            color: #172033;
+          }
+
+          .medical-staff-import-table {
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+
+          @media (max-width: 1100px) {
+            .medical-staff-filters {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+
+            .medical-staff-form-grid-3 {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+          }
+
+          @media (max-width: 720px) {
+            .medical-staff-header {
+              flex-direction: column;
+            }
+
+            .medical-staff-filters {
+              grid-template-columns: 1fr;
+            }
+
+            .medical-staff-form-grid-3,
+            .medical-staff-form-grid-2 {
+              grid-template-columns: 1fr;
+            }
+
+            .medical-staff-import-summary {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+          }
+        `}
+      </style>
 
     </>
   );

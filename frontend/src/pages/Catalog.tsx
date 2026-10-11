@@ -1,5 +1,4 @@
 import {
-  ApartmentOutlined,
   AppstoreOutlined,
   BankOutlined,
   BuildOutlined,
@@ -26,6 +25,10 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import {
+  useState,
+} from "react";
+
 import type {
   ReactNode,
 } from "react";
@@ -37,361 +40,500 @@ const {
 } = Typography;
 
 
+// ======================================================
+// TYPES
+// ======================================================
+
 interface CatalogCardItem {
-  title:
-    string;
+  title: string;
 
-  description:
-    string;
+  description: string;
 
-  path?:
-    string;
+  path?: string;
 
-  icon:
-    ReactNode;
+  icon: ReactNode;
 
-  color:
-    string;
+  color: string;
 
-  ready?:
-    boolean;
+  ready?: boolean;
 }
 
 
 interface RuleCard {
-  title:
-    string;
+  title: string;
 
-  description:
-    string;
+  description: string;
 
-  path:
-    string;
+  path: string;
 
-  icon:
-    ReactNode;
+  icon: ReactNode;
 
-  color:
-    string;
+  color: string;
 }
 
 
+type CatalogTabKey =
+  | "bhxh"
+  | "rules";
+
+
+// ======================================================
+// DANH MỤC BHXH
+// ======================================================
+
 const catalogCards:
   CatalogCardItem[] = [
-    {
-      title:
-        "DVKT",
 
-      description:
-        "Danh mục dịch vụ kỹ thuật và cấu hình kiểm tra.",
+  {
+    title:
+      "DVKT",
 
-      path:
-        "/catalog/services",
+    description:
+      "Danh mục dịch vụ kỹ thuật và cấu hình kiểm tra.",
 
-      icon:
-        <MedicineBoxOutlined />,
+    path:
+      "/catalog/services",
 
-      color:
-        "#1677ff",
+    icon:
+      <MedicineBoxOutlined />,
 
-      ready:
-        true,
-    },
+    color:
+      "#1677ff",
 
-    {
-      title:
-        "Vật tư",
+    ready:
+      true,
+  },
 
-      description:
-        "Danh mục vật tư y tế.",
 
-      path:
-        "/catalog/medical-supplies",
+  {
+    title:
+      "Vật tư",
 
-      icon:
-        <DatabaseOutlined />,
+    description:
+      "Danh mục vật tư y tế.",
 
-      color:
-        "#389e0d",
+    path:
+      "/catalog/medical-supplies",
 
-      ready:
-        false,
-    },
+    icon:
+      <DatabaseOutlined />,
 
-    {
-      title:
-        "Thuốc",
+    color:
+      "#389e0d",
 
-      description:
-        "Danh mục thuốc và thông tin sử dụng.",
+    ready:
+      false,
+  },
 
-      path:
-        "/catalog/drugs",
 
-      icon:
-        <ExperimentOutlined />,
+  {
+    title:
+      "Thuốc",
 
-      color:
-        "#fa8c16",
+    description:
+      "Danh mục thuốc và thông tin sử dụng.",
 
-      ready:
-        true,
-    },
+    path:
+      "/catalog/drugs",
 
-    {
-      title:
-        "Nhân viên y tế",
+    icon:
+      <ExperimentOutlined />,
 
-      description:
-        "Danh mục bác sĩ và nhân viên y tế.",
+    color:
+      "#fa8c16",
 
-      path:
-        "/catalog/medical-staff",
+    ready:
+      true,
+  },
 
-      icon:
-        <UserOutlined />,
 
-      color:
-        "#722ed1",
+  {
+    title:
+      "Nhân viên y tế",
 
-      ready:
-        true,
-    },
+    description:
+      "Danh mục bác sĩ và nhân viên y tế.",
 
-    {
-      title:
-        "Giường bệnh",
+    path:
+      "/catalog/medical-staff",
 
-      description:
-        "Danh mục giường bệnh theo khoa.",
+    icon:
+      <UserOutlined />,
 
-      path:
-        "/catalog/beds",
+    color:
+      "#722ed1",
 
-      icon:
-        <BuildOutlined />,
+    ready:
+      true,
+  },
 
-      color:
-        "#cf1322",
 
-      ready:
-        false,
-    },
+  {
+    title:
+      "Giường bệnh",
 
-    {
-      title:
-        "Khoa",
+    description:
+      "Danh mục giường bệnh theo khoa.",
 
-      description:
-        "Danh mục khoa phòng.",
+    path:
+      "/catalog/beds",
 
-      path:
-        "/catalog/departments",
+    icon:
+      <BuildOutlined />,
 
-      icon:
-        <BankOutlined />,
+    color:
+      "#cf1322",
 
-      color:
-        "#2f54eb",
+    ready:
+      false,
+  },
 
-      ready:
-        true,
-    },
 
-    {
-      title:
-        "Công khám",
+  {
+    title:
+      "Khoa",
 
-      description:
-        "Danh mục dịch vụ khám bệnh.",
+    description:
+      "Danh mục khoa phòng.",
 
-      path:
-        "/catalog/examination-services",
+    path:
+      "/catalog/departments",
 
-      icon:
-        <AppstoreOutlined />,
+    icon:
+      <BankOutlined />,
 
-      color:
-        "#08979c",
+    color:
+      "#2f54eb",
 
-      ready:
-        true,
-    },
+    ready:
+      true,
+  },
 
-    {
-      title:
-        "Tiền giường",
 
-      description:
-        "Danh mục giá giường BHYT.",
+  {
+    title:
+      "Công khám",
 
-      path:
-        "/catalog/bed-prices",
+    description:
+      "Danh mục dịch vụ khám bệnh.",
 
-      icon:
-        <DollarOutlined />,
+    path:
+      "/catalog/examination-services",
 
-      color:
-        "#c41d7f",
+    icon:
+      <AppstoreOutlined />,
 
-      ready:
-        false,
-    },
+    color:
+      "#08979c",
 
-    {
-      title:
-        "Danh mục máy",
+    ready:
+      true,
+  },
 
-      description:
-        "Quản lý máy và cảnh báo trùng thời gian thực hiện.",
 
-      path:
-        "/catalog/machines",
+  {
+    title:
+      "Tiền giường",
 
-      icon:
-        <BuildOutlined />,
+    description:
+      "Danh mục giá giường BHYT.",
 
-      color:
-        "#8c564b",
+    path:
+      "/catalog/bed-prices",
 
-      ready:
-        true,
-    },
-  ];
+    icon:
+      <DollarOutlined />,
 
+    color:
+      "#c41d7f",
+
+    ready:
+      false,
+  },
+
+
+  {
+    title:
+      "Danh mục máy",
+
+    description:
+      "Quản lý máy và cảnh báo trùng thời gian thực hiện.",
+
+    path:
+      "/catalog/machines",
+
+    icon:
+      <BuildOutlined />,
+
+    color:
+      "#8c564b",
+
+    ready:
+      true,
+  },
+];
+
+
+// ======================================================
+// QUY LUẬT KIỂM TRA
+// ======================================================
 
 const ruleCards:
   RuleCard[] = [
-    {
-      title:
-        "DVKT - ICD",
 
-      description:
-        "Kiểm tra dịch vụ kỹ thuật có phù hợp mã ICD của hồ sơ.",
+  // {
+  //   title:
+  //     "DVKT - ICD",
 
-      path:
-        "/catalog/service-icd",
+  //   description:
+  //     "Kiểm tra dịch vụ kỹ thuật có phù hợp mã ICD của hồ sơ.",
 
-      icon:
-        <SafetyCertificateOutlined />,
+  //   path:
+  //     "/catalog/service-icd",
 
-      color:
-        "#1677ff",
-    },
-    {
-  title:
-    "DVKT - Nhân viên",
+  //   icon:
+  //     <SafetyCertificateOutlined />,
 
-  description:
-    "Cấu hình nhân viên được phép thực hiện từng DVKT.",
+  //   color:
+  //     "#1677ff",
+  // },
 
-  path:
-    "/catalog/service-staff",
 
-  icon:
-    <TeamOutlined />,
+  {
+    title:
+      "DVKT - Nhân viên",
 
-  color:
-    "#607d8b",
-},
+    description:
+      "Cấu hình nhân viên được phép thực hiện từng DVKT.",
 
-    {
-      title:
-        "DVKT - Chẩn đoán vào",
+    path:
+      "/catalog/service-staff",
 
-      description:
-        "Kiểm tra DVKT có phù hợp chẩn đoán vào.",
+    icon:
+      <TeamOutlined />,
 
-      path:
-        "/catalog/service-diagnosis",
+    color:
+      "#607d8b",
+  },
 
-      icon:
-        <AppstoreOutlined />,
 
-      color:
-        "#2f54eb",
-    },
+  {
+    title:
+      "DVKT - Chẩn đoán vào",
 
-    {
-      title:
-        "Thuốc - ICD",
+    description:
+      "Kiểm tra DVKT có phù hợp chẩn đoán vào.",
 
-      description:
-        "Kiểm tra thuốc có phù hợp mã bệnh.",
+    path:
+      "/catalog/service-diagnosis",
 
-      path:
-        "/catalog/drug-icd",
+    icon:
+      <AppstoreOutlined />,
 
-      icon:
-        <MedicineBoxOutlined />,
+    color:
+      "#2f54eb",
+  },
 
-      color:
-        "#52c41a",
-    },
 
-    {
-      title:
-        "Thuốc - Hoạt chất",
+  {
+    title:
+      "ICD Cảnh báo",
 
-      description:
-        "Cấu hình hoạt chất của từng thuốc.",
+    description:
+      "Cấu hình các mã ICD cần cảnh báo khi kiểm tra hồ sơ.",
 
-      path:
-        "/catalog/drug-ingredient",
+    path:
+      "/catalog/icd-warnings",
 
-      icon:
-        <ExperimentOutlined />,
+    icon:
+      <SafetyCertificateOutlined />,
 
-      color:
-        "#fa8c16",
-    },
+    color:
+      "#d4380d",
+  },
 
-    {
-      title:
-        "Tương tác thuốc",
 
-      description:
-        "Cấu hình các hoạt chất không nên sử dụng cùng nhau.",
+  // {
+  //   title:
+  //     "Thuốc - ICD",
 
-      path:
-        "/catalog/drug-interaction",
+  //   description:
+  //     "Kiểm tra thuốc có phù hợp mã bệnh.",
 
-      icon:
-        <ApartmentOutlined />,
+  //   path:
+  //     "/catalog/drug-icd",
 
-      color:
-        "#722ed1",
-    },
-  ];
+  //   icon:
+  //     <MedicineBoxOutlined />,
 
+  //   color:
+  //     "#52c41a",
+  // },
+
+
+  // {
+  //   title:
+  //     "Thuốc - Hoạt chất",
+
+  //   description:
+  //     "Cấu hình hoạt chất của từng thuốc.",
+
+  //   path:
+  //     "/catalog/drug-ingredient",
+
+  //   icon:
+  //     <ExperimentOutlined />,
+
+  //   color:
+  //     "#fa8c16",
+  // },
+
+
+  // {
+  //   title:
+  //     "Tương tác thuốc",
+
+  //   description:
+  //     "Cấu hình các hoạt chất không nên sử dụng cùng nhau.",
+
+  //   path:
+  //     "/catalog/drug-interaction",
+
+  //   icon:
+  //     <ApartmentOutlined />,
+
+  //   color:
+  //     "#722ed1",
+  // },
+];
+
+
+// ======================================================
+// COMPONENT
+// ======================================================
 
 export default function Catalog() {
+
   const navigate =
     useNavigate();
 
 
-  // const readyCount =
-  //   catalogCards.filter(
-  //     (
-  //       item
-  //     ) =>
-  //       item.ready
-  //   ).length;
+  // ====================================================
+  // ACTIVE TAB
+  //
+  // Ghi nhớ tab người dùng đang chọn.
+  // Khi vào trang con rồi quay lại /catalog
+  // sẽ giữ nguyên tab trước đó.
+  // ====================================================
+
+  const [
+    activeTab,
+    setActiveTab,
+  ] = useState<CatalogTabKey>(
+    () => {
+
+      const savedTab =
+        sessionStorage.getItem(
+          "catalog-active-tab"
+        );
 
 
-  // const pendingCount =
-  //   catalogCards.length -
-  //   readyCount;
+      if (
+        savedTab ===
+        "rules"
+      ) {
 
+        return "rules";
+      }
+
+
+      return "bhxh";
+    }
+  );
+
+
+  function handleTabChange(
+    key: string
+  ) {
+
+    const nextTab:
+      CatalogTabKey =
+      key ===
+      "rules"
+        ? "rules"
+        : "bhxh";
+
+
+    setActiveTab(
+      nextTab
+    );
+
+
+    sessionStorage.setItem(
+      "catalog-active-tab",
+      nextTab
+    );
+  }
+
+
+  // ====================================================
+  // NAVIGATE FROM BHXH TAB
+  // ====================================================
+
+  function openCatalogPage(
+    path:
+      string
+  ) {
+
+    sessionStorage.setItem(
+      "catalog-active-tab",
+      "bhxh"
+    );
+
+
+    navigate(
+      path
+    );
+  }
+
+
+  // ====================================================
+  // NAVIGATE FROM RULES TAB
+  // ====================================================
+
+  function openRulePage(
+    path:
+      string
+  ) {
+
+    sessionStorage.setItem(
+      "catalog-active-tab",
+      "rules"
+    );
+
+
+    navigate(
+      path
+    );
+  }
+
+
+  // ====================================================
+  // DANH MỤC BHXH TAB
+  // ====================================================
 
   const bhxhTab = (
+
     <div
       className="catalog-section"
     >
+
       <div
         className="catalog-section-header"
       >
+
         <div>
+
           <Typography.Text
             strong
 
@@ -402,6 +544,7 @@ export default function Catalog() {
           >
             Danh mục nghiệp vụ
           </Typography.Text>
+
 
           <Typography.Text
             type="secondary"
@@ -419,26 +562,9 @@ export default function Catalog() {
           >
             Quản lý các danh mục phục vụ đối chiếu và kiểm tra hồ sơ BHYT
           </Typography.Text>
+
         </div>
 
-
-        {/* <div
-          className="catalog-section-status"
-        >
-          <Tag
-            color="success"
-          >
-            {
-              readyCount
-            } đã sẵn sàng
-          </Tag>
-
-          <Tag>
-            {
-              pendingCount
-            } sắp làm
-          </Tag>
-        </div> */}
       </div>
 
 
@@ -448,11 +574,13 @@ export default function Catalog() {
           14,
         ]}
       >
+
         {
           catalogCards.map(
             (
               item
             ) => (
+
               <Col
                 xs={24}
                 sm={12}
@@ -464,6 +592,7 @@ export default function Catalog() {
                   item.title
                 }
               >
+
                 <Card
                   hoverable={
                     item.ready
@@ -476,19 +605,23 @@ export default function Catalog() {
                   }
 
                   onClick={() => {
+
                     if (
                       item.ready &&
                       item.path
                     ) {
-                      navigate(
+
+                      openCatalogPage(
                         item.path
                       );
                     }
                   }}
                 >
+
                   <div
                     className="catalog-card-top"
                   >
+
                     <div
                       className="catalog-card-icon"
 
@@ -505,28 +638,13 @@ export default function Catalog() {
                       }
                     </div>
 
-
-                    {/* <Tag
-                      color={
-                        item.ready
-                          ? "success"
-                          : "default"
-                      }
-
-                      className="catalog-card-state"
-                    >
-                      {
-                        item.ready
-                          ? "Sẵn sàng"
-                          : "Sắp làm"
-                      }
-                    </Tag> */}
                   </div>
 
 
                   <div
                     className="catalog-card-content"
                   >
+
                     <Title
                       level={5}
 
@@ -547,12 +665,14 @@ export default function Catalog() {
                         item.description
                       }
                     </Text>
+
                   </div>
 
 
                   <div
                     className="catalog-card-footer"
                   >
+
                     <Button
                       type={
                         item.ready
@@ -571,6 +691,7 @@ export default function Catalog() {
                       onClick={(
                         event
                       ) => {
+
                         event.stopPropagation();
 
 
@@ -578,7 +699,8 @@ export default function Catalog() {
                           item.ready &&
                           item.path
                         ) {
-                          navigate(
+
+                          openCatalogPage(
                             item.path
                           );
                         }
@@ -598,25 +720,39 @@ export default function Catalog() {
                           : "Sắp làm"
                       }
                     </Button>
+
                   </div>
+
                 </Card>
+
               </Col>
+
             )
           )
         }
+
       </Row>
+
     </div>
   );
 
 
+  // ====================================================
+  // QUY LUẬT KIỂM TRA TAB
+  // ====================================================
+
   const rulesTab = (
+
     <div
       className="catalog-section"
     >
+
       <div
         className="catalog-section-header"
       >
+
         <div>
+
           <Typography.Text
             strong
 
@@ -627,6 +763,7 @@ export default function Catalog() {
           >
             Quy luật kiểm tra
           </Typography.Text>
+
 
           <Typography.Text
             type="secondary"
@@ -644,6 +781,7 @@ export default function Catalog() {
           >
             Thiết lập điều kiện nghiệp vụ dùng cho Rule Engine
           </Typography.Text>
+
         </div>
 
 
@@ -654,6 +792,7 @@ export default function Catalog() {
             ruleCards.length
           } nhóm quy luật
         </Tag>
+
       </div>
 
 
@@ -663,11 +802,13 @@ export default function Catalog() {
           14,
         ]}
       >
+
         {
           ruleCards.map(
             (
               item
             ) => (
+
               <Col
                 xs={24}
                 sm={12}
@@ -678,17 +819,19 @@ export default function Catalog() {
                   item.path
                 }
               >
+
                 <Card
                   hoverable
 
                   className="catalog-rule-card"
 
                   onClick={() =>
-                    navigate(
+                    openRulePage(
                       item.path
                     )
                   }
                 >
+
                   <div
                     className="catalog-rule-icon"
 
@@ -731,6 +874,7 @@ export default function Catalog() {
                   <div
                     className="catalog-rule-footer"
                   >
+
                     <Button
                       type="primary"
 
@@ -739,9 +883,11 @@ export default function Catalog() {
                       onClick={(
                         event
                       ) => {
+
                         event.stopPropagation();
 
-                        navigate(
+
+                        openRulePage(
                           item.path
                         );
                       }}
@@ -756,25 +902,43 @@ export default function Catalog() {
                     >
                       Chi tiết
                     </Button>
+
                   </div>
+
                 </Card>
+
               </Col>
+
             )
           )
         }
+
       </Row>
+
     </div>
   );
 
 
+  // ====================================================
+  // UI
+  // ====================================================
+
   return (
+
     <div
       className="catalog-page"
     >
+
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
       <div
         className="catalog-header"
       >
+
         <div>
+
           <Title
             level={3}
 
@@ -789,6 +953,7 @@ export default function Catalog() {
                 800,
             }}
           >
+
             <AppstoreOutlined
               style={{
                 marginRight:
@@ -799,7 +964,9 @@ export default function Catalog() {
               }}
             />
 
+
             Danh mục
+
           </Title>
 
 
@@ -816,9 +983,15 @@ export default function Catalog() {
           >
             Quản lý dữ liệu danh mục và cấu hình quy luật kiểm tra BHYT
           </Text>
+
         </div>
+
       </div>
 
+
+      {/* =================================================
+          TABS
+      ================================================= */}
 
       <Card
         className="catalog-main-card"
@@ -830,8 +1003,15 @@ export default function Catalog() {
           },
         }}
       >
+
         <Tabs
-          defaultActiveKey="bhxh"
+          activeKey={
+            activeTab
+          }
+
+          onChange={
+            handleTabChange
+          }
 
           className="catalog-tabs"
 
@@ -859,8 +1039,13 @@ export default function Catalog() {
             },
           ]}
         />
+
       </Card>
 
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
 
       <style>
         {`
@@ -877,12 +1062,8 @@ export default function Catalog() {
           }
 
           .catalog-main-card {
-            border:
-              1px solid
-              #edf0f5;
-
-            border-radius:
-              14px;
+            border: 1px solid #edf0f5;
+            border-radius: 14px;
 
             box-shadow:
               0
@@ -895,8 +1076,7 @@ export default function Catalog() {
                 0.04
               );
 
-            overflow:
-              hidden;
+            overflow: hidden;
           }
 
           .catalog-tabs
@@ -1302,6 +1482,7 @@ export default function Catalog() {
             max-width:
               800px
           ) {
+
             .catalog-section-header {
               align-items:
                 flex-start;
@@ -1309,9 +1490,11 @@ export default function Catalog() {
               flex-direction:
                 column;
             }
+
           }
         `}
       </style>
+
     </div>
   );
 }

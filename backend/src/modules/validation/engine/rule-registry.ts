@@ -93,6 +93,9 @@ import {
   serviceStaffRule,
 } from "./rules/service-staff.rule.js";
 
+import {
+  icdWarningRule,
+} from "./rules/icd-warning.rule.js";
 
 export const ruleRegistry:
   Record<
@@ -162,4 +165,7 @@ DRUG_INTERACTION:
 
   SERVICE_STAFF:
   serviceStaffRule,
+
+  ICD_WARNING:
+  icdWarningRule,
 };

@@ -1,22 +1,29 @@
 import {
+  Breadcrumb,
   Button,
-  Dropdown,
   Form,
   Input,
   Modal,
-  Popconfirm,
   Space,
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 
+import type {
+  TableColumnsType,
+} from "antd";
+
 import {
-  EllipsisOutlined,
+  EditOutlined,
+  HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
+  StopOutlined,
+  ToolOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -41,44 +48,36 @@ const {
 // ======================================================
 
 interface MachineItem {
-
   code: string;
 
   name: string;
 
   legacyServiceCode:
-    string |
-    null;
+    | string
+    | null;
 
-  warnTimeOverlap:
-    boolean;
+  warnTimeOverlap: boolean;
 
   note:
-    string |
-    null;
+    | string
+    | null;
 
-  active:
-    boolean;
+  active: boolean;
 
-  serviceCount:
-    number;
+  serviceCount: number;
 
-  createdAt?:
-    string;
+  createdAt?: string;
 
-  updatedAt?:
-    string;
+  updatedAt?: string;
 }
 
 
 interface MachineListResponse {
-
   success?: boolean;
 
   message?: string;
 
   data?: {
-
     items:
       MachineItem[];
 
@@ -95,21 +94,15 @@ interface MachineListResponse {
 
 
 interface MachineFormValues {
+  code: string;
 
-  code:
-    string;
+  name: string;
 
-  name:
-    string;
+  warnTimeOverlap: boolean;
 
-  warnTimeOverlap:
-    boolean;
+  note?: string;
 
-  note?:
-    string;
-
-  active:
-    boolean;
+  active: boolean;
 }
 
 
@@ -126,19 +119,17 @@ export default function Machines() {
   const [
     searchCode,
     setSearchCode,
-  ] =
-    useState(
-      ""
-    );
+  ] = useState(
+    ""
+  );
 
 
   const [
     searchName,
     setSearchName,
-  ] =
-    useState(
-      ""
-    );
+  ] = useState(
+    ""
+  );
 
 
   // ====================================================
@@ -148,46 +139,43 @@ export default function Machines() {
   const [
     items,
     setItems,
-  ] =
-    useState<
-      MachineItem[]
-    >([]);
+  ] = useState<
+    MachineItem[]
+  >(
+    []
+  );
 
 
   const [
     total,
     setTotal,
-  ] =
-    useState(
-      0
-    );
+  ] = useState(
+    0
+  );
 
 
   const [
     page,
     setPage,
-  ] =
-    useState(
-      1
-    );
+  ] = useState(
+    1
+  );
 
 
   const [
     pageSize,
     setPageSize,
-  ] =
-    useState(
-      10
-    );
+  ] = useState(
+    10
+  );
 
 
   const [
     loading,
     setLoading,
-  ] =
-    useState(
-      false
-    );
+  ] = useState(
+    false
+  );
 
 
   // ====================================================
@@ -197,31 +185,28 @@ export default function Machines() {
   const [
     modalOpen,
     setModalOpen,
-  ] =
-    useState(
-      false
-    );
+  ] = useState(
+    false
+  );
 
 
   const [
     saving,
     setSaving,
-  ] =
-    useState(
-      false
-    );
+  ] = useState(
+    false
+  );
 
 
   const [
     editingMachine,
     setEditingMachine,
-  ] =
-    useState<
-      MachineItem |
-      null
-    >(
-      null
-    );
+  ] = useState<
+    MachineItem |
+    null
+  >(
+    null
+  );
 
 
   const [
@@ -249,7 +234,6 @@ export default function Machines() {
 
           const params =
             new URLSearchParams({
-
               page:
                 String(
                   page
@@ -419,7 +403,6 @@ export default function Machines() {
 
 
     form.setFieldsValue({
-
       code:
         "",
 
@@ -458,7 +441,6 @@ export default function Machines() {
 
 
     form.setFieldsValue({
-
       code:
         machine.code,
 
@@ -523,14 +505,12 @@ export default function Machines() {
                 : "POST",
 
             headers: {
-
               "Content-Type":
                 "application/json",
             },
 
             body:
               JSON.stringify({
-
                 code:
                   values.code.trim(),
 
@@ -695,6 +675,44 @@ export default function Machines() {
 
 
   // ====================================================
+  // CONFIRM DISABLE
+  // ====================================================
+
+  function confirmDisable(
+    machine:
+      MachineItem
+  ) {
+
+    Modal.confirm({
+      title:
+        "Ngừng sử dụng máy?",
+
+      content:
+        `${machine.code} - ${machine.name}`,
+
+      okText:
+        "Đồng ý",
+
+      cancelText:
+        "Hủy",
+
+      okButtonProps: {
+        danger:
+          true,
+      },
+
+      onOk:
+        async () => {
+
+          await handleDisable(
+            machine
+          );
+        },
+    });
+  }
+
+
+  // ====================================================
   // RESET SEARCH
   // ====================================================
 
@@ -720,124 +738,39 @@ export default function Machines() {
   // COLUMNS
   // ====================================================
 
-  const columns = [
-
-    // ==================================================
-    // ACTION
-    // ==================================================
+  const columns:
+    TableColumnsType<
+      MachineItem
+    > = [
 
     {
       title:
-        "",
+        "STT",
 
       key:
-        "action",
+        "stt",
 
       width:
-        55,
+        65,
+
+      align:
+        "center",
 
       render:
         (
-          _:
-            unknown,
-
-          record:
-            MachineItem
-        ) => (
-
-          <Dropdown
-            trigger={[
-              "click",
-            ]}
-
-            menu={{
-              items: [
-
-                {
-                  key:
-                    "edit",
-
-                  label:
-                    "Cập nhật",
-                },
-
-                {
-                  key:
-                    "disable",
-
-                  danger:
-                    true,
-
-                  disabled:
-                    !record.active,
-
-                  label: (
-
-                    <Popconfirm
-                      title="Ngừng sử dụng máy?"
-
-                      description={
-                        record.name
-                      }
-
-                      okText="Đồng ý"
-
-                      cancelText="Hủy"
-
-                      onConfirm={() =>
-                        void handleDisable(
-                          record
-                        )
-                      }
-                    >
-
-                      <span>
-                        Ngừng sử dụng
-                      </span>
-
-                    </Popconfirm>
-                  ),
-                },
-              ],
-
-              onClick: ({
-                key,
-                domEvent,
-              }) => {
-
-                domEvent
-                  .stopPropagation();
-
-
-                if (
-                  key ===
-                  "edit"
-                ) {
-
-                  openEditModal(
-                    record
-                  );
-                }
-              },
-            }}
-          >
-
-            <Button
-              type="text"
-
-              icon={
-                <EllipsisOutlined />
-              }
-            />
-
-          </Dropdown>
-        ),
+          _,
+          __,
+          index
+        ) =>
+          (
+            page -
+            1
+          ) *
+            pageSize +
+          index +
+          1,
     },
 
-
-    // ==================================================
-    // CODE
-    // ==================================================
 
     {
       title:
@@ -846,14 +779,28 @@ export default function Machines() {
       dataIndex:
         "code",
 
+      key:
+        "code",
+
       width:
         280,
+
+      render:
+        (
+          value:
+            string
+        ) => (
+          <Text
+            strong
+          >
+            {
+              value ||
+              "-"
+            }
+          </Text>
+        ),
     },
 
-
-    // ==================================================
-    // NAME
-    // ==================================================
 
     {
       title:
@@ -862,14 +809,47 @@ export default function Machines() {
       dataIndex:
         "name",
 
+      key:
+        "name",
+
       width:
-        360,
+        340,
+
+      ellipsis:
+        true,
+
+      render:
+        (
+          value:
+            string
+        ) => {
+
+        if (
+          !value
+        ) {
+
+          return "-";
+        }
+
+
+        return (
+          <Tooltip
+            title={
+              value
+            }
+          >
+            <Text
+              ellipsis
+            >
+              {
+                value
+              }
+            </Text>
+          </Tooltip>
+        );
+      },
     },
 
-
-    // ==================================================
-    // WARN OVERLAP
-    // ==================================================
 
     {
       title:
@@ -878,11 +858,14 @@ export default function Machines() {
       dataIndex:
         "warnTimeOverlap",
 
+      key:
+        "warnTimeOverlap",
+
       width:
-        180,
+        165,
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -891,31 +874,25 @@ export default function Machines() {
         ) =>
           value
             ? (
+              <Tag
+                color="blue"
 
-              <Text
-                style={{
-                  color:
-                    "#1677ff",
-                }}
+                className="machines-pill"
               >
                 Có
-              </Text>
-
+              </Tag>
             )
             : (
+              <Tag
+                color="error"
 
-              <Text
-                type="danger"
+                className="machines-pill"
               >
                 Không
-              </Text>
+              </Tag>
             ),
     },
 
-
-    // ==================================================
-    // SERVICES
-    // ==================================================
 
     {
       title:
@@ -924,18 +901,20 @@ export default function Machines() {
       dataIndex:
         "serviceCount",
 
+      key:
+        "serviceCount",
+
       width:
-        150,
+        140,
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
           value:
             number
         ) => (
-
           <Tag
             color={
               value >
@@ -943,16 +922,17 @@ export default function Machines() {
                 ? "blue"
                 : "default"
             }
+
+            className="machines-count"
           >
-            {value}
+            {
+              value ??
+              0
+            }
           </Tag>
         ),
     },
 
-
-    // ==================================================
-    // NOTE
-    // ==================================================
 
     {
       title:
@@ -961,14 +941,56 @@ export default function Machines() {
       dataIndex:
         "note",
 
+      key:
+        "note",
+
+      width:
+        300,
+
       ellipsis:
         true,
+
+      render:
+        (
+          value:
+            string |
+            null
+        ) => {
+
+        const text =
+          value ||
+          "-";
+
+
+        if (
+          text ===
+          "-"
+        ) {
+
+          return "-";
+        }
+
+
+        return (
+          <Tooltip
+            title={
+              text
+            }
+
+            placement="topLeft"
+          >
+            <Text
+              ellipsis
+            >
+              {
+                text
+              }
+            </Text>
+          </Tooltip>
+        );
+      },
     },
 
-
-    // ==================================================
-    // ACTIVE
-    // ==================================================
 
     {
       title:
@@ -977,11 +999,17 @@ export default function Machines() {
       dataIndex:
         "active",
 
+      key:
+        "active",
+
       width:
-        130,
+        115,
+
+      fixed:
+        "right",
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -990,20 +1018,119 @@ export default function Machines() {
         ) =>
           value
             ? (
-
               <Tag
                 color="success"
+
+                className="machines-status"
               >
                 Đang dùng
               </Tag>
-
             )
             : (
-
-              <Tag>
+              <Tag
+                className="machines-status"
+              >
                 Ngừng dùng
               </Tag>
             ),
+    },
+
+
+    {
+      title:
+        "Thao tác",
+
+      key:
+        "actions",
+
+      width:
+        105,
+
+      fixed:
+        "right",
+
+      align:
+        "center",
+
+      render:
+        (
+          _,
+          record
+        ) => (
+
+          <Space
+            size={
+              10
+            }
+          >
+
+            <Tooltip
+              title="Cập nhật"
+            >
+
+              <Button
+                type="text"
+
+                size="small"
+
+                icon={
+                  <EditOutlined
+                    style={{
+                      color:
+                        "#1677ff",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  openEditModal(
+                    record
+                  )
+                }
+              />
+
+            </Tooltip>
+
+
+            <Tooltip
+              title={
+                record.active
+                  ? "Ngừng sử dụng"
+                  : "Đã ngừng sử dụng"
+              }
+            >
+
+              <Button
+                type="text"
+
+                size="small"
+
+                disabled={
+                  !record.active
+                }
+
+                icon={
+                  <StopOutlined
+                    style={{
+                      color:
+                        record.active
+                          ? "#ff4d4f"
+                          : "#bfbfbf",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  confirmDisable(
+                    record
+                  )
+                }
+              />
+
+            </Tooltip>
+
+          </Space>
+        ),
     },
   ];
 
@@ -1013,263 +1140,303 @@ export default function Machines() {
   // ====================================================
 
   return (
-
     <>
 
-      {/* ================================================= */}
-      {/* HEADER */}
-      {/* ================================================= */}
-
-      <Space
-        style={{
-          width:
-            "100%",
-
-          justifyContent:
-            "space-between",
-
-          marginBottom:
-            20,
-        }}
+      <div
+        className="machines-page"
       >
 
-        <Title
-          level={3}
+        {/* =================================================
+            BREADCRUMB
+        ================================================= */}
 
-          style={{
-            margin:
-              0,
-          }}
+        <Breadcrumb
+          className="machines-breadcrumb"
+
+          items={[
+            {
+              title: (
+                <HomeOutlined />
+              ),
+            },
+
+            {
+              title:
+                "Danh mục",
+            },
+
+            {
+              title:
+                "Máy",
+            },
+          ]}
+        />
+
+
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div
+          className="machines-header"
         >
-          Danh mục máy
-        </Title>
+
+          <div>
+
+            <div
+              className="machines-title-row"
+            >
+
+              <ToolOutlined
+                className="machines-title-icon"
+              />
 
 
-        <Button
-          type="primary"
+              <Title
+                level={
+                  3
+                }
 
-          icon={
-            <PlusOutlined />
-          }
+                style={{
+                  margin:
+                    0,
+                }}
+              >
+                Danh mục máy
+              </Title>
 
-          onClick={
-            openAddModal
-          }
-        >
-          Thêm mới
-        </Button>
-
-      </Space>
-
-
-      {/* ================================================= */}
-      {/* SEARCH */}
-      {/* ================================================= */}
-
-      <Space
-        wrap
-
-        style={{
-          width:
-            "100%",
-
-          marginBottom:
-            16,
-        }}
-      >
-
-        <div>
-
-          <Text>
-            Mã máy
-          </Text>
+            </div>
 
 
-          <Input
-            value={
-              searchCode
+            <Text
+              type="secondary"
+
+              className="machines-subtitle"
+            >
+              Quản lý máy thực hiện dịch vụ kỹ thuật và cấu hình cảnh báo
+            </Text>
+
+          </div>
+
+
+          <Button
+            type="primary"
+
+            icon={
+              <PlusOutlined />
             }
 
-            placeholder="Mã máy"
-
-            style={{
-              width:
-                300,
-
-              marginTop:
-                5,
-            }}
-
-            allowClear
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchCode(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
+            onClick={
+              openAddModal
+            }
+          >
+            Thêm mới
+          </Button>
 
         </div>
 
 
-        <div>
+        {/* =================================================
+            SEARCH
+        ================================================= */}
 
-          <Text>
-            Tên máy
-          </Text>
-
-
-          <Input
-            value={
-              searchName
-            }
-
-            placeholder="Tên máy"
-
-            style={{
-              width:
-                400,
-
-              marginTop:
-                5,
-            }}
-
-            allowClear
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchName(
-                event.target.value
-              );
-
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <Button
-          type="primary"
-
-          icon={
-            <ReloadOutlined />
-          }
-
-          style={{
-            marginTop:
-              25,
-          }}
-
-          onClick={
-            handleRefresh
-          }
+        <div
+          className="machines-filter-grid"
         >
-          Làm mới
-        </Button>
 
-      </Space>
+          <div
+            className="machines-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="machines-filter-label"
+            >
+              Mã máy
+            </Text>
 
 
-      {/* ================================================= */}
-      {/* TABLE */}
-      {/* ================================================= */}
+            <Input
+              value={
+                searchCode
+              }
 
-      <Table<MachineItem>
-        rowKey="code"
+              placeholder="Nhập mã máy"
 
-        bordered
+              allowClear
 
-        loading={
-          loading
-        }
+              onChange={(
+                event
+              ) => {
 
-        dataSource={
-          items
-        }
-
-        columns={
-          columns
-        }
-
-        scroll={{
-          x:
-            1200,
-        }}
-
-        pagination={{
-
-          current:
-            page,
-
-          pageSize,
-
-          total,
-
-          showSizeChanger:
-            true,
-
-          pageSizeOptions: [
-            "10",
-            "50",
-            "100",
-          ],
-
-          showTotal:
-            (
-              value
-            ) =>
-              `Tổng số: ${value}`,
-
-          onChange:
-            (
-              newPage,
-              newPageSize
-            ) => {
-
-              if (
-                newPageSize !==
-                pageSize
-              ) {
-
-                setPageSize(
-                  newPageSize
+                setSearchCode(
+                  event.target.value
                 );
 
 
                 setPage(
                   1
                 );
+              }}
+            />
+
+          </div>
 
 
-                return;
+          <div
+            className="machines-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="machines-filter-label"
+            >
+              Tên máy
+            </Text>
+
+
+            <Input
+              value={
+                searchName
               }
 
+              placeholder="Nhập tên máy"
 
-              setPage(
-                newPage
-              );
-            },
-        }}
-      />
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchName(
+                  event.target.value
+                );
 
 
-      {/* ================================================= */}
-      {/* CREATE / UPDATE MODAL */}
-      {/* ================================================= */}
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <Button
+            type="primary"
+
+            icon={
+              <ReloadOutlined />
+            }
+
+            onClick={
+              handleRefresh
+            }
+          >
+            Làm mới
+          </Button>
+
+        </div>
+
+
+        {/* =================================================
+            TABLE
+        ================================================= */}
+
+        <Table<MachineItem>
+          className="machines-table"
+
+          rowKey="code"
+
+          size="middle"
+
+          tableLayout="fixed"
+
+          loading={
+            loading
+          }
+
+          dataSource={
+            items
+          }
+
+          columns={
+            columns
+          }
+
+          scroll={{
+            x:
+              1450,
+          }}
+
+          pagination={{
+            current:
+              page,
+
+            pageSize,
+
+            total,
+
+            showSizeChanger:
+              true,
+
+            pageSizeOptions: [
+              "10",
+              "50",
+              "100",
+            ],
+
+            showTotal:
+              (
+                value
+              ) =>
+                `Tổng số: ${value}`,
+
+            onChange:
+              (
+                newPage,
+                newPageSize
+              ) => {
+
+                if (
+                  newPageSize !==
+                  pageSize
+                ) {
+
+                  setPageSize(
+                    newPageSize
+                  );
+
+
+                  setPage(
+                    1
+                  );
+
+
+                  return;
+                }
+
+
+                setPage(
+                  newPage
+                );
+              },
+          }}
+
+          locale={{
+            emptyText:
+              "Chưa có dữ liệu máy",
+          }}
+        />
+
+      </div>
+
+
+      {/* =================================================
+          CREATE / UPDATE MODAL
+      ================================================= */}
 
       <Modal
         open={
@@ -1337,28 +1504,12 @@ export default function Machines() {
             false
           }
 
-          style={{
-            marginTop:
-              20,
-          }}
+          className="machines-form"
         >
 
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 1fr",
-
-              gap:
-                16,
-            }}
+            className="machines-form-grid machines-form-grid-main"
           >
-
-            {/* =========================================== */}
-            {/* CODE */}
-            {/* =========================================== */}
 
             <Form.Item
               label="Mã máy"
@@ -1385,10 +1536,6 @@ export default function Machines() {
 
             </Form.Item>
 
-
-            {/* =========================================== */}
-            {/* NAME */}
-            {/* =========================================== */}
 
             <Form.Item
               label="Tên máy"
@@ -1419,21 +1566,8 @@ export default function Machines() {
 
 
           <div
-            style={{
-              display:
-                "grid",
-
-              gridTemplateColumns:
-                "1fr 2fr",
-
-              gap:
-                16,
-            }}
+            className="machines-form-grid machines-form-grid-config"
           >
-
-            {/* =========================================== */}
-            {/* OVERLAP */}
-            {/* =========================================== */}
 
             <Form.Item
               label="Cảnh báo trùng TGTH"
@@ -1452,10 +1586,6 @@ export default function Machines() {
             </Form.Item>
 
 
-            {/* =========================================== */}
-            {/* NOTE */}
-            {/* =========================================== */}
-
             <Form.Item
               label="Ghi chú"
 
@@ -1471,10 +1601,6 @@ export default function Machines() {
           </div>
 
 
-          {/* ============================================= */}
-          {/* ACTIVE */}
-          {/* ============================================= */}
-
           <Form.Item
             label="Đang sử dụng"
 
@@ -1483,13 +1609,192 @@ export default function Machines() {
             valuePropName="checked"
           >
 
-            <Switch />
+            <Switch
+              checkedChildren="Đang dùng"
+
+              unCheckedChildren="Ngừng dùng"
+            />
 
           </Form.Item>
 
         </Form>
 
       </Modal>
+
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
+
+      <style>
+        {`
+          .machines-page {
+            width: 100%;
+          }
+
+          .machines-breadcrumb {
+            margin-bottom: 14px;
+            font-size: 12px;
+          }
+
+          .machines-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+
+          .machines-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+
+          .machines-title-row h3 {
+            margin: 0 !important;
+            color: #172033 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+          }
+
+          .machines-title-icon {
+            color: #1677ff;
+            font-size: 25px;
+          }
+
+          .machines-subtitle {
+            display: block;
+            margin-top: 3px;
+            font-size: 12px;
+          }
+
+          .machines-filter-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(260px, 1fr)
+              minmax(380px, 1.4fr)
+              auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 14px;
+          }
+
+          .machines-filter-item {
+            min-width: 0;
+          }
+
+          .machines-filter-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .machines-table {
+            overflow: hidden;
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+          }
+
+          .machines-table
+          .ant-table {
+            border-radius: 8px;
+          }
+
+          .machines-table
+          .ant-table-container {
+            border-start-start-radius: 8px;
+            border-start-end-radius: 8px;
+          }
+
+          .machines-table
+          .ant-table-thead
+          > tr
+          > th {
+            padding: 11px 10px !important;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f3f6f9 !important;
+            border-bottom: 1px solid #e5eaf0 !important;
+          }
+
+          .machines-table
+          .ant-table-tbody
+          > tr
+          > td {
+            padding: 13px 10px !important;
+            color: #202a3b;
+            font-size: 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf0f5 !important;
+          }
+
+          .machines-table
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background: #f7fbff !important;
+          }
+
+          .machines-table
+          .ant-table-cell-fix-right {
+            background: #ffffff;
+          }
+
+          .machines-table
+          .ant-table-thead
+          .ant-table-cell-fix-right {
+            background: #f3f6f9 !important;
+          }
+
+          .machines-table
+          .ant-pagination {
+            margin: 14px 8px 6px;
+          }
+
+          .machines-status,
+          .machines-pill,
+          .machines-count {
+            margin: 0;
+            border-radius: 6px;
+            font-size: 11px;
+          }
+
+          .machines-form {
+            margin-top: 18px;
+          }
+
+          .machines-form-grid {
+            display: grid;
+            gap: 16px;
+          }
+
+          .machines-form-grid-main {
+            grid-template-columns:
+              1fr 1.5fr;
+          }
+
+          .machines-form-grid-config {
+            grid-template-columns:
+              1fr 2fr;
+          }
+
+          @media (max-width: 800px) {
+            .machines-header {
+              flex-direction: column;
+            }
+
+            .machines-filter-grid,
+            .machines-form-grid-main,
+            .machines-form-grid-config {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}
+      </style>
 
     </>
   );

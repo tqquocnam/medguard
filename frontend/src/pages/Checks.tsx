@@ -1164,61 +1164,76 @@ export default function Checks() {
         true,
     },
 
-    {
-      title:
-        "Số lỗi",
+   {
+  title:
+    "Số lỗi",
 
-      dataIndex:
-        "errorCount",
+  dataIndex:
+    "errorCount",
 
-      width:
-        110,
+  width:
+    120,
 
-      align:
-        "center" as const,
+  align:
+    "center" as const,
 
-      render:
-        (
-          value:
-            number,
+  render:
+    (
+      value:
+        number,
 
-          record:
-            CheckRunErrorCase
-        ) => (
-          <Button
-            type="link"
+      record:
+        CheckRunErrorCase
+    ) => (
 
-            danger
+      <Button
+        type="link"
 
-            size="small"
+        danger
 
-            style={{
-              padding:
-                "0 8px",
+        size="small"
 
-              height:
-                28,
+        icon={
+          <CloseCircleFilled />
+        }
 
-              borderRadius:
-                999,
+        style={{
+          padding:
+            "0 10px",
 
-              fontWeight:
-                700,
+          height:
+            28,
 
-              background:
-                "#fff1f0",
-            }}
+          borderRadius:
+            999,
 
-            onClick={() =>
-              setSelectedCase(
-                record
-              )
-            }
-          >
-            Lỗi ({value})
-          </Button>
-        ),
-    },
+          fontWeight:
+            700,
+
+          background:
+            "#fff1f0",
+
+          display:
+            "inline-flex",
+
+          alignItems:
+            "center",
+
+          gap:
+            4,
+        }}
+
+        onClick={() =>
+          setSelectedCase(
+            record
+          )
+        }
+      >
+        Lỗi ({value})
+      </Button>
+
+    ),
+},
   ];
 
 

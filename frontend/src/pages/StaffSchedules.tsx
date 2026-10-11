@@ -31,6 +31,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -48,11 +49,9 @@ import {
 // ======================================================
 
 interface MedicalStaff {
-  id:
-    string;
+  id: string;
 
-  fullName:
-    string;
+  fullName: string;
 
   socialInsuranceCode?:
     string |
@@ -73,14 +72,11 @@ interface MedicalStaff {
 
 
 interface StaffSchedule {
-  id:
-    string;
+  id: string;
 
-  staffId:
-    string;
+  staffId: string;
 
-  fullName:
-    string;
+  fullName: string;
 
   socialInsuranceCode?:
     string |
@@ -90,14 +86,11 @@ interface StaffSchedule {
     string |
     null;
 
-  workDate:
-    string;
+  workDate: string;
 
-  startTime:
-    string;
+  startTime: string;
 
-  endTime:
-    string;
+  endTime: string;
 
   status:
     | "ACTIVE"
@@ -114,24 +107,19 @@ interface StaffSchedule {
 
 
 interface ScheduleFormValues {
-  staffId:
-    string;
+  staffId: string;
 
-  workDate:
-    Dayjs;
+  workDate: Dayjs;
 
-  startTime:
-    Dayjs;
+  startTime: Dayjs;
 
-  endTime:
-    Dayjs;
+  endTime: Dayjs;
 
   status:
     | "ACTIVE"
     | "OFF";
 
-  note?:
-    string;
+  note?: string;
 }
 
 
@@ -140,9 +128,9 @@ interface ScheduleFormValues {
 // ======================================================
 
 function getWeekdayLabel(
-  value:
-    string
+  value: string
 ) {
+
   const date =
     dayjs(
       value
@@ -152,6 +140,7 @@ function getWeekdayLabel(
   switch (
     date.day()
   ) {
+
     case 0:
       return "Chủ nhật";
 
@@ -180,9 +169,9 @@ function getWeekdayLabel(
 
 
 function normalizeTime(
-  value:
-    string
+  value: string
 ) {
+
   return String(
     value ??
     ""
@@ -194,13 +183,17 @@ function normalizeTime(
 
 
 async function readJson(
-  response:
-    Response
+  response: Response
 ) {
+
   try {
+
     return await response.json();
+
   } catch {
+
     return null;
+
   }
 }
 
@@ -210,6 +203,448 @@ async function readJson(
 // ======================================================
 
 export default function StaffSchedules() {
+
+  // ====================================================
+  // RESPONSIVE PAGE - TỰ ĐO THEO MÀN HÌNH
+  // ====================================================
+
+  const pageRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+
+  const tableAreaRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+
+  const [
+    pageHeight,
+    setPageHeight,
+  ] =
+    useState<number | undefined>(
+      undefined
+    );
+
+
+  const [
+    tableScrollY,
+    setTableScrollY,
+  ] =
+    useState(
+      200
+    );
+
+
+  // ====================================================
+  // KHÓA SCROLL TOÀN TRANG
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      const html =
+        document.documentElement;
+
+
+      const body =
+        document.body;
+
+
+      const oldHtmlOverflow =
+        html.style.overflow;
+
+
+      const oldBodyOverflow =
+        body.style.overflow;
+
+
+      html.style.overflow =
+        "hidden";
+
+
+      body.style.overflow =
+        "hidden";
+
+
+      return () => {
+
+        html.style.overflow =
+          oldHtmlOverflow;
+
+
+        body.style.overflow =
+          oldBodyOverflow;
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // TÍNH CHIỀU CAO PAGE THEO VỊ TRÍ THỰC TẾ
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      let rafId =
+        0;
+
+
+      const updatePageHeight =
+        () => {
+
+          window.cancelAnimationFrame(
+            rafId
+          );
+
+
+          rafId =
+            window.requestAnimationFrame(
+              () => {
+
+                const element =
+                  pageRef.current;
+
+
+                if (
+                  !element
+                ) {
+
+                  return;
+                }
+
+
+                const rect =
+                  element.getBoundingClientRect();
+
+
+                /*
+                 * Không dùng calc(100vh - 160px) cố định.
+                 *
+                 * Tự lấy khoảng trống thực tế từ đầu
+                 * trang Lịch trực đến đáy viewport.
+                 */
+
+                const bottomGap =
+                  20;
+
+
+                const availableHeight =
+                  window.innerHeight -
+                  rect.top -
+                  bottomGap;
+
+
+                setPageHeight(
+                  Math.max(
+                    280,
+
+                    Math.floor(
+                      availableHeight
+                    )
+                  )
+                );
+
+              }
+            );
+
+        };
+
+
+      updatePageHeight();
+
+
+      window.addEventListener(
+        "resize",
+        updatePageHeight
+      );
+
+
+      const observer =
+        new ResizeObserver(
+          updatePageHeight
+        );
+
+
+      const parent =
+        pageRef.current
+          ?.parentElement;
+
+
+      if (
+        parent
+      ) {
+
+        observer.observe(
+          parent
+        );
+
+      }
+
+
+      return () => {
+
+        window.cancelAnimationFrame(
+          rafId
+        );
+
+
+        window.removeEventListener(
+          "resize",
+          updatePageHeight
+        );
+
+
+        observer.disconnect();
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // TỰ ĐO CHIỀU CAO BODY TABLE
+  // ====================================================
+
+  useEffect(
+    () => {
+
+      let rafId =
+        0;
+
+
+      const updateTableHeight =
+        () => {
+
+          window.cancelAnimationFrame(
+            rafId
+          );
+
+
+          rafId =
+            window.requestAnimationFrame(
+              () => {
+
+                const area =
+                  tableAreaRef.current;
+
+
+                if (
+                  !area
+                ) {
+
+                  return;
+                }
+
+
+                const cardHeader =
+                  area.querySelector<HTMLElement>(
+                    ".schedule-table-header"
+                  );
+
+
+                const tableHeader =
+                  area.querySelector<HTMLElement>(
+                    ".ant-table-thead"
+                  );
+
+
+                const pagination =
+                  area.querySelector<HTMLElement>(
+                    ".ant-pagination"
+                  );
+
+
+                const cardHeaderHeight =
+                  cardHeader
+                    ?.offsetHeight ??
+                  0;
+
+
+                const tableHeaderHeight =
+                  tableHeader
+                    ?.offsetHeight ??
+                  0;
+
+
+                let paginationHeight =
+                  0;
+
+
+                if (
+                  pagination
+                ) {
+
+                  const paginationStyle =
+                    window.getComputedStyle(
+                      pagination
+                    );
+
+
+                  paginationHeight =
+                    pagination.offsetHeight +
+                    (
+                      parseFloat(
+                        paginationStyle.marginTop
+                      ) ||
+                      0
+                    ) +
+                    (
+                      parseFloat(
+                        paginationStyle.marginBottom
+                      ) ||
+                      0
+                    );
+
+                }
+
+
+                /*
+                 * Chừa thêm 18px cho horizontal scrollbar
+                 * và khoảng an toàn dưới table.
+                 */
+
+                const extraSpace =
+                  18;
+
+
+                const availableBodyHeight =
+                  area.clientHeight -
+                  cardHeaderHeight -
+                  tableHeaderHeight -
+                  paginationHeight -
+                  extraSpace;
+
+
+                setTableScrollY(
+                  Math.max(
+                    80,
+
+                    Math.floor(
+                      availableBodyHeight
+                    )
+                  )
+                );
+
+              }
+            );
+
+        };
+
+
+      const timer1 =
+        window.setTimeout(
+          updateTableHeight,
+          0
+        );
+
+
+      const timer2 =
+        window.setTimeout(
+          updateTableHeight,
+          120
+        );
+
+
+      window.addEventListener(
+        "resize",
+        updateTableHeight
+      );
+
+
+      const resizeObserver =
+        new ResizeObserver(
+          updateTableHeight
+        );
+
+
+      if (
+        tableAreaRef.current
+      ) {
+
+        resizeObserver.observe(
+          tableAreaRef.current
+        );
+
+      }
+
+
+      /*
+       * Khi Table/Pagination load xong hoặc đổi dữ liệu
+       * thì tính lại chiều cao.
+       */
+
+      const mutationObserver =
+        new MutationObserver(
+          updateTableHeight
+        );
+
+
+      if (
+        tableAreaRef.current
+      ) {
+
+        mutationObserver.observe(
+          tableAreaRef.current,
+          {
+            childList:
+              true,
+
+            subtree:
+              true,
+          }
+        );
+
+      }
+
+
+      return () => {
+
+        window.cancelAnimationFrame(
+          rafId
+        );
+
+
+        window.clearTimeout(
+          timer1
+        );
+
+
+        window.clearTimeout(
+          timer2
+        );
+
+
+        window.removeEventListener(
+          "resize",
+          updateTableHeight
+        );
+
+
+        resizeObserver.disconnect();
+
+
+        mutationObserver.disconnect();
+
+      };
+
+    },
+    []
+  );
+
+
+  // ====================================================
+  // FORM
+  // ====================================================
+
   const [
     form,
   ] =
@@ -217,6 +652,10 @@ export default function StaffSchedules() {
       ScheduleFormValues
     >();
 
+
+  // ====================================================
+  // STATE
+  // ====================================================
 
   const [
     staffList,
@@ -355,7 +794,9 @@ export default function StaffSchedules() {
   // ====================================================
 
   async function loadStaff() {
+
     try {
+
       const response =
         await apiFetch(
           "/catalog/medical-staff?page=1&pageSize=500&active=true",
@@ -375,12 +816,14 @@ export default function StaffSchedules() {
       if (
         !response.ok ||
         json?.success !==
-          true
+        true
       ) {
+
         throw new Error(
           json?.message ||
           "Không thể tải danh sách nhân viên."
         );
+
       }
 
 
@@ -399,12 +842,15 @@ export default function StaffSchedules() {
     } catch (
       error
     ) {
+
       message.error(
         error instanceof Error
           ? error.message
           : "Không thể tải danh sách nhân viên."
       );
+
     }
+
   }
 
 
@@ -413,7 +859,9 @@ export default function StaffSchedules() {
   // ====================================================
 
   async function loadSchedules() {
+
     try {
+
       setLoading(
         true
       );
@@ -442,44 +890,52 @@ export default function StaffSchedules() {
       if (
         selectedStaffId
       ) {
+
         params.set(
           "staffId",
           selectedStaffId
         );
+
       }
 
 
       if (
         year
       ) {
+
         params.set(
           "year",
           String(
             year
           )
         );
+
       }
 
 
       if (
         month
       ) {
+
         params.set(
           "month",
           String(
             month
           )
         );
+
       }
 
 
       if (
         status
       ) {
+
         params.set(
           "status",
           status
         );
+
       }
 
 
@@ -502,12 +958,14 @@ export default function StaffSchedules() {
       if (
         !response.ok ||
         json?.success !==
-          true
+        true
       ) {
+
         throw new Error(
           json?.message ||
           "Không thể tải lịch làm việc."
         );
+
       }
 
 
@@ -530,6 +988,7 @@ export default function StaffSchedules() {
     } catch (
       error
     ) {
+
       message.error(
         error instanceof Error
           ? error.message
@@ -537,10 +996,13 @@ export default function StaffSchedules() {
       );
 
     } finally {
+
       setLoading(
         false
       );
+
     }
+
   }
 
 
@@ -550,7 +1012,9 @@ export default function StaffSchedules() {
 
   useEffect(
     () => {
+
       void loadStaff();
+
     },
     []
   );
@@ -558,7 +1022,9 @@ export default function StaffSchedules() {
 
   useEffect(
     () => {
+
       void loadSchedules();
+
     },
     [
       selectedStaffId,
@@ -596,6 +1062,7 @@ export default function StaffSchedules() {
               ),
           })
         ),
+
       [
         staffList,
       ]
@@ -609,14 +1076,18 @@ export default function StaffSchedules() {
   const summary =
     useMemo(
       () => {
+
         let active =
           0;
+
 
         let off =
           0;
 
+
         let manual =
           0;
+
 
         let defaultCount =
           0;
@@ -626,11 +1097,14 @@ export default function StaffSchedules() {
           const item
           of schedules
         ) {
+
           if (
             item.status ===
             "ACTIVE"
           ) {
+
             active++;
+
           }
 
 
@@ -638,7 +1112,9 @@ export default function StaffSchedules() {
             item.status ===
             "OFF"
           ) {
+
             off++;
+
           }
 
 
@@ -646,7 +1122,9 @@ export default function StaffSchedules() {
             item.source ===
             "MANUAL"
           ) {
+
             manual++;
+
           }
 
 
@@ -654,8 +1132,11 @@ export default function StaffSchedules() {
             item.source ===
             "DEFAULT"
           ) {
+
             defaultCount++;
+
           }
+
         }
 
 
@@ -665,6 +1146,7 @@ export default function StaffSchedules() {
           manual,
           defaultCount,
         };
+
       },
       [
         schedules,
@@ -677,6 +1159,7 @@ export default function StaffSchedules() {
   // ====================================================
 
   function openCreateModal() {
+
     setEditingSchedule(
       null
     );
@@ -715,6 +1198,7 @@ export default function StaffSchedules() {
     setModalOpen(
       true
     );
+
   }
 
 
@@ -723,9 +1207,9 @@ export default function StaffSchedules() {
   // ====================================================
 
   function openEditModal(
-    record:
-      StaffSchedule
+    record: StaffSchedule
   ) {
+
     setEditingSchedule(
       record
     );
@@ -768,6 +1252,7 @@ export default function StaffSchedules() {
     setModalOpen(
       true
     );
+
   }
 
 
@@ -776,7 +1261,9 @@ export default function StaffSchedules() {
   // ====================================================
 
   async function handleSave() {
+
     try {
+
       const values =
         await form
           .validateFields();
@@ -855,12 +1342,14 @@ export default function StaffSchedules() {
       if (
         !response.ok ||
         json?.success !==
-          true
+        true
       ) {
+
         throw new Error(
           json?.message ||
           "Không thể lưu lịch."
         );
+
       }
 
 
@@ -889,20 +1378,26 @@ export default function StaffSchedules() {
     } catch (
       error
     ) {
+
       if (
         error instanceof
         Error
       ) {
+
         message.error(
           error.message
         );
+
       }
 
     } finally {
+
       setSaving(
         false
       );
+
     }
+
   }
 
 
@@ -911,10 +1406,11 @@ export default function StaffSchedules() {
   // ====================================================
 
   async function handleDelete(
-    id:
-      string
+    id: string
   ) {
+
     try {
+
       const response =
         await apiFetch(
           `/catalog/staff-schedules/${id}`,
@@ -934,12 +1430,14 @@ export default function StaffSchedules() {
       if (
         !response.ok ||
         json?.success !==
-          true
+        true
       ) {
+
         throw new Error(
           json?.message ||
           "Không thể xóa lịch."
         );
+
       }
 
 
@@ -953,12 +1451,15 @@ export default function StaffSchedules() {
     } catch (
       error
     ) {
+
       message.error(
         error instanceof Error
           ? error.message
           : "Không thể xóa lịch."
       );
+
     }
+
   }
 
 
@@ -967,14 +1468,18 @@ export default function StaffSchedules() {
   // ====================================================
 
   function handleGenerateDefault() {
+
     if (
       !selectedStaffId
     ) {
+
       message.warning(
         "Vui lòng chọn nhân viên trước."
       );
 
+
       return;
+
     }
 
 
@@ -1005,6 +1510,7 @@ export default function StaffSchedules() {
               12,
           }}
         >
+
           <Typography.Paragraph>
             Nhân viên:{" "}
 
@@ -1056,6 +1562,7 @@ export default function StaffSchedules() {
             Hệ thống sẽ tự tạo lịch theo thông tin trong Danh mục Nhân viên y tế.
             Những ngày đã có lịch sẽ được bỏ qua và không ghi đè.
           </Typography.Text>
+
         </div>
       ),
 
@@ -1067,7 +1574,9 @@ export default function StaffSchedules() {
 
       onOk:
         async () => {
+
           try {
+
             setGenerating(
               true
             );
@@ -1107,12 +1616,14 @@ export default function StaffSchedules() {
             if (
               !response.ok ||
               json?.success !==
-                true
+              true
             ) {
+
               throw new Error(
                 json?.message ||
                 "Không thể tạo lịch mặc định."
               );
+
             }
 
 
@@ -1127,6 +1638,7 @@ export default function StaffSchedules() {
           } catch (
             error
           ) {
+
             message.error(
               error instanceof Error
                 ? error.message
@@ -1134,12 +1646,16 @@ export default function StaffSchedules() {
             );
 
           } finally {
+
             setGenerating(
               false
             );
+
           }
+
         },
     });
+
   }
 
 
@@ -1148,6 +1664,7 @@ export default function StaffSchedules() {
   // ====================================================
 
   function handleReset() {
+
     setSelectedStaffId(
       undefined
     );
@@ -1172,6 +1689,7 @@ export default function StaffSchedules() {
     setPage(
       1
     );
+
   }
 
 
@@ -1181,12 +1699,30 @@ export default function StaffSchedules() {
 
   return (
     <div
+      ref={
+        pageRef
+      }
+
       className="schedule-page"
+
+      style={{
+        height:
+          pageHeight
+            ? `${pageHeight}px`
+            : "calc(100dvh - 160px)",
+      }}
     >
+
+      {/* ==================================================
+          HEADER
+      ================================================== */}
+
       <div
         className="schedule-header"
       >
+
         <div>
+
           <Typography.Title
             level={
               3
@@ -1199,10 +1735,17 @@ export default function StaffSchedules() {
               color:
                 "#172033",
 
+              fontSize:
+                21,
+
+              lineHeight:
+                1.25,
+
               fontWeight:
                 800,
             }}
           >
+
             <CalendarOutlined
               style={{
                 marginRight:
@@ -1210,10 +1753,14 @@ export default function StaffSchedules() {
 
                 color:
                   "#1677ff",
+
+                fontSize:
+                  20,
               }}
             />
 
             Lịch trực
+
           </Typography.Title>
 
 
@@ -1225,11 +1772,15 @@ export default function StaffSchedules() {
                 "block",
 
               marginTop:
-                4,
+                2,
+
+              fontSize:
+                12,
             }}
           >
             Quản lý lịch làm việc của nhân viên y tế và làm dữ liệu đối chiếu hồ sơ XML
           </Typography.Text>
+
         </div>
 
 
@@ -1263,52 +1814,68 @@ export default function StaffSchedules() {
         >
           Thêm lịch
         </Button>
+
       </div>
 
+
+      {/* ==================================================
+          THỐNG KÊ
+      ================================================== */}
 
       <div
         className="schedule-stat-grid"
       >
+
         <Card
           className="schedule-stat-card schedule-stat-total"
         >
+
           <div
             className="schedule-stat-icon"
           >
             <CalendarOutlined />
           </div>
 
+
           <div>
+
             <div
               className="schedule-stat-label"
             >
               Tổng lịch
             </div>
 
+
             <div
               className="schedule-stat-value"
             >
               {total}
             </div>
+
           </div>
+
         </Card>
 
 
         <Card
           className="schedule-stat-card schedule-stat-active"
         >
+
           <div
             className="schedule-stat-icon"
           >
             <CheckCircleFilled />
           </div>
 
+
           <div>
+
             <div
               className="schedule-stat-label"
             >
               Đang làm
             </div>
+
 
             <div
               className="schedule-stat-value"
@@ -1317,25 +1884,31 @@ export default function StaffSchedules() {
                 summary.active
               }
             </div>
+
           </div>
+
         </Card>
 
 
         <Card
           className="schedule-stat-card schedule-stat-off"
         >
+
           <div
             className="schedule-stat-icon"
           >
             <StopOutlined />
           </div>
 
+
           <div>
+
             <div
               className="schedule-stat-label"
             >
               Nghỉ
             </div>
+
 
             <div
               className="schedule-stat-value"
@@ -1344,25 +1917,31 @@ export default function StaffSchedules() {
                 summary.off
               }
             </div>
+
           </div>
+
         </Card>
 
 
         <Card
           className="schedule-stat-card schedule-stat-default"
         >
+
           <div
             className="schedule-stat-icon"
           >
             <ThunderboltOutlined />
           </div>
 
+
           <div>
+
             <div
               className="schedule-stat-label"
             >
               Lịch mặc định
             </div>
+
 
             <div
               className="schedule-stat-value"
@@ -1371,18 +1950,28 @@ export default function StaffSchedules() {
                 summary.defaultCount
               }
             </div>
+
           </div>
+
         </Card>
+
       </div>
 
+
+      {/* ==================================================
+          FILTER
+      ================================================== */}
 
       <Card
         className="schedule-filter-card"
       >
+
         <div
           className="schedule-filter-header"
         >
+
           <div>
+
             <Typography.Text
               strong
             >
@@ -1406,6 +1995,7 @@ export default function StaffSchedules() {
             >
               Lọc theo nhân viên, thời gian và trạng thái
             </Typography.Text>
+
           </div>
 
 
@@ -1414,6 +2004,7 @@ export default function StaffSchedules() {
               8
             }
           >
+
             <Button
               icon={
                 <ReloadOutlined />
@@ -1458,16 +2049,20 @@ export default function StaffSchedules() {
             >
               Tạo lịch mặc định
             </Button>
+
           </Space>
+
         </div>
 
 
         <div
           className="schedule-filter-grid"
         >
+
           <div
             className="schedule-filter-field schedule-filter-staff"
           >
+
             <Typography.Text
               className="schedule-filter-label"
             >
@@ -1500,21 +2095,26 @@ export default function StaffSchedules() {
               onChange={(
                 value
               ) => {
+
                 setSelectedStaffId(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
 
 
           <div
             className="schedule-filter-field"
           >
+
             <Typography.Text
               className="schedule-filter-label"
             >
@@ -1569,21 +2169,26 @@ export default function StaffSchedules() {
               onChange={(
                 value
               ) => {
+
                 setYear(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
 
 
           <div
             className="schedule-filter-field"
           >
+
             <Typography.Text
               className="schedule-filter-label"
             >
@@ -1607,6 +2212,7 @@ export default function StaffSchedules() {
                     length:
                       12,
                   },
+
                   (
                     _,
                     index
@@ -1624,21 +2230,26 @@ export default function StaffSchedules() {
               onChange={(
                 value
               ) => {
+
                 setMonth(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
 
 
           <div
             className="schedule-filter-field"
           >
+
             <Typography.Text
               className="schedule-filter-label"
             >
@@ -1681,525 +2292,618 @@ export default function StaffSchedules() {
               onChange={(
                 value
               ) => {
+
                 setStatus(
                   value
                 );
 
+
                 setPage(
                   1
                 );
+
               }}
             />
+
           </div>
+
         </div>
+
       </Card>
 
 
-      <Card
-        className="schedule-table-card"
+      {/* ==================================================
+          TABLE
+      ================================================== */}
 
-        styles={{
-          body: {
-            padding:
-              0,
-          },
-        }}
+      <div
+        ref={
+          tableAreaRef
+        }
+
+        className="schedule-table-area"
       >
-        <div
-          className="schedule-table-header"
-        >
-          <div>
-            <Typography.Text
-              strong
 
-              style={{
-                fontSize:
-                  15,
-              }}
-            >
-              Danh sách lịch làm việc
-            </Typography.Text>
+        <Card
+          className="schedule-table-card"
+
+          styles={{
+            body: {
+              padding:
+                0,
+
+              height:
+                "100%",
+
+              display:
+                "flex",
+
+              flexDirection:
+                "column",
+
+              overflow:
+                "hidden",
+            },
+          }}
+        >
+
+          {/* ==============================================
+              HEADER TABLE
+          ============================================== */}
+
+          <div
+            className="schedule-table-header"
+          >
+
+            <div>
+
+              <Typography.Text
+                strong
+
+                style={{
+                  fontSize:
+                    14,
+                }}
+              >
+                Danh sách lịch làm việc
+              </Typography.Text>
+
+
+              <Typography.Text
+                type="secondary"
+
+                style={{
+                  marginLeft:
+                    8,
+
+                  fontSize:
+                    11,
+                }}
+              >
+                Tổng {total} lịch
+              </Typography.Text>
+
+            </div>
 
 
             <Typography.Text
               type="secondary"
 
               style={{
-                marginLeft:
-                  8,
-
                 fontSize:
-                  12,
+                  11,
               }}
             >
-              Tổng {total} lịch
+              Bấm biểu tượng bút để chỉnh sửa lịch
             </Typography.Text>
+
           </div>
 
 
-          <Typography.Text
-            type="secondary"
+          {/* ==============================================
+              CHỈ TABLE NÀY SCROLL
+          ============================================== */}
 
-            style={{
-              fontSize:
-                12,
+          <Table<StaffSchedule>
+            rowKey="id"
+
+            loading={
+              loading
+            }
+
+            dataSource={
+              schedules
+            }
+
+            size="middle"
+
+            scroll={{
+              x:
+                1300,
+
+              y:
+                tableScrollY,
             }}
-          >
-            Bấm biểu tượng bút để chỉnh sửa lịch
-          </Typography.Text>
-        </div>
 
+            pagination={{
+              current:
+                page,
 
-        <Table<StaffSchedule>
-          rowKey="id"
+              pageSize,
 
-          loading={
-            loading
-          }
+              total,
 
-          dataSource={
-            schedules
-          }
+              showSizeChanger:
+                true,
 
-          size="middle"
+              pageSizeOptions: [
+                "20",
+                "50",
+                "100",
+              ],
 
-          scroll={{
-            x:
-              1300,
-          }}
-
-          pagination={{
-            current:
-              page,
-
-            pageSize,
-
-            total,
-
-            showSizeChanger:
-              true,
-
-            pageSizeOptions: [
-              "20",
-              "50",
-              "100",
-            ],
-
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
-
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
-                  setPageSize(
-                    newPageSize
-                  );
-
-                  setPage(
-                    1
-                  );
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
-          }}
-
-          rowClassName={(
-            record
-          ) =>
-            record.status ===
-            "OFF"
-              ? "schedule-row-off"
-              : ""
-          }
-
-          columns={[
-            {
-              title:
-                "Nhân viên",
-
-              dataIndex:
-                "fullName",
-
-              width:
-                220,
-
-              fixed:
-                "left",
-
-              render:
+              showTotal:
                 (
                   value
-                ) => (
-                  <div
-                    className="schedule-staff-cell"
-                  >
+                ) =>
+                  `Tổng số: ${value}`,
+
+              onChange:
+                (
+                  newPage,
+                  newPageSize
+                ) => {
+
+                  if (
+                    newPageSize !==
+                    pageSize
+                  ) {
+
+                    setPageSize(
+                      newPageSize
+                    );
+
+
+                    setPage(
+                      1
+                    );
+
+
+                    return;
+                  }
+
+
+                  setPage(
+                    newPage
+                  );
+
+                },
+            }}
+
+            rowClassName={(
+              record
+            ) =>
+              record.status ===
+              "OFF"
+                ? "schedule-row-off"
+                : ""
+            }
+
+            columns={[
+              {
+                title:
+                  "Nhân viên",
+
+                dataIndex:
+                  "fullName",
+
+                width:
+                  220,
+
+                fixed:
+                  "left",
+
+                render:
+                  (
+                    value
+                  ) => (
+
                     <div
-                      className="schedule-staff-avatar"
+                      className="schedule-staff-cell"
                     >
-                      <TeamOutlined />
+
+                      <div
+                        className="schedule-staff-avatar"
+                      >
+                        <TeamOutlined />
+                      </div>
+
+
+                      <Typography.Text
+                        strong
+                      >
+                        {value}
+                      </Typography.Text>
+
                     </div>
+
+                  ),
+              },
+
+
+              {
+                title:
+                  "Mã BHXH",
+
+                dataIndex:
+                  "socialInsuranceCode",
+
+                width:
+                  145,
+
+                render:
+                  (
+                    value
+                  ) =>
+                    value ||
+                    "-",
+              },
+
+
+              {
+                title:
+                  "Mã CCHN/GPHN",
+
+                dataIndex:
+                  "licenseNumber",
+
+                width:
+                  175,
+
+                render:
+                  (
+                    value
+                  ) =>
+                    value ||
+                    "-",
+              },
+
+
+              {
+                title:
+                  "Ngày",
+
+                dataIndex:
+                  "workDate",
+
+                width:
+                  120,
+
+                render:
+                  (
+                    value
+                  ) => (
 
                     <Typography.Text
                       strong
                     >
-                      {value}
+                      {
+                        dayjs(
+                          value
+                        ).format(
+                          "DD/MM/YYYY"
+                        )
+                      }
                     </Typography.Text>
-                  </div>
-                ),
-            },
 
-            {
-              title:
-                "Mã BHXH",
+                  ),
+              },
 
-              dataIndex:
-                "socialInsuranceCode",
 
-              width:
-                145,
+              {
+                title:
+                  "Thứ",
 
-              render:
-                (
-                  value
-                ) =>
-                  value ||
-                  "-",
-            },
+                dataIndex:
+                  "workDate",
 
-            {
-              title:
-                "Mã CCHN/GPHN",
+                width:
+                  100,
 
-              dataIndex:
-                "licenseNumber",
+                render:
+                  getWeekdayLabel,
+              },
 
-              width:
-                175,
 
-              render:
-                (
-                  value
-                ) =>
-                  value ||
-                  "-",
-            },
+              {
+                title:
+                  "Bắt đầu",
 
-            {
-              title:
-                "Ngày",
+                dataIndex:
+                  "startTime",
 
-              dataIndex:
-                "workDate",
+                width:
+                  95,
 
-              width:
-                120,
+                align:
+                  "center",
 
-              render:
-                (
-                  value
-                ) => (
-                  <Typography.Text
-                    strong
-                  >
-                    {
-                      dayjs(
-                        value
-                      ).format(
-                        "DD/MM/YYYY"
-                      )
+                render:
+                  (
+                    value
+                  ) => (
+
+                    <span
+                      className="schedule-time"
+                    >
+                      <ClockCircleOutlined />
+
+                      {
+                        normalizeTime(
+                          value
+                        )
+                      }
+                    </span>
+
+                  ),
+              },
+
+
+              {
+                title:
+                  "Kết thúc",
+
+                dataIndex:
+                  "endTime",
+
+                width:
+                  95,
+
+                align:
+                  "center",
+
+                render:
+                  (
+                    value
+                  ) => (
+
+                    <span
+                      className="schedule-time"
+                    >
+                      {
+                        normalizeTime(
+                          value
+                        )
+                      }
+                    </span>
+
+                  ),
+              },
+
+
+              {
+                title:
+                  "Trạng thái",
+
+                dataIndex:
+                  "status",
+
+                width:
+                  125,
+
+                render:
+                  (
+                    value
+                  ) => {
+
+                    if (
+                      value ===
+                      "ACTIVE"
+                    ) {
+
+                      return (
+                        <Tag
+                          color="success"
+
+                          icon={
+                            <CheckCircleFilled />
+                          }
+
+                          className="schedule-status-tag"
+                        >
+                          Đang làm
+                        </Tag>
+                      );
+
                     }
-                  </Typography.Text>
-                ),
-            },
 
-            {
-              title:
-                "Thứ",
 
-              dataIndex:
-                "workDate",
-
-              width:
-                100,
-
-              render:
-                getWeekdayLabel,
-            },
-
-            {
-              title:
-                "Bắt đầu",
-
-              dataIndex:
-                "startTime",
-
-              width:
-                95,
-
-              align:
-                "center",
-
-              render:
-                (
-                  value
-                ) => (
-                  <span
-                    className="schedule-time"
-                  >
-                    <ClockCircleOutlined />
-
-                    {
-                      normalizeTime(
-                        value
-                      )
-                    }
-                  </span>
-                ),
-            },
-
-            {
-              title:
-                "Kết thúc",
-
-              dataIndex:
-                "endTime",
-
-              width:
-                95,
-
-              align:
-                "center",
-
-              render:
-                (
-                  value
-                ) => (
-                  <span
-                    className="schedule-time"
-                  >
-                    {
-                      normalizeTime(
-                        value
-                      )
-                    }
-                  </span>
-                ),
-            },
-
-            {
-              title:
-                "Trạng thái",
-
-              dataIndex:
-                "status",
-
-              width:
-                125,
-
-              render:
-                (
-                  value
-                ) => {
-                  if (
-                    value ===
-                    "ACTIVE"
-                  ) {
                     return (
                       <Tag
-                        color="success"
-
                         icon={
-                          <CheckCircleFilled />
+                          <StopOutlined />
                         }
 
                         className="schedule-status-tag"
                       >
-                        Đang làm
+                        Nghỉ
                       </Tag>
                     );
-                  }
+
+                  },
+              },
 
 
-                  return (
-                    <Tag
-                      icon={
-                        <StopOutlined />
-                      }
+              {
+                title:
+                  "Nguồn",
 
-                      className="schedule-status-tag"
-                    >
-                      Nghỉ
-                    </Tag>
-                  );
-                },
-            },
+                dataIndex:
+                  "source",
 
-            {
-              title:
-                "Nguồn",
+                width:
+                  125,
 
-              dataIndex:
-                "source",
+                render:
+                  (
+                    value
+                  ) => {
 
-              width:
-                125,
+                    if (
+                      value ===
+                      "DEFAULT"
+                    ) {
 
-              render:
-                (
-                  value
-                ) => {
-                  if (
-                    value ===
-                    "DEFAULT"
-                  ) {
+                      return (
+                        <Tag
+                          icon={
+                            <ThunderboltOutlined />
+                          }
+
+                          color="blue"
+
+                          className="schedule-status-tag"
+                        >
+                          Mặc định
+                        </Tag>
+                      );
+
+                    }
+
+
                     return (
                       <Tag
                         icon={
-                          <ThunderboltOutlined />
+                          <EditOutlined />
                         }
-
-                        color="blue"
 
                         className="schedule-status-tag"
                       >
-                        Mặc định
+                        Thủ công
                       </Tag>
                     );
-                  }
+
+                  },
+              },
 
 
-                  return (
-                    <Tag
-                      icon={
-                        <EditOutlined />
-                      }
+              {
+                title:
+                  "Ghi chú",
 
-                      className="schedule-status-tag"
-                    >
-                      Thủ công
-                    </Tag>
-                  );
-                },
-            },
+                dataIndex:
+                  "note",
 
-            {
-              title:
-                "Ghi chú",
+                width:
+                  180,
 
-              dataIndex:
-                "note",
+                ellipsis:
+                  true,
 
-              width:
-                180,
-
-              ellipsis:
-                true,
-
-              render:
-                (
-                  value
-                ) =>
-                  value ||
-                  "-",
-            },
-
-            {
-              title:
-                "Thao tác",
-
-              key:
-                "action",
-
-              fixed:
-                "right",
-
-              width:
-                115,
-
-              align:
-                "center",
-
-              render:
-                (
-                  _,
-                  record
-                ) => (
-                  <Space
-                    size={
-                      4
-                    }
-                  >
-                    <Button
-                      type="text"
-
-                      className="schedule-action-edit"
-
-                      icon={
-                        <EditOutlined />
-                      }
-
-                      onClick={() =>
-                        openEditModal(
-                          record
-                        )
-                      }
-                    />
+                render:
+                  (
+                    value
+                  ) =>
+                    value ||
+                    "-",
+              },
 
 
-                    <Popconfirm
-                      title="Xóa lịch?"
+              {
+                title:
+                  "Thao tác",
 
-                      description="Bạn có chắc muốn xóa lịch này?"
+                key:
+                  "action",
 
-                      okText="Xóa"
+                fixed:
+                  "right",
 
-                      cancelText="Hủy"
+                width:
+                  115,
 
-                      okButtonProps={{
-                        danger:
-                          true,
-                      }}
+                align:
+                  "center",
 
-                      onConfirm={() =>
-                        void handleDelete(
-                          record.id
-                        )
+                render:
+                  (
+                    _,
+                    record
+                  ) => (
+
+                    <Space
+                      size={
+                        4
                       }
                     >
+
                       <Button
                         type="text"
 
-                        danger
-
-                        className="schedule-action-delete"
+                        className="schedule-action-edit"
 
                         icon={
-                          <DeleteOutlined />
+                          <EditOutlined />
+                        }
+
+                        onClick={() =>
+                          openEditModal(
+                            record
+                          )
                         }
                       />
-                    </Popconfirm>
-                  </Space>
-                ),
-            },
-          ]}
-        />
-      </Card>
 
+
+                      <Popconfirm
+                        title="Xóa lịch?"
+
+                        description="Bạn có chắc muốn xóa lịch này?"
+
+                        okText="Xóa"
+
+                        cancelText="Hủy"
+
+                        okButtonProps={{
+                          danger:
+                            true,
+                        }}
+
+                        onConfirm={() =>
+                          void handleDelete(
+                            record.id
+                          )
+                        }
+                      >
+
+                        <Button
+                          type="text"
+
+                          danger
+
+                          className="schedule-action-delete"
+
+                          icon={
+                            <DeleteOutlined />
+                          }
+                        />
+
+                      </Popconfirm>
+
+                    </Space>
+
+                  ),
+              },
+            ]}
+          />
+
+        </Card>
+
+      </div>
+
+
+      {/* ==================================================
+          MODAL
+      ================================================== */}
 
       <Modal
         open={
@@ -2210,6 +2914,7 @@ export default function StaffSchedules() {
 
         title={
           <div>
+
             <div
               style={{
                 fontSize:
@@ -2251,6 +2956,7 @@ export default function StaffSchedules() {
                   : "Tạo lịch làm việc mới cho nhân viên y tế"
               }
             </div>
+
           </div>
         }
 
@@ -2275,9 +2981,11 @@ export default function StaffSchedules() {
         }
 
         onCancel={() => {
+
           if (
             saving
           ) {
+
             return;
           }
 
@@ -2293,8 +3001,10 @@ export default function StaffSchedules() {
 
 
           form.resetFields();
+
         }}
       >
+
         <Form
           form={
             form
@@ -2311,6 +3021,7 @@ export default function StaffSchedules() {
               18,
           }}
         >
+
           <Form.Item
             label="Nhân viên"
 
@@ -2326,6 +3037,7 @@ export default function StaffSchedules() {
               },
             ]}
           >
+
             <Select
               showSearch
 
@@ -2337,6 +3049,7 @@ export default function StaffSchedules() {
                 staffOptions
               }
             />
+
           </Form.Item>
 
 
@@ -2355,6 +3068,7 @@ export default function StaffSchedules() {
               },
             ]}
           >
+
             <DatePicker
               format="DD/MM/YYYY"
 
@@ -2363,12 +3077,14 @@ export default function StaffSchedules() {
                   "100%",
               }}
             />
+
           </Form.Item>
 
 
           <div
             className="schedule-form-time-grid"
           >
+
             <Form.Item
               label="Giờ bắt đầu"
 
@@ -2384,6 +3100,7 @@ export default function StaffSchedules() {
                 },
               ]}
             >
+
               <TimePicker
                 format="HH:mm"
 
@@ -2396,6 +3113,7 @@ export default function StaffSchedules() {
                     "100%",
                 }}
               />
+
             </Form.Item>
 
 
@@ -2414,6 +3132,7 @@ export default function StaffSchedules() {
                 },
               ]}
             >
+
               <TimePicker
                 format="HH:mm"
 
@@ -2426,7 +3145,9 @@ export default function StaffSchedules() {
                     "100%",
                 }}
               />
+
             </Form.Item>
+
           </div>
 
 
@@ -2442,6 +3163,7 @@ export default function StaffSchedules() {
               },
             ]}
           >
+
             <Select
               options={[
                 {
@@ -2461,6 +3183,7 @@ export default function StaffSchedules() {
                 },
               ]}
             />
+
           </Form.Item>
 
 
@@ -2469,6 +3192,7 @@ export default function StaffSchedules() {
 
             name="note"
           >
+
             <Input.TextArea
               rows={
                 3
@@ -2476,28 +3200,71 @@ export default function StaffSchedules() {
 
               placeholder="Ghi chú nếu có"
             />
+
           </Form.Item>
+
         </Form>
+
       </Modal>
 
 
+      {/* ==================================================
+          STYLE
+      ================================================== */}
+
       <style>
         {`
+
+          /* ===============================================
+             PAGE
+          =============================================== */
+
           .schedule-page {
             display: flex;
+
             flex-direction: column;
-            gap: 16px;
+
+            gap: 10px;
+
+            width: 100%;
+
+            min-height: 0;
+
+            overflow: hidden;
+
+            box-sizing: border-box;
           }
+
+
+          /* ===============================================
+             HEADER
+          =============================================== */
 
           .schedule-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
-            gap: 16px;
+
+            gap: 12px;
+
+            flex-shrink: 0;
           }
+
+
+          .schedule-header .ant-typography {
+            line-height: 1.25;
+          }
+
+
+          /* ===============================================
+             STAT
+          =============================================== */
 
           .schedule-stat-grid {
             display: grid;
+
             grid-template-columns:
               repeat(
                 4,
@@ -2506,8 +3273,12 @@ export default function StaffSchedules() {
                   1fr
                 )
               );
-            gap: 14px;
+
+            gap: 10px;
+
+            flex-shrink: 0;
           }
+
 
           .schedule-stat-card {
             border:
@@ -2534,72 +3305,82 @@ export default function StaffSchedules() {
               ease;
           }
 
+
           .schedule-stat-card:hover {
             transform:
               translateY(
-                -2px
+                -1px
               );
 
             box-shadow:
               0
-              8px
-              24px
+              6px
+              20px
               rgba(
                 15,
                 23,
                 42,
-                0.08
+                0.07
               );
           }
+
 
           .schedule-stat-card
           .ant-card-body {
             display: flex;
+
             align-items: center;
-            gap: 13px;
+
+            gap: 10px;
 
             padding:
-              16px
-              17px;
+              10px
+              14px;
           }
 
+
           .schedule-stat-icon {
-            width: 40px;
-            height: 40px;
+            width: 34px;
+
+            height: 34px;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             flex-shrink: 0;
 
             border-radius:
-              11px;
+              9px;
 
             font-size:
-              18px;
+              16px;
           }
+
 
           .schedule-stat-label {
             color:
               #64748b;
 
             font-size:
-              12px;
+              11px;
 
             font-weight:
               500;
           }
 
+
           .schedule-stat-value {
             margin-top:
-              2px;
+              1px;
 
             color:
               #172033;
 
             font-size:
-              23px;
+              19px;
 
             line-height:
               1.2;
@@ -2608,11 +3389,13 @@ export default function StaffSchedules() {
               800;
           }
 
+
           .schedule-stat-total {
             border-left:
               4px solid
               #1677ff;
           }
+
 
           .schedule-stat-total
           .schedule-stat-icon {
@@ -2623,11 +3406,13 @@ export default function StaffSchedules() {
               #e6f4ff;
           }
 
+
           .schedule-stat-active {
             border-left:
               4px solid
               #52c41a;
           }
+
 
           .schedule-stat-active
           .schedule-stat-icon {
@@ -2638,11 +3423,13 @@ export default function StaffSchedules() {
               #f6ffed;
           }
 
+
           .schedule-stat-off {
             border-left:
               4px solid
               #ff4d4f;
           }
+
 
           .schedule-stat-off
           .schedule-stat-icon {
@@ -2653,11 +3440,13 @@ export default function StaffSchedules() {
               #fff1f0;
           }
 
+
           .schedule-stat-default {
             border-left:
               4px solid
               #722ed1;
           }
+
 
           .schedule-stat-default
           .schedule-stat-icon {
@@ -2668,7 +3457,14 @@ export default function StaffSchedules() {
               #f9f0ff;
           }
 
+
+          /* ===============================================
+             FILTER
+          =============================================== */
+
           .schedule-filter-card {
+            flex-shrink: 0;
+
             border:
               1px solid
               #edf0f5;
@@ -2688,21 +3484,35 @@ export default function StaffSchedules() {
               );
           }
 
+
           .schedule-filter-card
           .ant-card-body {
             padding:
-              15px;
+              10px
+              14px;
           }
+
 
           .schedule-filter-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
-            gap: 12px;
+
+            gap: 10px;
 
             margin-bottom:
-              14px;
+              8px;
           }
+
+
+          .schedule-filter-header
+          .ant-typography {
+            font-size:
+              13px;
+          }
+
 
           .schedule-filter-grid {
             display: grid;
@@ -2725,34 +3535,51 @@ export default function StaffSchedules() {
                 1fr
               );
 
-            gap: 10px;
+            gap: 8px;
 
             align-items: end;
           }
+
 
           .schedule-filter-field {
             min-width: 0;
           }
 
+
           .schedule-filter-label {
             display: block;
 
             margin-bottom:
-              6px;
+              4px;
 
             color:
               #475569;
 
             font-size:
-              12px;
+              11px;
 
             font-weight:
               700;
           }
 
+
+          /* ===============================================
+             TABLE AREA
+          =============================================== */
+
+          .schedule-table-area {
+            flex: 1;
+
+            min-height: 0;
+
+            overflow: hidden;
+          }
+
+
           .schedule-table-card {
-            overflow:
-              hidden;
+            height: 100%;
+
+            overflow: hidden;
 
             border:
               1px solid
@@ -2773,21 +3600,107 @@ export default function StaffSchedules() {
               );
           }
 
+
+          .schedule-table-card
+          .ant-card-body {
+            height: 100%;
+
+            padding: 0 !important;
+
+            display: flex;
+
+            flex-direction: column;
+
+            overflow: hidden;
+          }
+
+
           .schedule-table-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
 
-            gap: 12px;
+            gap: 10px;
 
             padding:
-              14px
-              16px;
+              10px
+              14px;
+
+            flex-shrink: 0;
 
             border-bottom:
               1px solid
               #edf0f5;
           }
+
+
+          .schedule-table-header
+          .ant-typography {
+            font-size:
+              12px;
+          }
+
+
+          /*
+           * Ép cấu trúc Ant Table thành flex column
+           * để pagination luôn nằm trong vùng nhìn thấy.
+           */
+
+          .schedule-table-card
+          .ant-table-wrapper {
+            flex: 1;
+
+            min-height: 0;
+
+            display: flex;
+
+            flex-direction: column;
+          }
+
+
+          .schedule-table-card
+          .ant-spin-nested-loading {
+            flex: 1;
+
+            min-height: 0;
+          }
+
+
+          .schedule-table-card
+          .ant-spin-container {
+            height: 100%;
+
+            min-height: 0;
+
+            display: flex;
+
+            flex-direction: column;
+          }
+
+
+          .schedule-table-card
+          .ant-table {
+            flex: 1;
+
+            min-height: 0;
+          }
+
+
+          /* ===============================================
+             CHỈ TABLE BODY SCROLL
+          =============================================== */
+
+          .schedule-table-card
+          .ant-table-body {
+            overflow-y:
+              auto !important;
+
+            overscroll-behavior:
+              contain;
+          }
+
 
           .schedule-table-card
           .ant-table-thead
@@ -2810,6 +3723,7 @@ export default function StaffSchedules() {
               #e8edf3 !important;
           }
 
+
           .schedule-table-card
           .ant-table-tbody
           > tr
@@ -2826,6 +3740,7 @@ export default function StaffSchedules() {
               ease;
           }
 
+
           .schedule-table-card
           .ant-table-tbody
           > tr:hover
@@ -2834,11 +3749,13 @@ export default function StaffSchedules() {
               #f5f9ff !important;
           }
 
+
           .schedule-row-off
           > td {
             background:
               #fffafa;
           }
+
 
           .schedule-row-off
           > td:first-child {
@@ -2850,18 +3767,29 @@ export default function StaffSchedules() {
               #ff7875;
           }
 
+
+          /* ===============================================
+             STAFF CELL
+          =============================================== */
+
           .schedule-staff-cell {
             display: flex;
+
             align-items: center;
+
             gap: 8px;
           }
 
+
           .schedule-staff-avatar {
             width: 28px;
+
             height: 28px;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             flex-shrink: 0;
@@ -2875,6 +3803,11 @@ export default function StaffSchedules() {
             background:
               #e6f4ff;
           }
+
+
+          /* ===============================================
+             TIME
+          =============================================== */
 
           .schedule-time {
             display:
@@ -2899,6 +3832,11 @@ export default function StaffSchedules() {
               600;
           }
 
+
+          /* ===============================================
+             TAG
+          =============================================== */
+
           .schedule-status-tag {
             margin:
               0;
@@ -2917,6 +3855,11 @@ export default function StaffSchedules() {
               700;
           }
 
+
+          /* ===============================================
+             ACTION
+          =============================================== */
+
           .schedule-action-edit,
           .schedule-action-delete {
             width:
@@ -2929,10 +3872,12 @@ export default function StaffSchedules() {
               8px;
           }
 
+
           .schedule-action-edit {
             color:
               #1677ff;
           }
+
 
           .schedule-action-edit:hover {
             color:
@@ -2942,18 +3887,68 @@ export default function StaffSchedules() {
               #e6f4ff !important;
           }
 
+
           .schedule-action-delete:hover {
             background:
               #fff1f0 !important;
           }
 
+
+          /* ===============================================
+             PAGINATION
+          =============================================== */
+
           .schedule-table-card
           .ant-pagination {
+            flex-shrink: 0;
+
+            margin-top:
+              8px;
+
+            margin-bottom:
+              0;
+
             padding:
               0
-              16px
-              12px;
+              14px
+              6px;
           }
+
+
+          /* ===============================================
+             SCROLLBAR
+          =============================================== */
+
+          .schedule-table-card
+          .ant-table-body::-webkit-scrollbar {
+            width:
+              8px;
+
+            height:
+              8px;
+          }
+
+
+          .schedule-table-card
+          .ant-table-body::-webkit-scrollbar-thumb {
+            background:
+              #cbd5e1;
+
+            border-radius:
+              999px;
+          }
+
+
+          .schedule-table-card
+          .ant-table-body::-webkit-scrollbar-track {
+            background:
+              #f8fafc;
+          }
+
+
+          /* ===============================================
+             MODAL
+          =============================================== */
 
           .schedule-form-modal
           .ant-modal-content {
@@ -2964,11 +3959,13 @@ export default function StaffSchedules() {
               hidden;
           }
 
+
           .schedule-form-modal
           .ant-modal-header {
             margin-bottom:
               16px;
           }
+
 
           .schedule-form-time-grid {
             display:
@@ -2982,11 +3979,159 @@ export default function StaffSchedules() {
               14px;
           }
 
-          @media
-          (
+
+          /* ===============================================
+             RESPONSIVE THEO CHIỀU CAO MÀN HÌNH
+          =============================================== */
+
+          @media (max-height: 820px) {
+
+            .schedule-page {
+              gap: 8px;
+            }
+
+
+            .schedule-header h3 {
+              font-size: 19px !important;
+            }
+
+
+            .schedule-header
+            .ant-typography-secondary {
+              font-size: 11px !important;
+            }
+
+
+            .schedule-stat-card
+            .ant-card-body {
+              padding:
+                7px
+                12px;
+            }
+
+
+            .schedule-stat-icon {
+              width: 30px;
+
+              height: 30px;
+
+              font-size: 14px;
+            }
+
+
+            .schedule-stat-label {
+              font-size: 10px;
+            }
+
+
+            .schedule-stat-value {
+              font-size: 17px;
+            }
+
+
+            .schedule-filter-card
+            .ant-card-body {
+              padding:
+                7px
+                12px;
+            }
+
+
+            .schedule-filter-header {
+              margin-bottom: 5px;
+            }
+
+
+            .schedule-filter-label {
+              margin-bottom: 3px;
+
+              font-size: 10px;
+            }
+
+
+            .schedule-table-header {
+              padding:
+                8px
+                12px;
+            }
+
+          }
+
+
+          @media (max-height: 700px) {
+
+            .schedule-page {
+              gap: 6px;
+            }
+
+
+            .schedule-header
+            .ant-typography-secondary {
+              display:
+                none !important;
+            }
+
+
+            .schedule-stat-card
+            .ant-card-body {
+              padding:
+                5px
+                10px;
+            }
+
+
+            .schedule-stat-icon {
+              width: 28px;
+
+              height: 28px;
+
+              font-size: 13px;
+            }
+
+
+            .schedule-stat-value {
+              font-size: 16px;
+            }
+
+
+            .schedule-filter-header
+            .ant-typography-secondary {
+              display:
+                none !important;
+            }
+
+
+            .schedule-filter-card
+            .ant-card-body {
+              padding:
+                6px
+                10px;
+            }
+
+
+            .schedule-filter-header {
+              margin-bottom: 4px;
+            }
+
+
+            .schedule-table-header {
+              padding:
+                6px
+                10px;
+            }
+
+          }
+
+
+          /* ===============================================
+             RESPONSIVE THEO CHIỀU RỘNG
+          =============================================== */
+
+          @media (
             max-width:
               1100px
           ) {
+
             .schedule-stat-grid {
               grid-template-columns:
                 repeat(
@@ -2998,6 +4143,7 @@ export default function StaffSchedules() {
                 );
             }
 
+
             .schedule-filter-grid {
               grid-template-columns:
                 repeat(
@@ -3008,13 +4154,15 @@ export default function StaffSchedules() {
                   )
                 );
             }
+
           }
 
-          @media
-          (
+
+          @media (
             max-width:
               700px
           ) {
+
             .schedule-header,
             .schedule-filter-header,
             .schedule-table-header {
@@ -3025,19 +4173,24 @@ export default function StaffSchedules() {
                 flex-start;
             }
 
+
             .schedule-stat-grid,
             .schedule-filter-grid {
               grid-template-columns:
                 1fr;
             }
 
+
             .schedule-form-time-grid {
               grid-template-columns:
                 1fr;
             }
+
           }
+
         `}
       </style>
+
     </div>
   );
 }

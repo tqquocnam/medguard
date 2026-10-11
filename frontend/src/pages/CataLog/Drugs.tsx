@@ -1,7 +1,7 @@
 import {
   Alert,
+  Breadcrumb,
   Button,
-  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -10,19 +10,24 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message,
 } from "antd";
 
 import type {
+  TableColumnsType,
   UploadFile,
 } from "antd";
 
 import {
-  EllipsisOutlined,
+  EditOutlined,
+  ExperimentOutlined,
+  HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
+  StopOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 
@@ -49,238 +54,183 @@ const {
 
 interface DrugItem {
   code: string;
-
   name: string;
 
   activeIngredient:
-    string |
-    null;
+    | string
+    | null;
 
   strength:
-    string |
-    null;
+    | string
+    | null;
 
   unit:
-    string |
-    null;
+    | string
+    | null;
 
   groupCode:
-    string |
-    null;
+    | string
+    | null;
 
   route:
-    string |
-    null;
+    | string
+    | null;
 
   routeCode:
-    string |
-    null;
+    | string
+    | null;
 
   dosageForm:
-    string |
-    null;
+    | string
+    | null;
 
   registrationNumber:
-    string |
-    null;
+    | string
+    | null;
 
   quantity:
-    number |
-    null;
+    | number
+    | null;
 
-  unitPrice:
-    number;
+  unitPrice: number;
 
   insuranceUnitPrice:
-    number |
-    null;
+    | number
+    | null;
 
   packaging:
-    string |
-    null;
+    | string
+    | null;
 
   manufacturer:
-    string |
-    null;
+    | string
+    | null;
 
   country:
-    string |
-    null;
+    | string
+    | null;
 
   contractor:
-    string |
-    null;
+    | string
+    | null;
 
   tenderInfo:
-    string |
-    null;
+    | string
+    | null;
 
   drugType:
-    string |
-    null;
+    | string
+    | null;
 
   scientificName:
-    string |
-    null;
+    | string
+    | null;
 
   origin:
-    string |
-    null;
+    | string
+    | null;
 
   processingMethod:
-    string |
-    null;
+    | string
+    | null;
 
   importedMaterialCode:
-    string |
-    null;
+    | string
+    | null;
 
   processedMaterialCode:
-    string |
-    null;
+    | string
+    | null;
 
   processingLossRate:
-    number |
-    null;
+    | number
+    | null;
 
   preservationLossRate:
-    number |
-    null;
+    | number
+    | null;
 
   qualityStandard:
-    string |
-    null;
+    | string
+    | null;
 
   decisionNo:
-    string |
-    null;
+    | string
+    | null;
 
-  insurancePaymentRate:
-    number;
+  insurancePaymentRate: number;
 
   note:
-    string |
-    null;
+    | string
+    | null;
 
-  active:
-    boolean;
+  active: boolean;
 }
 
 
 interface DrugFormValues {
   code: string;
-
   name: string;
 
-  activeIngredient?:
-    string;
-
-  strength?:
-    string;
-
-  unit?:
-    string;
-
-  groupCode?:
-    string;
-
-  route?:
-    string;
-
-  routeCode?:
-    string;
-
-  dosageForm?:
-    string;
-
-  registrationNumber?:
-    string;
+  activeIngredient?: string;
+  strength?: string;
+  unit?: string;
+  groupCode?: string;
+  route?: string;
+  routeCode?: string;
+  dosageForm?: string;
+  registrationNumber?: string;
 
   quantity?:
-    number |
-    null;
+    | number
+    | null;
 
-  unitPrice?:
-    number;
+  unitPrice?: number;
 
   insuranceUnitPrice?:
-    number |
-    null;
+    | number
+    | null;
 
-  packaging?:
-    string;
-
-  manufacturer?:
-    string;
-
-  country?:
-    string;
-
-  contractor?:
-    string;
-
-  tenderInfo?:
-    string;
-
-  drugType?:
-    string;
-
-  scientificName?:
-    string;
-
-  origin?:
-    string;
-
-  processingMethod?:
-    string;
-
-  importedMaterialCode?:
-    string;
-
-  processedMaterialCode?:
-    string;
+  packaging?: string;
+  manufacturer?: string;
+  country?: string;
+  contractor?: string;
+  tenderInfo?: string;
+  drugType?: string;
+  scientificName?: string;
+  origin?: string;
+  processingMethod?: string;
+  importedMaterialCode?: string;
+  processedMaterialCode?: string;
 
   processingLossRate?:
-    number |
-    null;
+    | number
+    | null;
 
   preservationLossRate?:
-    number |
-    null;
+    | number
+    | null;
 
-  qualityStandard?:
-    string;
+  qualityStandard?: string;
+  decisionNo?: string;
+  insurancePaymentRate?: number;
+  note?: string;
 
-  decisionNo?:
-    string;
-
-  insurancePaymentRate?:
-    number;
-
-  note?:
-    string;
-
-  active:
-    boolean;
+  active: boolean;
 }
 
 
 interface DrugImportError {
   row: number;
-
   field: string;
-
   message: string;
 }
 
 
 interface DrugImportResult {
   totalRows: number;
-
   inserted: number;
-
   updated: number;
-
   skipped: number;
 }
 
@@ -291,20 +241,17 @@ interface DrugImportResult {
 
 function formatMoney(
   value:
-    number |
-    null |
-    undefined
+    | number
+    | null
+    | undefined
 ) {
 
   if (
-    value ===
-      null ||
-    value ===
-      undefined
+    value === null ||
+    value === undefined
   ) {
     return "-";
   }
-
 
   return Number(
     value
@@ -316,9 +263,9 @@ function formatMoney(
 
 function textOrDash(
   value:
-    string |
-    null |
-    undefined
+    | string
+    | null
+    | undefined
 ) {
 
   return (
@@ -334,21 +281,17 @@ function textOrDash(
 
 function numberOrDash(
   value:
-    number |
-    null |
-    undefined
+    | number
+    | null
+    | undefined
 ) {
 
   if (
-    value ===
-      null ||
-    value ===
-      undefined
+    value === null ||
+    value === undefined
   ) {
-
     return "-";
   }
-
 
   return Number(
     value
@@ -360,14 +303,12 @@ function numberOrDash(
 
 function trimOrNull(
   value:
-    string |
-    undefined
+    | string
+    | undefined
 ) {
 
   const result =
-    value
-      ?.trim();
-
+    value?.trim();
 
   return (
     result ||
@@ -651,8 +592,7 @@ export default function Drugs() {
 
           if (
             !response.ok ||
-            json.success !==
-              true
+            json.success !== true
           ) {
 
             throw new Error(
@@ -663,16 +603,14 @@ export default function Drugs() {
 
 
           setItems(
-            json.data
-              ?.items ??
+            json.data?.items ??
             []
           );
 
 
           setTotal(
             Number(
-              json.data
-                ?.total ??
+              json.data?.total ??
               0
             )
           );
@@ -682,8 +620,7 @@ export default function Drugs() {
         ) {
 
           message.error(
-            error instanceof
-            Error
+            error instanceof Error
               ? error.message
               : "Không thể tải danh mục thuốc."
           );
@@ -863,8 +800,7 @@ export default function Drugs() {
 
       if (
         !response.ok ||
-        json.success !==
-          true
+        json.success !== true
       ) {
 
         throw new Error(
@@ -925,10 +861,8 @@ export default function Drugs() {
           "",
 
         quantity:
-          data.quantity ===
-            null ||
-          data.quantity ===
-            undefined
+          data.quantity === null ||
+          data.quantity === undefined
             ? null
             : Number(
                 data.quantity
@@ -941,10 +875,8 @@ export default function Drugs() {
           ),
 
         insuranceUnitPrice:
-          data.insuranceUnitPrice ===
-            null ||
-          data.insuranceUnitPrice ===
-            undefined
+          data.insuranceUnitPrice === null ||
+          data.insuranceUnitPrice === undefined
             ? null
             : Number(
                 data.insuranceUnitPrice
@@ -995,20 +927,16 @@ export default function Drugs() {
           "",
 
         processingLossRate:
-          data.processingLossRate ===
-            null ||
-          data.processingLossRate ===
-            undefined
+          data.processingLossRate === null ||
+          data.processingLossRate === undefined
             ? null
             : Number(
                 data.processingLossRate
               ),
 
         preservationLossRate:
-          data.preservationLossRate ===
-            null ||
-          data.preservationLossRate ===
-            undefined
+          data.preservationLossRate === null ||
+          data.preservationLossRate === undefined
             ? null
             : Number(
                 data.preservationLossRate
@@ -1048,8 +976,7 @@ export default function Drugs() {
     ) {
 
       message.error(
-        error instanceof
-        Error
+        error instanceof Error
           ? error.message
           : "Không thể tải thuốc."
       );
@@ -1075,8 +1002,7 @@ export default function Drugs() {
 
 
       const isEdit =
-        editingDrug !==
-        null;
+        editingDrug !== null;
 
 
       const endpoint =
@@ -1260,8 +1186,7 @@ export default function Drugs() {
 
       if (
         !response.ok ||
-        json.success !==
-          true
+        json.success !== true
       ) {
 
         throw new Error(
@@ -1299,10 +1224,8 @@ export default function Drugs() {
 
       if (
         error &&
-        typeof error ===
-          "object" &&
-        "errorFields" in
-          error
+        typeof error === "object" &&
+        "errorFields" in error
       ) {
 
         return;
@@ -1310,8 +1233,7 @@ export default function Drugs() {
 
 
       message.error(
-        error instanceof
-        Error
+        error instanceof Error
           ? error.message
           : "Không thể lưu thuốc."
       );
@@ -1375,8 +1297,7 @@ export default function Drugs() {
 
             if (
               !response.ok ||
-              json.success !==
-                true
+              json.success !== true
             ) {
 
               throw new Error(
@@ -1398,8 +1319,7 @@ export default function Drugs() {
           ) {
 
             message.error(
-              error instanceof
-              Error
+              error instanceof Error
                 ? error.message
                 : "Không thể ngừng sử dụng thuốc."
             );
@@ -1419,21 +1339,17 @@ export default function Drugs() {
       ""
     );
 
-
     setSearchName(
       ""
     );
-
 
     setSearchIngredient(
       ""
     );
 
-
     setSearchGroup(
       ""
     );
-
 
     setPage(
       1
@@ -1451,21 +1367,17 @@ export default function Drugs() {
       []
     );
 
-
     setImportResult(
       null
     );
-
 
     setImportErrors(
       []
     );
 
-
     setImportMessage(
       ""
     );
-
 
     setImportModalOpen(
       true
@@ -1482,7 +1394,6 @@ export default function Drugs() {
     if (
       importing
     ) {
-
       return;
     }
 
@@ -1491,21 +1402,17 @@ export default function Drugs() {
       false
     );
 
-
     setImportFileList(
       []
     );
-
 
     setImportResult(
       null
     );
 
-
     setImportErrors(
       []
     );
-
 
     setImportMessage(
       ""
@@ -1558,16 +1465,13 @@ export default function Drugs() {
         true
       );
 
-
       setImportResult(
         null
       );
 
-
       setImportErrors(
         []
       );
-
 
       setImportMessage(
         ""
@@ -1615,8 +1519,7 @@ export default function Drugs() {
 
       if (
         !response.ok ||
-        json?.success !==
-          true
+        json?.success !== true
       ) {
 
         const errors =
@@ -1653,29 +1556,25 @@ export default function Drugs() {
 
         totalRows:
           Number(
-            json.data
-              ?.totalRows ??
+            json.data?.totalRows ??
             0
           ),
 
         inserted:
           Number(
-            json.data
-              ?.inserted ??
+            json.data?.inserted ??
             0
           ),
 
         updated:
           Number(
-            json.data
-              ?.updated ??
+            json.data?.updated ??
             0
           ),
 
         skipped:
           Number(
-            json.data
-              ?.skipped ??
+            json.data?.skipped ??
             0
           ),
       };
@@ -1699,8 +1598,7 @@ export default function Drugs() {
 
 
       if (
-        page !==
-        1
+        page !== 1
       ) {
 
         setPage(
@@ -1717,8 +1615,7 @@ export default function Drugs() {
     ) {
 
       const text =
-        error instanceof
-        Error
+        error instanceof Error
           ? error.message
           : "Import thuốc thất bại.";
 
@@ -1745,101 +1642,10 @@ export default function Drugs() {
   // TABLE COLUMNS
   // ====================================================
 
-  const columns = [
-
-    {
-      title:
-        "",
-
-      key:
-        "action",
-
-      width:
-        50,
-
-      fixed:
-        "left" as const,
-
-      render:
-        (
-          _:
-            unknown,
-
-          record:
-            DrugItem
-        ) => (
-
-          <Dropdown
-            trigger={[
-              "click",
-            ]}
-
-            menu={{
-              items: [
-                {
-                  key:
-                    "edit",
-
-                  label:
-                    "Cập nhật",
-                },
-
-                {
-                  key:
-                    "disable",
-
-                  label:
-                    "Ngừng sử dụng",
-
-                  danger:
-                    true,
-
-                  disabled:
-                    !record.active,
-                },
-              ],
-
-              onClick:
-                ({
-                  key,
-                }) => {
-
-                  if (
-                    key ===
-                    "edit"
-                  ) {
-
-                    void openEditModal(
-                      record
-                    );
-                  }
-
-
-                  if (
-                    key ===
-                    "disable"
-                  ) {
-
-                    confirmDisable(
-                      record
-                    );
-                  }
-                },
-            }}
-          >
-
-            <Button
-              type="text"
-
-              icon={
-                <EllipsisOutlined />
-              }
-            />
-
-          </Dropdown>
-        ),
-    },
-
+  const columns:
+    TableColumnsType<
+      DrugItem
+    > = [
 
     {
       title:
@@ -1849,30 +1655,25 @@ export default function Drugs() {
         "stt",
 
       width:
-        65,
+        60,
 
       fixed:
-        "left" as const,
+        "left",
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
-          _:
-            unknown,
-
-          __:
-            DrugItem,
-
-          index:
-            number
+          _,
+          __,
+          index
         ) =>
           (
             page -
             1
           ) *
-          pageSize +
+            pageSize +
           index +
           1,
     },
@@ -1885,11 +1686,29 @@ export default function Drugs() {
       dataIndex:
         "code",
 
+      key:
+        "code",
+
       width:
-        140,
+        135,
 
       fixed:
-        "left" as const,
+        "left",
+
+      render:
+        (
+          value:
+            string
+        ) => (
+          <Text
+            strong
+          >
+            {
+              value ||
+              "-"
+            }
+          </Text>
+        ),
     },
 
 
@@ -1900,11 +1719,17 @@ export default function Drugs() {
       dataIndex:
         "name",
 
+      key:
+        "name",
+
       width:
-        230,
+        220,
 
       fixed:
-        "left" as const,
+        "left",
+
+      ellipsis:
+        true,
     },
 
 
@@ -1915,8 +1740,14 @@ export default function Drugs() {
       dataIndex:
         "activeIngredient",
 
+      key:
+        "activeIngredient",
+
       width:
-        210,
+        220,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -1930,8 +1761,14 @@ export default function Drugs() {
       dataIndex:
         "strength",
 
+      key:
+        "strength",
+
       width:
         150,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -1945,8 +1782,11 @@ export default function Drugs() {
       dataIndex:
         "unit",
 
+      key:
+        "unit",
+
       width:
-        100,
+        90,
 
       render:
         textOrDash,
@@ -1960,8 +1800,11 @@ export default function Drugs() {
       dataIndex:
         "groupCode",
 
+      key:
+        "groupCode",
+
       width:
-        110,
+        105,
 
       render:
         textOrDash,
@@ -1975,8 +1818,14 @@ export default function Drugs() {
       dataIndex:
         "route",
 
+      key:
+        "route",
+
       width:
-        130,
+        125,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -1990,8 +1839,11 @@ export default function Drugs() {
       dataIndex:
         "routeCode",
 
+      key:
+        "routeCode",
+
       width:
-        130,
+        120,
 
       render:
         textOrDash,
@@ -2005,8 +1857,14 @@ export default function Drugs() {
       dataIndex:
         "dosageForm",
 
+      key:
+        "dosageForm",
+
       width:
-        180,
+        170,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2020,8 +1878,14 @@ export default function Drugs() {
       dataIndex:
         "registrationNumber",
 
+      key:
+        "registrationNumber",
+
       width:
-        150,
+        145,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2035,11 +1899,14 @@ export default function Drugs() {
       dataIndex:
         "quantity",
 
+      key:
+        "quantity",
+
       width:
-        110,
+        105,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         numberOrDash,
@@ -2053,11 +1920,14 @@ export default function Drugs() {
       dataIndex:
         "unitPrice",
 
+      key:
+        "unitPrice",
+
       width:
         120,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         formatMoney,
@@ -2071,11 +1941,14 @@ export default function Drugs() {
       dataIndex:
         "insuranceUnitPrice",
 
+      key:
+        "insuranceUnitPrice",
+
       width:
-        130,
+        125,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         formatMoney,
@@ -2089,8 +1962,14 @@ export default function Drugs() {
       dataIndex:
         "packaging",
 
+      key:
+        "packaging",
+
       width:
-        200,
+        190,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2104,8 +1983,14 @@ export default function Drugs() {
       dataIndex:
         "manufacturer",
 
+      key:
+        "manufacturer",
+
       width:
-        200,
+        190,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2119,8 +2004,14 @@ export default function Drugs() {
       dataIndex:
         "country",
 
+      key:
+        "country",
+
       width:
-        140,
+        130,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2134,8 +2025,14 @@ export default function Drugs() {
       dataIndex:
         "contractor",
 
+      key:
+        "contractor",
+
       width:
-        200,
+        190,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2149,8 +2046,14 @@ export default function Drugs() {
       dataIndex:
         "tenderInfo",
 
+      key:
+        "tenderInfo",
+
       width:
-        220,
+        210,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2164,8 +2067,14 @@ export default function Drugs() {
       dataIndex:
         "drugType",
 
+      key:
+        "drugType",
+
       width:
-        150,
+        145,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2179,8 +2088,14 @@ export default function Drugs() {
       dataIndex:
         "scientificName",
 
+      key:
+        "scientificName",
+
       width:
-        200,
+        190,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2194,8 +2109,14 @@ export default function Drugs() {
       dataIndex:
         "origin",
 
+      key:
+        "origin",
+
       width:
-        160,
+        150,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2209,8 +2130,14 @@ export default function Drugs() {
       dataIndex:
         "processingMethod",
 
+      key:
+        "processingMethod",
+
       width:
-        180,
+        170,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2224,8 +2151,14 @@ export default function Drugs() {
       dataIndex:
         "importedMaterialCode",
 
+      key:
+        "importedMaterialCode",
+
       width:
-        150,
+        140,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2239,8 +2172,14 @@ export default function Drugs() {
       dataIndex:
         "processedMaterialCode",
 
+      key:
+        "processedMaterialCode",
+
       width:
-        150,
+        145,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2254,11 +2193,14 @@ export default function Drugs() {
       dataIndex:
         "processingLossRate",
 
+      key:
+        "processingLossRate",
+
       width:
-        130,
+        125,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         numberOrDash,
@@ -2272,11 +2214,14 @@ export default function Drugs() {
       dataIndex:
         "preservationLossRate",
 
+      key:
+        "preservationLossRate",
+
       width:
-        130,
+        125,
 
       align:
-        "right" as const,
+        "right",
 
       render:
         numberOrDash,
@@ -2290,8 +2235,14 @@ export default function Drugs() {
       dataIndex:
         "qualityStandard",
 
+      key:
+        "qualityStandard",
+
       width:
-        180,
+        170,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2305,8 +2256,14 @@ export default function Drugs() {
       dataIndex:
         "decisionNo",
 
+      key:
+        "decisionNo",
+
       width:
-        150,
+        145,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2320,11 +2277,14 @@ export default function Drugs() {
       dataIndex:
         "insurancePaymentRate",
 
+      key:
+        "insurancePaymentRate",
+
       width:
-        130,
+        125,
 
       align:
-        "center" as const,
+        "center",
     },
 
 
@@ -2335,8 +2295,14 @@ export default function Drugs() {
       dataIndex:
         "note",
 
+      key:
+        "note",
+
       width:
-        180,
+        170,
+
+      ellipsis:
+        true,
 
       render:
         textOrDash,
@@ -2350,14 +2316,17 @@ export default function Drugs() {
       dataIndex:
         "active",
 
+      key:
+        "active",
+
       width:
-        120,
+        105,
 
       fixed:
-        "right" as const,
+        "right",
 
       align:
-        "center" as const,
+        "center",
 
       render:
         (
@@ -2368,15 +2337,113 @@ export default function Drugs() {
             ? (
               <Tag
                 color="success"
+
+                className="drugs-status"
               >
                 Đang dùng
               </Tag>
             )
             : (
-              <Tag>
+              <Tag
+                className="drugs-status"
+              >
                 Ngừng dùng
               </Tag>
             ),
+    },
+
+
+    {
+      title:
+        "Thao tác",
+
+      key:
+        "actions",
+
+      width:
+        100,
+
+      fixed:
+        "right",
+
+      align:
+        "center",
+
+      render:
+        (
+          _,
+          record
+        ) => (
+
+          <Space
+            size={
+              8
+            }
+          >
+
+            <Tooltip
+              title="Cập nhật"
+            >
+              <Button
+                type="text"
+
+                size="small"
+
+                icon={
+                  <EditOutlined
+                    style={{
+                      color:
+                        "#1677ff",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  void openEditModal(
+                    record
+                  )
+                }
+              />
+            </Tooltip>
+
+
+            <Tooltip
+              title={
+                record.active
+                  ? "Ngừng sử dụng"
+                  : "Đã ngừng sử dụng"
+              }
+            >
+              <Button
+                type="text"
+
+                size="small"
+
+                disabled={
+                  !record.active
+                }
+
+                icon={
+                  <StopOutlined
+                    style={{
+                      color:
+                        record.active
+                          ? "#ff4d4f"
+                          : "#bfbfbf",
+                    }}
+                  />
+                }
+
+                onClick={() =>
+                  confirmDisable(
+                    record
+                  )
+                }
+              />
+            </Tooltip>
+
+          </Space>
+        ),
     },
   ];
 
@@ -2388,337 +2455,396 @@ export default function Drugs() {
   return (
     <>
 
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <Space
-        style={{
-          width:
-            "100%",
-
-          justifyContent:
-            "space-between",
-
-          marginBottom:
-            18,
-        }}
+      <div
+        className="drugs-page"
       >
 
-        <Title
-          level={
-            3
-          }
+        {/* =================================================
+            BREADCRUMB
+        ================================================= */}
 
-          style={{
-            margin:
-              0,
-          }}
+        <Breadcrumb
+          className="drugs-breadcrumb"
+
+          items={[
+            {
+              title: (
+                <HomeOutlined />
+              ),
+            },
+
+            {
+              title:
+                "Danh mục",
+            },
+
+            {
+              title:
+                "Thuốc",
+            },
+          ]}
+        />
+
+
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div
+          className="drugs-header"
         >
-          Thuốc
-        </Title>
+
+          <div>
+
+            <div
+              className="drugs-title-row"
+            >
+
+              <ExperimentOutlined
+                className="drugs-title-icon"
+              />
 
 
-        <Space>
+              <Title
+                level={
+                  3
+                }
 
-          <Button
-            icon={
-              <UploadOutlined />
-            }
+                style={{
+                  margin:
+                    0,
+                }}
+              >
+                Thuốc
+              </Title>
 
-            onClick={
-              openImportModal
+            </div>
+
+
+            <Text
+              type="secondary"
+
+              className="drugs-subtitle"
+            >
+              Quản lý danh mục thuốc và thông tin sử dụng
+            </Text>
+
+          </div>
+
+
+          <Space
+            size={
+              8
             }
           >
-            Import Excel
-          </Button>
+
+            <Button
+              icon={
+                <UploadOutlined />
+              }
+
+              onClick={
+                openImportModal
+              }
+            >
+              Import Excel
+            </Button>
+
+
+            <Button
+              type="primary"
+
+              icon={
+                <PlusOutlined />
+              }
+
+              onClick={
+                openAddModal
+              }
+            >
+              Thêm mới
+            </Button>
+
+          </Space>
+
+        </div>
+
+
+        {/* =================================================
+            FILTER
+        ================================================= */}
+
+        <div
+          className="drugs-filter-grid"
+        >
+
+          <div
+            className="drugs-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="drugs-filter-label"
+            >
+              Mã thuốc
+            </Text>
+
+
+            <Input
+              value={
+                searchCode
+              }
+
+              placeholder="Nhập mã thuốc"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchCode(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="drugs-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="drugs-filter-label"
+            >
+              Tên thuốc
+            </Text>
+
+
+            <Input
+              value={
+                searchName
+              }
+
+              placeholder="Nhập tên thuốc"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchName(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="drugs-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="drugs-filter-label"
+            >
+              Hoạt chất
+            </Text>
+
+
+            <Input
+              value={
+                searchIngredient
+              }
+
+              placeholder="Nhập hoạt chất"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchIngredient(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
+
+
+          <div
+            className="drugs-filter-item"
+          >
+
+            <Text
+              strong
+
+              className="drugs-filter-label"
+            >
+              Mã nhóm
+            </Text>
+
+
+            <Input
+              value={
+                searchGroup
+              }
+
+              placeholder="Mã nhóm"
+
+              allowClear
+
+              onChange={(
+                event
+              ) => {
+
+                setSearchGroup(
+                  event.target.value
+                );
+
+
+                setPage(
+                  1
+                );
+              }}
+            />
+
+          </div>
 
 
           <Button
             type="primary"
 
             icon={
-              <PlusOutlined />
+              <ReloadOutlined />
             }
 
             onClick={
-              openAddModal
+              handleRefresh
             }
           >
-            Thêm mới
+            Làm mới
           </Button>
 
-        </Space>
-
-      </Space>
-
-
-      {/* =================================================
-          FILTER
-      ================================================= */}
-
-      <div
-        style={{
-          display:
-            "grid",
-
-          gridTemplateColumns:
-            "1fr 1.4fr 1.2fr 1fr auto",
-
-          gap:
-            10,
-
-          alignItems:
-            "end",
-
-          marginBottom:
-            16,
-        }}
-      >
-
-        <div>
-
-          <Text>
-            Mã thuốc
-          </Text>
-
-          <Input
-            value={
-              searchCode
-            }
-
-            placeholder="Mã thuốc"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchCode(
-                event.target.value
-              );
-
-              setPage(
-                1
-              );
-            }}
-          />
-
         </div>
 
 
-        <div>
+        {/* =================================================
+            TABLE
+        ================================================= */}
 
-          <Text>
-            Tên thuốc
-          </Text>
+        <Table<DrugItem>
+          className="drugs-table"
 
-          <Input
-            value={
-              searchName
-            }
+          rowKey="code"
 
-            placeholder="Tên thuốc"
+          size="middle"
 
-            allowClear
+          tableLayout="fixed"
 
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchName(
-                event.target.value
-              );
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <div>
-
-          <Text>
-            Hoạt chất
-          </Text>
-
-          <Input
-            value={
-              searchIngredient
-            }
-
-            placeholder="Hoạt chất"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchIngredient(
-                event.target.value
-              );
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <div>
-
-          <Text>
-            Mã nhóm
-          </Text>
-
-          <Input
-            value={
-              searchGroup
-            }
-
-            placeholder="Mã nhóm"
-
-            allowClear
-
-            style={{
-              marginTop:
-                5,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setSearchGroup(
-                event.target.value
-              );
-
-              setPage(
-                1
-              );
-            }}
-          />
-
-        </div>
-
-
-        <Button
-          icon={
-            <ReloadOutlined />
+          loading={
+            loading
           }
 
-          onClick={
-            handleRefresh
+          dataSource={
+            items
           }
-        >
-          Làm mới
-        </Button>
 
-      </div>
+          columns={
+            columns
+          }
+
+          scroll={{
+            x:
+              4900,
+          }}
+
+          pagination={{
+            current:
+              page,
+
+            pageSize,
+
+            total,
+
+            showSizeChanger:
+              true,
+
+            pageSizeOptions: [
+              "10",
+              "50",
+              "100",
+            ],
+
+            showTotal:
+              (
+                value
+              ) =>
+                `Tổng số: ${value}`,
+
+            onChange:
+              (
+                newPage,
+                newPageSize
+              ) => {
+
+                if (
+                  newPageSize !== pageSize
+                ) {
+
+                  setPageSize(
+                    newPageSize
+                  );
 
 
-      {/* =================================================
-          TABLE
-      ================================================= */}
+                  setPage(
+                    1
+                  );
 
-      <Table<DrugItem>
-        rowKey="code"
 
-        bordered
+                  return;
+                }
 
-        size="middle"
-
-        loading={
-          loading
-        }
-
-        dataSource={
-          items
-        }
-
-        columns={
-          columns
-        }
-
-        scroll={{
-          x:
-            5200,
-        }}
-
-        pagination={{
-          current:
-            page,
-
-          pageSize,
-
-          total,
-
-          showSizeChanger:
-            true,
-
-          pageSizeOptions: [
-            "10",
-            "50",
-            "100",
-          ],
-
-          showTotal:
-            (
-              value
-            ) =>
-              `Tổng số: ${value}`,
-
-          onChange:
-            (
-              newPage,
-              newPageSize
-            ) => {
-
-              if (
-                newPageSize !==
-                pageSize
-              ) {
-
-                setPageSize(
-                  newPageSize
-                );
 
                 setPage(
-                  1
+                  newPage
                 );
+              },
+          }}
 
-                return;
-              }
+          locale={{
+            emptyText:
+              "Chưa có dữ liệu thuốc",
+          }}
+        />
 
-
-              setPage(
-                newPage
-              );
-            },
-        }}
-      />
+      </div>
 
 
       {/* =================================================
@@ -2843,8 +2969,7 @@ export default function Drugs() {
 
               <Input
                 disabled={
-                  editingDrug !==
-                  null
+                  editingDrug !== null
                 }
               />
 
@@ -3465,10 +3590,8 @@ export default function Drugs() {
 
         okButtonProps={{
           disabled:
-            importFileList.length ===
-              0 ||
-            importResult !==
-              null,
+            importFileList.length === 0 ||
+            importResult !== null,
         }}
 
         onOk={() =>
@@ -3496,17 +3619,28 @@ export default function Drugs() {
 
             description={
               <>
-                Hệ thống tự nhận diện sheet có cột <b>MA_THUOC</b> và <b>TEN_THUOC</b>.
+                Hệ thống tự nhận diện sheet có cột{" "}
+                <b>MA_THUOC</b>{" "}
+                và{" "}
+                <b>TEN_THUOC</b>.
                 {" "}
-                Hỗ trợ trực tiếp file mẫu <b>Generic 324</b>.
+
+                Hỗ trợ trực tiếp file mẫu{" "}
+                <b>Generic 324</b>.
                 {" "}
+
                 Các cột DEN_NGAY và DENNGAY được bỏ qua.
                 {" "}
+
                 Nếu có lỗi dữ liệu thì toàn bộ lần import sẽ bị hủy.
                 {" "}
-                Mã thuốc đã tồn tại sẽ được cập nhật, mã mới sẽ được thêm mới.
+
+                Mã thuốc đã tồn tại sẽ được cập nhật,
+                mã mới sẽ được thêm mới.
                 {" "}
-                Nếu MA_THUOC xuất hiện nhiều lần thì giữ dòng đầu tiên và các dòng còn lại được tính vào Bỏ qua.
+
+                Nếu MA_THUOC xuất hiện nhiều lần thì giữ dòng đầu tiên
+                và các dòng còn lại được tính vào Bỏ qua.
               </>
             }
 
@@ -3542,21 +3676,17 @@ export default function Drugs() {
                 []
               );
 
-
               setImportResult(
                 null
               );
-
 
               setImportErrors(
                 []
               );
 
-
               setImportMessage(
                 ""
               );
-
 
               return true;
             }}
@@ -3571,16 +3701,13 @@ export default function Drugs() {
                 )
               );
 
-
               setImportResult(
                 null
               );
 
-
               setImportErrors(
                 []
               );
-
 
               setImportMessage(
                 ""
@@ -3630,37 +3757,41 @@ export default function Drugs() {
                 >
 
                   <div>
-                    Tổng số dòng:
-                    {" "}
+                    Tổng số dòng:{" "}
                     <b>
-                      {importResult.totalRows}
+                      {
+                        importResult.totalRows
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Thêm mới:
-                    {" "}
+                    Thêm mới:{" "}
                     <b>
-                      {importResult.inserted}
+                      {
+                        importResult.inserted
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Cập nhật:
-                    {" "}
+                    Cập nhật:{" "}
                     <b>
-                      {importResult.updated}
+                      {
+                        importResult.updated
+                      }
                     </b>
                   </div>
 
 
                   <div>
-                    Bỏ qua:
-                    {" "}
+                    Bỏ qua:{" "}
                     <b>
-                      {importResult.skipped}
+                      {
+                        importResult.skipped
+                      }
                     </b>
                   </div>
 
@@ -3673,8 +3804,7 @@ export default function Drugs() {
 
           {!importResult &&
             importMessage &&
-            importErrors.length ===
-              0 && (
+            importErrors.length === 0 && (
 
               <Alert
                 type="error"
@@ -3694,112 +3824,276 @@ export default function Drugs() {
             )}
 
 
-          {importErrors.length >
-            0 && (
+          {importErrors.length > 0 && (
 
-              <div
+            <div
+              style={{
+                marginTop:
+                  20,
+              }}
+            >
+
+              <Alert
+                type="error"
+
+                showIcon
+
+                message={
+                  importMessage ||
+                  `File có ${importErrors.length} lỗi.`
+                }
+
+                description="Không có thuốc nào được import. Hãy sửa các dòng lỗi rồi import lại."
+
                 style={{
-                  marginTop:
-                    20,
+                  marginBottom:
+                    12,
                 }}
-              >
-
-                <Alert
-                  type="error"
-
-                  showIcon
-
-                  message={
-                    importMessage ||
-                    `File có ${importErrors.length} lỗi.`
-                  }
-
-                  description="Không có thuốc nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
-                  style={{
-                    marginBottom:
-                      12,
-                  }}
-                />
+              />
 
 
-                <Table<DrugImportError>
-                  size="small"
+              <Table<DrugImportError>
+                size="small"
 
-                  bordered
+                bordered
 
-                  rowKey={(
-                    record
-                  ) =>
-                    `${record.row}-${record.field}-${record.message}`
-                  }
+                rowKey={(
+                  record
+                ) =>
+                  `${record.row}-${record.field}-${record.message}`
+                }
 
-                  dataSource={
-                    importErrors
-                  }
+                dataSource={
+                  importErrors
+                }
 
-                  pagination={{
-                    pageSize:
-                      10,
+                pagination={{
+                  pageSize:
+                    10,
 
-                    showSizeChanger:
-                      false,
+                  showSizeChanger:
+                    false,
 
-                    showTotal:
-                      (
-                        value
-                      ) =>
-                        `Tổng lỗi: ${value}`,
-                  }}
+                  showTotal:
+                    (
+                      value
+                    ) =>
+                      `Tổng lỗi: ${value}`,
+                }}
 
-                  scroll={{
-                    y:
-                      320,
-                  }}
+                scroll={{
+                  y:
+                    320,
+                }}
 
-                  columns={[
-                    {
-                      title:
-                        "Dòng",
+                columns={[
+                  {
+                    title:
+                      "Dòng",
 
-                      dataIndex:
-                        "row",
+                    dataIndex:
+                      "row",
 
-                      width:
-                        80,
+                    width:
+                      80,
 
-                      align:
-                        "center",
-                    },
+                    align:
+                      "center",
+                  },
 
-                    {
-                      title:
-                        "Cột",
+                  {
+                    title:
+                      "Cột",
 
-                      dataIndex:
-                        "field",
+                    dataIndex:
+                      "field",
 
-                      width:
-                        170,
-                    },
+                    width:
+                      170,
+                  },
 
-                    {
-                      title:
-                        "Lỗi",
+                  {
+                    title:
+                      "Lỗi",
 
-                      dataIndex:
-                        "message",
-                    },
-                  ]}
-                />
+                    dataIndex:
+                      "message",
+                  },
+                ]}
+              />
 
-              </div>
+            </div>
 
-            )}
+          )}
 
         </div>
 
       </Modal>
+
+
+      {/* =================================================
+          STYLE
+      ================================================= */}
+
+      <style>
+        {`
+          .drugs-page {
+            width: 100%;
+          }
+
+          .drugs-breadcrumb {
+            margin-bottom: 14px;
+            font-size: 12px;
+          }
+
+          .drugs-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+
+          .drugs-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+
+          .drugs-title-row h3 {
+            margin: 0 !important;
+            color: #172033 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+          }
+
+          .drugs-title-icon {
+            color: #fa8c16;
+            font-size: 25px;
+          }
+
+          .drugs-subtitle {
+            display: block;
+            margin-top: 3px;
+            font-size: 12px;
+          }
+
+          .drugs-filter-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(180px, 0.9fr)
+              minmax(250px, 1.4fr)
+              minmax(230px, 1.2fr)
+              minmax(160px, 0.8fr)
+              auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 14px;
+          }
+
+          .drugs-filter-item {
+            min-width: 0;
+          }
+
+          .drugs-filter-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .drugs-table {
+            overflow: hidden;
+            border: 1px solid #e6ebf1;
+            border-radius: 8px;
+          }
+
+          .drugs-table .ant-table {
+            border-radius: 8px;
+          }
+
+          .drugs-table
+          .ant-table-container {
+            border-start-start-radius: 8px;
+            border-start-end-radius: 8px;
+          }
+
+          .drugs-table
+          .ant-table-thead
+          > tr
+          > th {
+            padding: 11px 10px !important;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f3f6f9 !important;
+            border-bottom: 1px solid #e5eaf0 !important;
+          }
+
+          .drugs-table
+          .ant-table-tbody
+          > tr
+          > td {
+            padding: 11px 10px !important;
+            color: #202a3b;
+            font-size: 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf0f5 !important;
+          }
+
+          .drugs-table
+          .ant-table-tbody
+          > tr:hover
+          > td {
+            background: #f7fbff !important;
+          }
+
+          .drugs-table
+          .ant-table-cell-fix-left,
+          .drugs-table
+          .ant-table-cell-fix-right {
+            background: #ffffff;
+          }
+
+          .drugs-table
+          .ant-table-thead
+          .ant-table-cell-fix-left,
+          .drugs-table
+          .ant-table-thead
+          .ant-table-cell-fix-right {
+            background: #f3f6f9 !important;
+          }
+
+          .drugs-table
+          .ant-pagination {
+            margin: 14px 8px 6px;
+          }
+
+          .drugs-status {
+            margin: 0;
+            border-radius: 6px;
+            font-size: 11px;
+          }
+
+          @media (max-width: 1150px) {
+            .drugs-filter-grid {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+          }
+
+          @media (max-width: 760px) {
+            .drugs-header {
+              flex-direction: column;
+            }
+
+            .drugs-filter-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}
+      </style>
 
     </>
   );
