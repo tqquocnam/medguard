@@ -1,51 +1,22 @@
-import {
-  Alert,
-  Modal,
-  Spin,
-  Table,
-  Tag,
-  // Typography,
-} from "antd";
+import { Alert, Button, Descriptions, Modal, Spin, Statistic, Table, Tag, Typography } from "antd";
 
-import {
-  CloseCircleFilled,
-} from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { CalendarOutlined, CloseCircleFilled, EyeOutlined } from "@ant-design/icons";
+
+import { useEffect, useMemo, useState } from "react";
 
 import dayjs from "dayjs";
 
-import {
-  apiFetch,
-} from "../api/apiClient";
+import { apiFetch } from "../api/apiClient";
 
+type RuleResult = {
 
-// const {
-//   Text,
-// } = Typography;
-
-
-// ======================================================
-// TYPES
-// ======================================================
-
-interface RuleResult {
   id: string;
 
-  result:
-    | "PASS"
-    | "FAIL"
-    | "SKIP";
+  result: "PASS" | "FAIL" | "SKIP";
 
-  severity:
-    | "ERROR"
-    | "WARNING"
-    | "INFO";
+  severity: "ERROR" | "WARNING" | "INFO";
 
   message?: string;
 
@@ -58,24 +29,21 @@ interface RuleResult {
   rule_code: string;
 
   rule_name: string;
-}
 
+};
 
-interface ApiData {
-  checkRunId:
-    | string
-    | null;
+type ApiData = {
 
-  checkedAt:
-    | string
-    | null;
+  checkRunId: string | null;
 
-  results:
-    RuleResult[];
-}
+  checkedAt: string | null;
 
+  results: RuleResult[];
 
-interface Props {
+};
+
+type Props = {
+
   open: boolean;
 
   caseId: string | null;
@@ -86,1610 +54,1495 @@ interface Props {
 
   patientCode?: string;
 
+  treatmentGroup?: string | null;
+
   onClose: () => void;
-}
 
+};
 
-interface ErrorRow {
+type ErrorRow = {
+
   key: string;
 
   ruleCode: string;
 
   ruleName: string;
 
-  severity:
-    | "ERROR"
-    | "WARNING"
-    | "INFO";
+  severity: "ERROR" | "WARNING" | "INFO";
 
   content: string;
-}
 
+  findingDate?: string;
 
-// ======================================================
-// FORMAT TIME
-// ======================================================
+};
 
 function formatTime(
+
   value: unknown
+
 ) {
 
   if (
+
     !value
+
   ) {
 
     return "";
+
   }
 
-
   const date =
+
     dayjs(
+
       String(
+
         value
+
       )
+
     );
 
-
   if (
+
     !date.isValid()
+
   ) {
 
     return String(
+
       value
+
     );
+
   }
 
-
   return date.format(
+
     "DD/MM/YYYY HH:mm"
+
   );
+
 }
 
-
 // ======================================================
+
 // TÊN NGẮN CỦA RULE
+
 // ======================================================
 
 function getRuleDisplayName(
+
   ruleCode: string,
+
   ruleName: string
+
 ) {
 
   switch (
+
     ruleCode
+
   ) {
 
     case "STAFF_TIME_OVERLAP":
 
       return "Trùng thời gian";
 
-
     case "EXAM_MIN_TIME":
 
       return "Thời gian khám";
-
 
     case "DRUG_ICD":
 
       return "Thuốc - ICD";
 
-
     case "SERVICE_ICD":
 
       return "DVKT - ICD";
-
 
     case "SERVICE_DIAGNOSIS":
 
       return "DVKT - Chẩn đoán";
 
-
     case "ICD_WARNING":
 
       return "ICD cảnh báo";
 
-
     default:
 
       return (
+
         ruleName ||
+
         ruleCode ||
+
         "Lỗi kiểm tra"
+
       );
+
   }
+
 }
 
-
 // ======================================================
+
 // FORMAT VIOLATION
+
 // ======================================================
 
 function formatViolation(
+
   rule: RuleResult,
+
   violation: any
+
 ): string {
 
   // ====================================================
+
   // BACKEND ĐÃ FORMAT MESSAGE
+
   // ====================================================
 
   if (
+
     violation?.displayMessage
+
   ) {
 
     return String(
+
       violation.displayMessage
+
     );
+
   }
 
-
   // ====================================================
+
   // STAFF TIME OVERLAP
+
   // ====================================================
 
   if (
+
     rule.rule_code ===
+
     "STAFF_TIME_OVERLAP"
+
   ) {
 
     const staff =
-      violation.staffCode ??
-      violation.staff_code ??
-      violation.doctorCode ??
-      violation.performerCode ??
-      "";
 
+      violation.staffCode ??
+
+      violation.staff_code ??
+
+      violation.doctorCode ??
+
+      violation.performerCode ??
+
+      "";
 
     const sourceName =
-      violation.sourceItemName ??
-      violation.itemName ??
-      violation.source_name ??
-      "";
 
+      violation.sourceItemName ??
+
+      violation.itemName ??
+
+      violation.source_name ??
+
+      "";
 
     const sourceTime =
-      formatTime(
-        violation.sourceStart ??
-        violation.sourceTime ??
-        violation.startTime
-      );
 
+      formatTime(
+
+        violation.sourceStart ??
+
+        violation.sourceTime ??
+
+        violation.startTime
+
+      );
 
     const conflictPatient =
-      violation.conflictPatientName ??
-      violation.patientName ??
-      violation.conflict_patient_name ??
-      "";
 
+      violation.conflictPatientName ??
+
+      violation.patientName ??
+
+      violation.conflict_patient_name ??
+
+      "";
 
     const conflictItem =
+
       violation.conflictItemName ??
+
       violation.otherItemName ??
+
       violation.conflict_name ??
+
       "";
 
-
     const conflictStart =
-      formatTime(
-        violation.conflictStart ??
-        violation.otherStart
-      );
 
+      formatTime(
+
+        violation.conflictStart ??
+
+        violation.otherStart
+
+      );
 
     const conflictEnd =
+
       formatTime(
+
         violation.conflictEnd ??
+
         violation.otherEnd
+
       );
 
-
     return [
+
       staff,
 
       sourceName
-        ? `[${sourceName}: ${sourceTime} (Trùng thời gian)]`
+
+        ? `[${sourceName}: ${sourceTime} (Trùng thời gian) với`
+
         : sourceTime
-          ? `[${sourceTime} (Trùng thời gian)]`
-          : "(Trùng thời gian)",
+
+          ? `[${sourceTime} (Trùng thời gian) với`
+
+          : "(Trùng thời gian)  với",
 
       conflictPatient,
 
       conflictItem
+
         ? `- ${conflictItem}:`
+
         : "",
 
       conflictStart &&
+
       conflictEnd
+
         ? `${conflictStart} → ${conflictEnd}`
+
         : conflictStart,
+
     ]
+
       .filter(
+
         Boolean
+
       )
+
       .join(
+
         " "
+
       );
+
   }
 
-
   // ====================================================
+
   // EXAM MIN TIME
+
   // ====================================================
 
   if (
+
     rule.rule_code ===
+
     "EXAM_MIN_TIME"
+
   ) {
 
     const name =
+
       violation.itemName ??
+
       violation.examName ??
+
       "Công khám";
 
-
     const start =
-      formatTime(
-        violation.startTime
-      );
 
+      formatTime(
+
+        violation.startTime
+
+      );
 
     const end =
+
       formatTime(
+
         violation.endTime
+
       );
 
-
     const minutes =
+
       violation.durationMinutes ??
+
       violation.minutes;
 
-
     return (
+
       `${name}: ` +
+
       `${start}` +
 
       (
+
         end
+
           ? ` → ${end}`
+
           : ""
+
       ) +
 
       (
+
         minutes !==
+
         undefined
+
           ? ` (${minutes} phút - thời gian khám không đủ)`
+
           : " (Thời gian khám không đủ)"
+
       )
+
     );
+
   }
 
-
   // ====================================================
+
   // DRUG ICD
+
   // ====================================================
 
   if (
+
     rule.rule_code ===
+
     "DRUG_ICD"
+
   ) {
 
     const drug =
+
       violation.drugName ??
+
       violation.itemName ??
+
       violation.drugCode ??
+
       "Thuốc";
 
-
     const code =
+
       violation.drugCode ??
+
       violation.itemCode ??
+
       "";
 
-
     return (
+
       `${code ? `${code} - ` : ""}` +
+
       `${drug}: Không phù hợp ICD của hồ sơ`
+
     );
+
   }
 
-
   // ====================================================
+
   // SERVICE ICD
+
   // ====================================================
 
   if (
+
     rule.rule_code ===
+
     "SERVICE_ICD"
+
   ) {
 
     const service =
-      violation.serviceName ??
-      violation.itemName ??
-      violation.serviceCode ??
-      "DVKT";
 
+      violation.serviceName ??
+
+      violation.itemName ??
+
+      violation.serviceCode ??
+
+      "DVKT";
 
     const code =
+
       violation.serviceCode ??
+
       violation.itemCode ??
+
       "";
 
-
     return (
+
       `${code ? `${code} - ` : ""}` +
+
       `${service}: Không phù hợp ICD của hồ sơ`
+
     );
+
   }
 
-
   // ====================================================
+
   // SERVICE DIAGNOSIS
+
   // ====================================================
 
   if (
+
     rule.rule_code ===
+
     "SERVICE_DIAGNOSIS"
+
   ) {
 
     const service =
+
       violation.serviceName ??
+
       violation.itemName ??
+
       violation.serviceCode ??
+
       "DVKT";
 
-
     return (
+
       `${service}: ` +
+
       "Không phù hợp chẩn đoán vào"
+
     );
+
   }
 
-
   // ====================================================
+
   // FALLBACK
+
   // ====================================================
 
   if (
+
     violation?.message
+
   ) {
 
     return String(
+
       violation.message
+
     );
+
   }
 
-
   return (
+
     rule.message ??
+
     rule.rule_name
+
   );
+
 }
 
-
 // ======================================================
+
 // BUILD ERROR ROWS
+
 // ======================================================
 
 function buildErrorRows(
+
   rules: RuleResult[]
+
 ): ErrorRow[] {
 
   const rows:
+
     ErrorRow[] = [];
 
-
   const seen =
+
     new Set<string>();
 
-
   for (
+
     const rule
+
     of rules
+
   ) {
 
     // ==================================================
+
     // CHỈ FAIL
+
     // ==================================================
 
     if (
+
       rule.result !==
+
       "FAIL"
+
     ) {
 
       continue;
+
     }
 
-
     const violations =
+
       Array.isArray(
+
         rule.details?.violations
+
       )
+
         ? rule.details.violations
+
         : [];
 
-
     // ==================================================
+
     // CÓ VIOLATIONS
+
     // ==================================================
 
     if (
+
       violations.length >
+
       0
+
     ) {
 
       for (
+
         let index = 0;
+
         index <
+
         violations.length;
+
         index++
+
       ) {
 
         const violation =
+
           violations[index];
 
-
         // ================================================
+
         // CHỐNG HIỂN THỊ TRÙNG
+
         // ================================================
 
         const sourceEventId =
-          violation.eventId ??
-          violation.sourceEventId ??
-          violation.source_event_id ??
-          "";
 
+          violation.eventId ??
+
+          violation.sourceEventId ??
+
+          violation.source_event_id ??
+
+          "";
 
         const conflictEventId =
-          violation.conflictEventId ??
-          violation.otherEventId ??
-          violation.conflict_event_id ??
-          "";
 
+          violation.conflictEventId ??
+
+          violation.otherEventId ??
+
+          violation.conflict_event_id ??
+
+          "";
 
         let duplicateKey =
+
           "";
 
-
         // ================================================
+
         // ƯU TIÊN EVENT ID
+
         // ================================================
 
         if (
+
           sourceEventId &&
+
           conflictEventId
+
         ) {
 
           duplicateKey =
+
             [
+
               rule.rule_code,
 
               ...[
+
                 String(
+
                   sourceEventId
+
                 ),
 
                 String(
+
                   conflictEventId
+
                 ),
+
               ].sort(),
+
             ].join(
+
               "|"
+
             );
+
         }
 
         // ================================================
+
         // FALLBACK CASE ID
+
         // ================================================
 
         else {
 
           const sourceCase =
-            violation.medicalCaseId ??
-            violation.sourceCaseId ??
-            "";
 
+            violation.medicalCaseId ??
+
+            violation.sourceCaseId ??
+
+            "";
 
           const conflictCase =
+
             violation.conflictCaseId ??
+
             violation.otherCaseId ??
+
             "";
 
-
           if (
+
             sourceCase &&
+
             conflictCase
+
           ) {
 
             duplicateKey =
+
               [
+
                 rule.rule_code,
 
                 ...[
+
                   String(
+
                     sourceCase
+
                   ),
 
                   String(
+
                     conflictCase
+
                   ),
+
                 ].sort(),
 
                 violation.itemCode ??
+
                 violation.drugCode ??
+
                 violation.serviceCode ??
+
                 "",
 
                 violation.startTime ??
+
                 violation.sourceStart ??
+
                 "",
+
               ].join(
+
                 "|"
+
               );
+
           }
+
         }
 
-
         if (
+
           duplicateKey &&
+
           seen.has(
+
             duplicateKey
+
           )
+
         ) {
 
           continue;
+
         }
 
-
         if (
+
           duplicateKey
+
         ) {
 
           seen.add(
+
             duplicateKey
+
           );
+
         }
 
-
         rows.push({
+
           key:
+
             `${rule.id}-${index}`,
 
           ruleCode:
+
             rule.rule_code,
 
           ruleName:
+
             getRuleDisplayName(
+
               rule.rule_code,
+
               rule.rule_name
+
             ),
 
           severity:
+
             rule.severity,
 
           content:
+
             formatViolation(
+
               rule,
+
               violation
+
             ),
+
         });
+
       }
 
-
       continue;
+
     }
 
+    // YHCT lưu từng phát hiện trong details.findings, không phải violations.
+
+    const findings = Array.isArray(rule.details?.findings)
+
+      ? rule.details.findings
+
+      : [];
+
+    if (findings.length > 0) {
+
+      findings.forEach((finding: any, index: number) => {
+
+        const content = String(finding?.message || rule.message || rule.rule_name);
+
+        const date = String(finding?.date || "");
+
+        const key = `${rule.rule_code}|${finding?.type || "FINDING"}|${date}|${content}`;
+
+        if (seen.has(key)) return;
+
+        seen.add(key);
+
+        rows.push({
+
+          key: `${rule.id}-finding-${index}`,
+
+          ruleCode: rule.rule_code,
+
+          ruleName: getRuleDisplayName(rule.rule_code, rule.rule_name),
+
+          severity: rule.severity,
+
+          content,
+
+          findingDate: date || undefined,
+
+        });
+
+      });
+
+      continue;
+
+    }
 
     // ==================================================
+
     // FAIL KHÔNG CÓ VIOLATIONS
+
     // ==================================================
 
     rows.push({
+
       key:
+
         rule.id,
 
       ruleCode:
+
         rule.rule_code,
 
       ruleName:
+
         getRuleDisplayName(
+
           rule.rule_code,
+
           rule.rule_name
+
         ),
 
       severity:
+
         rule.severity,
 
       content:
+
         rule.message ||
+
         rule.rule_name,
+
     });
+
   }
 
-
   return rows;
+
 }
 
-
 // ======================================================
+
 // COMPONENT
+
 // ======================================================
 
-export default function CaseCheckResultsModal({
+type YhctDay = {
 
-  open,
+  date: string;
 
-  caseId,
+  status: "BOTH" | "XML3_ONLY" | "XML5_ONLY" | "NEITHER";
 
-  patientName,
+  serviceCount: number;
 
-  patientCode,
+  progressCount: number;
 
-  onClose,
+  serviceCodes: string[];
 
-}: Props) {
+  hasXml3Service: boolean;
 
-  // ====================================================
-  // STATE
-  // ====================================================
+  hasXml5Progress: boolean;
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      false
-    );
+};
 
+const YHCT_CODE = "YHCT_DAILY_TREATMENT_CONTINUITY";
 
-  const [
-    data,
-    setData,
-  ] =
-    useState<ApiData | null>(
-      null
-    );
+const dayLabels: Record<YhctDay["status"], string> = {
 
+  BOTH: "Có XML3 + XML5",
 
-  const [
-    error,
-    setError,
-  ] =
-    useState<string | null>(
-      null
-    );
+  XML3_ONLY: "Có DVKT, thiếu diễn biến",
 
+  XML5_ONLY: "Có diễn biến, không có DVKT nhóm kiểm tra",
 
-  // ====================================================
-  // LOAD RESULTS
-  // ====================================================
+  NEITHER: "Không ghi nhận cả hai",
 
-  const loadResults =
-    useCallback(
-      async () => {
+};
 
-        if (
-          !caseId
-        ) {
+function validCalendar(raw: unknown): YhctDay[] {
 
-          return;
-        }
+  if (!Array.isArray(raw)) return [];
 
+  return raw.filter((item): item is YhctDay =>
 
-        try {
+    item != null && typeof item === "object" &&
 
-          setLoading(
-            true
-          );
+    typeof item.date === "string" &&
 
+    ["BOTH", "XML3_ONLY", "XML5_ONLY", "NEITHER"].includes(item.status)
 
-          setError(
-            null
-          );
-
-
-          setData(
-            null
-          );
-
-
-          const response =
-            await apiFetch(
-              `/checks/cases/${caseId}/results`,
-              {
-                method:
-                  "GET",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-              }
-            );
-
-
-          // ==============================================
-          // HẾT PHIÊN
-          // ==============================================
-
-          if (
-            response.status ===
-            401
-          ) {
-
-            throw new Error(
-              "Phiên đăng nhập đã hết. Vui lòng đăng nhập lại."
-            );
-          }
-
-
-          // ==============================================
-          // KHÔNG CÓ QUYỀN
-          // ==============================================
-
-          if (
-            response.status ===
-            403
-          ) {
-
-            throw new Error(
-              "Bạn không có quyền xem kết quả kiểm tra hồ sơ này."
-            );
-          }
-
-
-          const json =
-            await response.json();
-
-
-          if (
-            !response.ok ||
-            !json.success
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải kết quả kiểm tra."
-            );
-          }
-
-
-          setData(
-            json.data
-          );
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Load case check results error:",
-            error
-          );
-
-
-          setError(
-            error instanceof
-            Error
-              ? error.message
-              : "Không thể tải kết quả kiểm tra."
-          );
-
-        } finally {
-
-          setLoading(
-            false
-          );
-        }
-      },
-      [
-        caseId,
-      ]
-    );
-
-
-  // ====================================================
-  // LOAD KHI MỞ MODAL
-  // ====================================================
-
-  useEffect(
-    () => {
-
-      if (
-        !open ||
-        !caseId
-      ) {
-
-        return;
-      }
-
-
-      const timer =
-        window.setTimeout(
-          () => {
-
-            void loadResults();
-
-          },
-          0
-        );
-
-
-      return () => {
-
-        window.clearTimeout(
-          timer
-        );
-      };
-
-    },
-    [
-      open,
-      caseId,
-      loadResults,
-    ]
   );
 
+}
 
-  // ====================================================
-  // ERROR ROWS
-  // ====================================================
+function YhctTreatmentCalendar({ rule, preferredDate }: {
 
-  const rows =
-    useMemo(
-      () =>
-        buildErrorRows(
-          data?.results ??
-          []
-        ),
+  rule: RuleResult;
 
-      [
-        data,
-      ]
-    );
+  preferredDate?: string;
 
+}) {
 
-  // ====================================================
-  // SỐ NHÓM RULE BỊ LỖI
-  // ====================================================
+  const details = rule.details ?? {};
 
-  // const failedRuleCount =
-  //   useMemo(
-  //     () =>
-  //       new Set(
-  //         rows.map(
-  //           (
-  //             row
-  //           ) =>
-  //             row.ruleCode
-  //         )
-  //       ).size,
+  const calendar = useMemo(() => validCalendar(details.calendar), [details.calendar]);
 
-  //     [
-  //       rows,
-  //     ]
-  //   );
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  useEffect(() => {
 
-  // ====================================================
-  // UI
-  // ====================================================
+    setSelectedDate(calendar.some(item => item.date === preferredDate) ? preferredDate! : (calendar.find(item => item.status === "XML3_ONLY")?.date || calendar[0]?.date || null));
+
+  }, [preferredDate, rule.id, calendar]);
+
+  const selected = calendar.find(item => item.date === selectedDate);
+
+  const findings: any[] = Array.isArray(details.findings) ? details.findings : [];
+
+  const selectedFindings = findings.filter(item => item.date === selectedDate ||
+
+    (Array.isArray(item.missingDays) && item.missingDays.includes(selectedDate)));
+
+  if (!calendar.length) {
+
+    return <Alert type="info" showIcon message="Chưa có dữ liệu lịch điều trị của lần kiểm tra này." description="Hãy chạy lại Rule Check với bản mới của YHCT_DAILY_TREATMENT_CONTINUITY." />;
+
+  }
 
   return (
 
-<Modal
-  open={open}
-  onCancel={onClose}
-  footer={null}
+    <section className="mg-yhct-panel" aria-label="Lịch điều trị YHCT">
 
-  width={1250}
+      <div className="mg-yhct-heading">
 
-  mask={true}
+        <CalendarOutlined /> <strong>Lịch điều trị Y học cổ truyền</strong>
 
-  styles={{
-    mask: {
-      backgroundColor: "rgba(15, 23, 42, 0.18)",
-      backdropFilter: "blur(6px)",
-      WebkitBackdropFilter: "blur(6px)",
-    },
-  }}
+        <Typography.Text type="secondary">{details.startDate || "-"} → {details.endDate || "-"}</Typography.Text>
 
-  destroyOnClose
-  className="medguard-case-error-modal"
-
-  title={
-    <div className="case-error-title">
-      <div className="case-error-title-icon">
-        <CloseCircleFilled />
       </div>
 
-      <div className="case-error-title-info">
-        <div className="case-error-title-main">
-          Chi tiết lỗi hồ sơ
-        </div>
+      <div className="mg-yhct-stats">
 
-        <div className="case-error-patient">
-          <span className="case-error-patient-code">
-            {patientCode || "-"}
-          </span>
+        <Statistic title="Tổng ngày" value={details.totalTreatmentDays ?? calendar.length} />
 
-          {patientName ? (
-            <>
-              <span className="case-error-patient-separator">
-                -
-              </span>
+        <Statistic title="Ngày có XML3" value={details.daysWithXml3Service ?? 0} />
 
-              <span className="case-error-patient-name">
-                {patientName}
-              </span>
-            </>
-          ) : null}
-        </div>
+        <Statistic title="Ngày có XML5" value={details.daysWithXml5Progress ?? 0} />
+
+        <Statistic title="Chỉ XML3" value={details.daysWithServiceOnly ?? 0} />
+
+        <Statistic title="Thiếu cả hai" value={details.daysWithNeither ?? 0} />
+
       </div>
-    </div>
+
+      <div className="mg-yhct-legend">
+
+        <Tag color="success">Có XML3 + XML5</Tag>
+
+        <Tag color="warning">Chỉ XML3</Tag>
+
+        <Tag color="processing">Chỉ XML5</Tag>
+
+        <Tag>Không ghi nhận</Tag>
+
+      </div>
+
+      <div className="mg-yhct-days">
+
+        {calendar.map(item => {
+
+          const active = item.date === selectedDate;
+
+          return (
+
+            <button key={item.date} type="button"
+
+              className={`mg-yhct-day mg-yhct-${item.status.toLowerCase()} ${active ? "is-selected" : ""}`}
+
+              onClick={() => setSelectedDate(item.date)}
+
+              aria-pressed={active}
+
+              title={dayLabels[item.status]}>
+
+              <strong>{dayjs(item.date).format("DD/MM")}</strong>
+
+              <small>{item.status === "BOTH" ? "XML3 + 5" : item.status === "XML3_ONLY" ? "Thiếu XML5" : item.status === "XML5_ONLY" ? "Chỉ XML5" : "Trống"}</small>
+
+            </button>
+
+          );
+
+        })}
+
+      </div>
+
+      {selected && (
+
+        <div className="mg-yhct-day-detail">
+
+          <Typography.Title level={5} style={{ marginTop: 0 }}>Ngày {dayjs(selected.date).format("DD/MM/YYYY")}</Typography.Title>
+
+          <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+
+            <Descriptions.Item label="Trạng thái" span={2}>
+
+              <Tag color={selected.status === "BOTH" ? "success" : selected.status === "XML3_ONLY" ? "warning" : selected.status === "XML5_ONLY" ? "processing" : "default"}>
+
+                {dayLabels[selected.status]}
+
+              </Tag>
+
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Lượt DVKT XML3">{selected.serviceCount}</Descriptions.Item>
+
+            <Descriptions.Item label="Bản ghi diễn biến XML5">{selected.progressCount}</Descriptions.Item>
+
+            <Descriptions.Item label="Mã DVKT" span={2}>
+
+              {selected.serviceCodes?.length ? selected.serviceCodes.map(code => <Tag key={code}>{code}</Tag>) : "Không có trong nhóm DVKT được cấu hình"}
+
+            </Descriptions.Item>
+
+          </Descriptions>
+
+          {selectedFindings.map((finding, i) => (
+
+            <Alert key={i} style={{ marginTop: 12 }} type="warning" showIcon message={String(finding.message || "Cần rà soát")} />
+
+          ))}
+
+          {selected.status === "NEITHER" && !selectedFindings.length && (
+
+            <Typography.Text type="secondary" style={{ display: "block", marginTop: 8 }}>
+
+              Chưa ghi nhận DVKT thuộc phạm vi kiểm tra hoặc diễn biến XML5 trong ngày. Không tự kết luận vi phạm BHYT.
+
+            </Typography.Text>
+
+          )}
+
+        </div>
+
+      )}
+
+    </section>
+
+  );
+
+}
+
+function renderOverlapContent(
+  content: string,
+  ruleCode: string
+) {
+  if (ruleCode !== "STAFF_TIME_OVERLAP") {
+    return content;
   }
->
 
-      {/* =================================================
-          LOADING
-      ================================================= */}
+  // Backend co the tra displayMessage da duoc format.
+  // Xu ly ngay tren noi dung thuc te, tranh bo qua displayMessage.
+  const formattedContent = content
+    .replace(/\(Trùng thời gian với\)/gi, "(Trùng thời gian) với")
+    .replace(/\(Trùng thời gian\)\s+với(?=\s*\])/gi, "(Trùng thời gian) với")
+    .replace(/\(Trùng thời gian\)(?!\s+với)/gi, "(Trùng thời gian) với")
+    // Khong de dau ngoac dong chen giua 'voi' va ten benh nhan.
+    .replace(/\(Trùng thời gian\) với\](?=\s+)/gi, "(Trùng thời gian) với");
 
-      {
-        loading && (
+  const timePattern = /(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/g;
+  const exactTimePattern = /^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}$/;
 
-          <div
-            className="case-error-loading"
-          >
-            <Spin
-              size="large"
-            />
-          </div>
+  return formattedContent.split(timePattern).map((part, index) =>
+    exactTimePattern.test(part) ? (
+      <strong key={index} style={{ fontWeight: 700, color: "#111827" }}>
+        {part}
+      </strong>
+    ) : (
+      <span key={index}>{part}</span>
+    )
+  );
+}
 
-        )
+export default function CaseCheckResultsModal({
+
+  open, caseId, checkRunId, patientName, patientCode, treatmentGroup, onClose,
+
+}: Props) {
+
+  const [data, setData] = useState<ApiData | null>(null);
+
+  const [loading, setLoading] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
+
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+
+  const [preferredDate, setPreferredDate] = useState<string | undefined>();
+
+  useEffect(() => {
+
+    if (!open || !caseId) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+
+      setLoading(true);
+
+      setData(null);
+
+      setError(null);
+
+      setCalendarExpanded(false);
+
+      setPreferredDate(undefined);
+
+      try {
+
+        // Chỉ hiển thị kết quả đúng lần kiểm tra được chọn.
+
+        const response = await apiFetch(`/checks/cases/${encodeURIComponent(caseId)}/results`, { method: "GET" });
+
+        if (response.status === 401) throw new Error("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");
+
+        if (response.status === 403) throw new Error("Bạn không có quyền xem kết quả hồ sơ này.");
+
+        const json = await response.json();
+
+        if (!response.ok || json.success !== true || !json.data) {
+
+          throw new Error(json.message || "Không thể tải kết quả kiểm tra.");
+
+        }
+
+        const incoming = json.data as ApiData;
+
+        if (checkRunId && incoming.checkRunId !== checkRunId) {
+
+          throw new Error("API đang trả kết quả của lần kiểm tra khác. Cần hỗ trợ checkRunId trên backend trước khi hiển thị chi tiết để tránh lấy nhầm kết quả cũ.");
+
+        }
+
+        if (!cancelled) setData(incoming);
+
+      } catch (e) {
+
+        if (!cancelled) setError(e instanceof Error ? e.message : "Không thể tải kết quả.");
+
+      } finally {
+
+        if (!cancelled) setLoading(false);
+
       }
 
+    };
 
-      {/* =================================================
-          API ERROR
-      ================================================= */}
+    void load();
 
-      {
-        !loading &&
-        error && (
+    return () => { cancelled = true; };
 
-          <Alert
-            type="error"
+  }, [open, caseId, checkRunId]);
 
-            showIcon
+  const errorRows = useMemo(() => buildErrorRows(data?.results ?? []), [data]);
 
-            message={
-              error
-            }
-          />
+  const yhctRule = useMemo(() => data?.results.find(rule => rule.rule_code === YHCT_CODE), [data]);
 
-        )
-      }
+  // If treatment_group was not selected by GET_MEDICAL_CASES,
 
+  // recognize YHCT from the actual executed rule's scope.
 
-      {/* =================================================
-          KHÔNG CÓ LỖI
-      ================================================= */}
+  // A SKIP from GENERAL must NOT be treated as YHCT.
 
-      {
-        !loading &&
-        !error &&
-        data &&
-        rows.length ===
-          0 && (
+  const isYhct = treatmentGroup != null && treatmentGroup.trim() !== ""
 
-          <Alert
-            type="success"
+    ? treatmentGroup.trim().toUpperCase() === "YHCT"
 
-            showIcon
+    : yhctRule?.details?.scope === "YHCT_MA_LOAI_KCB_02";
 
-            message="Không phát hiện lỗi."
+  const counts = useMemo(() => ({
 
-            description="Hồ sơ không có lỗi theo các quy luật kiểm tra hiện tại."
-          />
+    errors: errorRows.filter(row => row.severity === "ERROR").length,
 
-        )
-      }
+    warnings: errorRows.filter(row => row.severity === "WARNING").length,
 
+    info: errorRows.filter(row => row.severity === "INFO").length,
 
-      {/* =================================================
-          DANH SÁCH LỖI
-      ================================================= */}
+  }), [errorRows]);
 
-      {
-        !loading &&
-        !error &&
-        rows.length >
-          0 && (
+  const columns: ColumnsType<ErrorRow> = [
 
-          <>
+    { title: "#", key: "index", width: 56, align: "center", render: (_value, _record, index) => index + 1 },
 
-            {/* =============================================
-                TÓM TẮT
-            ============================================= */}
+    { title: "Nhóm lỗi", dataIndex: "ruleName", key: "ruleName", width: 220,
 
-            {/* <div
-              className="case-error-summary"
-            >
+      render: (value: string, record) => <Tag color={record.severity === "WARNING" ? "warning" : record.severity === "INFO" ? "blue" : "error"} style={{ whiteSpace: "normal", margin: 0 }}>{value || record.ruleCode}</Tag> },
 
-              <div
-                className="case-error-summary-left"
-              >
+{
 
-                <CloseCircleFilled />
+  title: "Nội dung cảnh báo / lỗi",
 
+  dataIndex: "content",
 
-                <span>
-                  Phát hiện
-                </span>
+  key: "content",
 
+  render: (value: string, record: ErrorRow) => (
 
-                <strong>
-                  {
-                    rows.length
-                  } lỗi
-                </strong>
+    <span
+
+      style={{
+
+        whiteSpace: "pre-wrap",
+
+        overflowWrap: "anywhere",
+
+        lineHeight: 1.65,
+
+      }}
+
+    >
+
+      {renderOverlapContent(value, record.ruleCode)}
+
+    </span>
+
+  ),
+
+}
+
+,
+
+    // GENERAL has only the three columns above; YHCT keeps calendar actions.
+
+    ...(isYhct ? [{
+
+      title: "Chi tiết", key: "action", width: 130, align: "center" as const,
+
+      render: (_value: unknown, record: ErrorRow) =>
+
+        record.ruleCode === YHCT_CODE && yhctRule ? (
+
+          <Button size="small" icon={<EyeOutlined />} onClick={() => {
+
+            setPreferredDate(record.findingDate);
+
+            setCalendarExpanded(true);
+
+          }}>Xem lịch</Button>
+
+        ) : null,
+
+    }] : []),
+
+  ];
+
+  return (
+
+    <Modal open={open} onCancel={onClose} footer={null} width={1000}
+
+      destroyOnClose className="medguard-case-error-modal"
+
+      style={{ top: "5vh", maxWidth: "calc(100vw - 24px)" }}
+
+      styles={{
+
+        mask: { backgroundColor: "rgba(15,23,42,.22)", backdropFilter: "blur(5px)" },
+
+        body: { maxHeight: "calc(90dvh - 115px)", overflowY: "auto", overflowX: "hidden", paddingRight: 4 },
+
+      }}
+
+      title={<div style={{ display: "flex", alignItems: "center", gap: 12, paddingRight: 32 }}>
+
+        <CloseCircleFilled style={{ fontSize: 26, color: "#e05252" }} />
+
+        <div style={{ minWidth: 0 }}>
+
+          <div style={{ fontWeight: 700 }}>Chi tiết lỗi hồ sơ</div>
+
+          <Typography.Text type="secondary" style={{ fontSize: 18, overflowWrap: "anywhere", fontWeight:700 }}>
+
+            {patientCode || "-"}{patientName ? ` - ${patientName}` : ""}
+
+          </Typography.Text>
+
+        </div>
+
+      </div>}>
+
+      {loading && <div style={{ textAlign: "center", padding: 48 }}><Spin size="large" /></div>}
+
+      {!loading && error && <Alert type="error" showIcon message={error} />}
+
+      {!loading && !error && data && (
+
+        <>
+
+          {errorRows.length === 0 ? (
+
+            <Alert type="success" showIcon message="Không phát hiện lỗi hoặc cảnh báo trong lần kiểm tra này." />
+
+          ) : (
+
+            <>
+
+              <div className="mg-error-summary">
+
+                <Tag color="error">{counts.errors} lỗi</Tag>
+
+                <Tag color="warning">{counts.warnings} cảnh báo</Tag>
+
+                {counts.info > 0 && <Tag color="processing">{counts.info} thông tin</Tag>}
 
               </div>
 
+              <Table<ErrorRow> rowKey="key" size="small" bordered={false}
 
-              <div
-                className="case-error-summary-right"
-              >
+              columns={columns} dataSource={errorRows}
 
-                <SafetyCertificateOutlined />
+              pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"], showTotal: total => `Tổng ${total} mục` }}
 
+              scroll={{ x: isYhct ? 800 : 670 }} />
 
-                <span>
-                  {
-                    failedRuleCount
-                  } nhóm quy luật
-                </span>
+            </>
 
-              </div>
+          )}
 
-            </div> */}
+          {isYhct && yhctRule && validCalendar(yhctRule.details?.calendar).length > 0 && (
 
+            <div style={{ marginTop: 14 }}>
 
-            {/* =============================================
-                TABLE
-            ============================================= */}
+              <Button type={calendarExpanded ? "default" : "primary"} ghost={!calendarExpanded}
 
-            <Table<ErrorRow>
-              rowKey="key"
+                icon={<CalendarOutlined />} onClick={() => {
 
-              size="small"
+                  setPreferredDate(undefined);
 
-              pagination={
-                false
-              }
+                  setCalendarExpanded(v => !v);
 
-              bordered={
-                false
-              }
+                }}>
 
-              dataSource={
-                rows
-              }
+                {calendarExpanded ? "Thu gọn lịch điều trị YHCT" : "Xem lịch điều trị YHCT"}
 
-              className="case-error-table"
+              </Button>
 
-              scroll={{
-                y:
-                  430,
-              }}
+              {calendarExpanded && <YhctTreatmentCalendar rule={yhctRule} preferredDate={preferredDate} />}
 
-              columns={[
+            </div>
 
-                // =========================================
-                // STT
-                // =========================================
+          )}
 
-                {
-                  title:
-                    "#",
+        </>
 
-                  key:
-                    "index",
+      )}
 
-                  width:
-                    54,
+      <style>{`
 
-                  align:
-                    "center",
+        .medguard-case-error-modal .ant-modal-content { border-radius: 14px; padding: 20px; }
 
-                  render:
-                    (
-                      _,
-                      __,
-                      index
-                    ) => (
+        .medguard-case-error-modal .ant-table-wrapper { max-width: 100%; }
 
-                      <div
-                        className="case-error-number"
-                      >
-                        {
-                          index +
-                          1
-                        }
-                      </div>
+        .mg-error-summary { display:flex; gap:6px; flex-wrap:wrap; margin: 0 0 12px; }
 
-                    ),
-                },
+        .mg-error-summary .ant-tag { margin:0; padding:3px 10px; border-radius:8px; font-weight:600; }
 
+        .medguard-case-error-modal .ant-pagination { flex-wrap: wrap; row-gap: 10px; }
 
-                // =========================================
-                // NHÓM LỖI
-                // =========================================
+        .mg-yhct-panel { margin-top: 14px; padding: 14px; background: #fafcff; border: 1px solid #e5ebf5; border-radius: 12px; }
 
-                {
-                  title:
-                    "Nhóm lỗi",
+        .mg-yhct-heading { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 
-                  dataIndex:
-                    "ruleName",
+        .mg-yhct-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 
-                  key:
-                    "ruleName",
+        .mg-yhct-stats .ant-statistic { padding: 10px; background: white; border-radius: 9px; border: 1px solid #edf0f4; }
 
-                  width:
-                    190,
-
-                  render:
-                    (
-                      value:
-                        string,
-
-                      record:
-                        ErrorRow
-                    ) => (
-
-                      <Tag
-                        color={
-                          record.severity ===
-                          "WARNING"
-                            ? "warning"
-                            : record.severity ===
-                              "INFO"
-                              ? "blue"
-                              : "error"
-                        }
-
-                        className="case-error-rule-tag"
-                      >
-                        {
-                          value ||
-                          record.ruleCode
-                        }
-                      </Tag>
-
-                    ),
-                },
+        .mg-yhct-stats .ant-statistic-title { font-size: 12px; }
 
+        .mg-yhct-stats .ant-statistic-content { font-size: 20px; }
 
-                // =========================================
-                // NỘI DUNG
-                // =========================================
+        .mg-yhct-legend { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 10px; }
 
-                {
-                  title:
-                    "Nội dung lỗi",
+        .mg-yhct-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 9px; }
 
-                  dataIndex:
-                    "content",
+        .mg-yhct-day { border: 1px solid #e5e7eb; border-radius: 10px; min-height: 64px; padding: 8px; cursor: pointer; text-align: center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; color:#243247; }
 
-                  key:
-                    "content",
+        .mg-yhct-day small { font-size: 11px; }
 
-                  render:
-                    (
-                      value:
-                        string
-                    ) => (
+        .mg-yhct-both { background: #ecfdf3; border-color: #a7e7c0; }
 
-                      <div
-                        className="case-error-content"
-                      >
-                        {
-                          value
-                        }
-                      </div>
+        .mg-yhct-xml3_only { background: #fff7e8; border-color: #f8cf87; }
 
-                    ),
-                },
+        .mg-yhct-xml5_only { background: #eaf5ff; border-color: #add6ff; }
 
-              ]}
-            />
+        .mg-yhct-neither { background: #f5f5f5; }
 
-          </>
+        .mg-yhct-day.is-selected { outline: 2px solid #1677ff; outline-offset: 1px; }
 
-        )
-      }
+        .mg-yhct-day-detail { background: white; padding: 14px; margin-top: 14px; border-radius: 10px; border: 1px solid #e9edf3; }
 
+        @media(max-width: 760px) { .mg-yhct-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } .medguard-case-error-modal .ant-modal-content { padding: 13px; } }
 
-      {/* =================================================
-          STYLE
-      ================================================= */}
-
-      <style>
-        {`
-
-          /* ===============================================
-             MODAL
-          =============================================== */
-
-          .medguard-case-error-modal
-          .ant-modal-content {
-            padding: 20px;
-            border-radius: 12px;
-            overflow: hidden;
-          }
-
-
-          .medguard-case-error-modal
-          .ant-modal-header {
-            margin-bottom: 16px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid #edf0f5;
-          }
-
-
-          .medguard-case-error-modal
-          .ant-modal-close {
-            top: 17px;
-            right: 17px;
-          }
-
-
-          /* ===============================================
-             TITLE
-          =============================================== */
-
-          .case-error-title {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            padding-right: 34px;
-          }
-
-
-          .case-error-title-icon {
-            width: 40px;
-            height: 40px;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            flex-shrink: 0;
-
-            border-radius: 10px;
-
-            background: #fff1f0;
-            color: #ff4d4f;
-
-            font-size: 19px;
-          }
-
-
-          .case-error-title-info {
-            min-width: 0;
-          }
-
-
-          .case-error-title-main {
-            color: #172033;
-
-            font-size: 17px;
-            font-weight: 800;
-
-            line-height: 1.3;
-          }
-
-
-          .case-error-patient {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-
-            margin-top: 3px;
-
-            color: #64748b;
-
-            font-size: 12px;
-            font-weight: 500;
-          }
-
-
-       .case-error-patient-code {
-  color: #1677ff;
-
-  font-size: 15px;
-  font-weight: 800;
-
-  line-height: 1.4;
-}
-
-.case-error-patient-name {
-  color: #334155;
-
-  font-size: 16px;
-  font-weight: 800;
-
-  line-height: 1.4;
-  letter-spacing: 0.1px;
-}
-
-          .case-error-patient-separator {
-            color: #94a3b8;
-          }
-
-
-          /* ===============================================
-             LOADING
-          =============================================== */
-
-          .case-error-loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            min-height: 220px;
-          }
-
-
-          /* ===============================================
-             SUMMARY
-          =============================================== */
-
-          .case-error-summary {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-
-            gap: 12px;
-
-            min-height: 46px;
-
-            margin-bottom: 12px;
-            padding: 9px 13px;
-
-            border: 1px solid #ffccc7;
-            border-radius: 9px;
-
-            background: #fff7f6;
-          }
-
-
-          .case-error-summary-left {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-
-            color: #cf1322;
-
-            font-size: 13px;
-          }
-
-
-          .case-error-summary-left
-          strong {
-            font-size: 14px;
-            font-weight: 800;
-          }
-
-
-          .case-error-summary-right {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-
-            padding: 4px 10px;
-
-            border: 1px solid #f0f0f0;
-            border-radius: 999px;
-
-            background: #ffffff;
-
-            color: #64748b;
-
-            font-size: 12px;
-            font-weight: 600;
-          }
-
-
-          /* ===============================================
-             TABLE
-          =============================================== */
-
-          .case-error-table {
-            overflow: hidden;
-
-            border: 1px solid #e7ebf0;
-            border-radius: 9px;
-          }
-
-
-          .case-error-table
-          .ant-table {
-            border-radius: 9px;
-          }
-
-
-          .case-error-table
-          .ant-table-container {
-            border-radius: 9px;
-          }
-
-
-          .case-error-table
-          .ant-table-thead
-          > tr
-          > th {
-            padding: 10px 12px !important;
-
-            background: #f3f6f9 !important;
-
-            color: #475569;
-
-            font-size: 12px;
-            font-weight: 700;
-
-            border-bottom: 1px solid #e5eaf0 !important;
-          }
-
-
-          .case-error-table
-          .ant-table-tbody
-          > tr
-          > td {
-            padding: 10px 12px !important;
-
-            background: #ffffff;
-
-            border-bottom: 1px solid #edf0f5 !important;
-
-            vertical-align: top;
-          }
-
-
-          .case-error-table
-          .ant-table-tbody
-          > tr:nth-child(even)
-          > td {
-            background: #fafbfc;
-          }
-
-
-          .case-error-table
-          .ant-table-tbody
-          > tr:hover
-          > td {
-            background: #fff8f7 !important;
-          }
-
-
-          .case-error-table
-          .ant-table-tbody
-          > tr:last-child
-          > td {
-            border-bottom: none !important;
-          }
-
-
-          /* ===============================================
-             STT
-          =============================================== */
-
-          .case-error-number {
-            width: 24px;
-            height: 24px;
-
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            border-radius: 7px;
-
-            background: #fff1f0;
-            color: #cf1322;
-
-            font-size: 11px;
-            font-weight: 800;
-          }
-
-
-          /* ===============================================
-             RULE TAG
-          =============================================== */
-
-          .case-error-rule-tag {
-            max-width: 165px;
-
-            margin: 0;
-
-            overflow: hidden;
-
-            border-radius: 6px;
-
-            font-size: 11px;
-            font-weight: 600;
-
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-
-
-          /* ===============================================
-             CONTENT
-          =============================================== */
-
-          .case-error-content {
-            color: #334155;
-
-            font-size: 12.5px;
-            font-weight: 500;
-
-            line-height: 1.55;
-
-            word-break: break-word;
-          }
-
-
-          /* ===============================================
-             SCROLLBAR
-          =============================================== */
-
-          .case-error-table
-          .ant-table-body::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-          }
-
-
-          .case-error-table
-          .ant-table-body::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 999px;
-          }
-
-
-          .case-error-table
-          .ant-table-body::-webkit-scrollbar-track {
-            background: #f8fafc;
-          }
-
-
-          /* ===============================================
-             RESPONSIVE
-          =============================================== */
-
-          @media (max-width: 760px) {
-
-            .case-error-summary {
-              align-items: flex-start;
-              flex-direction: column;
-            }
-
-
-            .case-error-title {
-              align-items: flex-start;
-            }
-
-
-            .case-error-rule-tag {
-              max-width: 120px;
-            }
-
-          }
-
-        `}
-      </style>
+      `}</style>
 
     </Modal>
 
   );
+
 }

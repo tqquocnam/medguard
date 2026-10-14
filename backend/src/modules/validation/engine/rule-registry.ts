@@ -97,6 +97,96 @@ import {
   icdWarningRule,
 } from "./rules/icd-warning.rule.js";
 
+import {
+  kcbTypeRule,
+} from "./rules/kcb-type.rule.js";
+
+import {
+  outpatientTreatmentTimeRule,
+} from "./rules/outpatient-treatment-time.rule.js";
+
+
+import {
+  outpatientDailyServiceRule,
+} from "./rules/outpatient-daily-service.rule.js";
+
+
+import {
+  outpatientClinicalProgressRule,
+} from "./rules/outpatient-clinical-progress.rule.js";
+
+
+import {
+  yhctCaseIdentificationRule,
+} from "./rules/yhct-case-identification.rule.js";
+
+
+import {
+  yhctServiceDiagnosisRule,
+} from "./rules/yhct-service-diagnosis.rule.js";
+
+
+import {
+  outpatientClsResultRule,
+} from "./rules/outpatient-cls-result.rule.js";
+
+import {
+  yhctServiceFrequencyRule,
+} from "./rules/yhct-service-frequency.rule.js";
+
+import {
+  yhctPerformOverlapRule,
+} from "./rules/yhct-perform-overlap.rule.js";
+
+import {
+  yhctPerformScheduleRule,
+} from "./rules/yhct-perform-schedule.rule.js";
+
+import { yhctOrderPerformTimeRule } from "./rules/yhct-order-perform-time.rule.js";
+
+import { yhctDailyStaffWorkloadRule } from "./rules/yhct-daily-staff-workload.rule.js";
+
+import {
+  yhctMachineDailyUsageRule,
+} from "./rules/yhct-machine-daily-usage.rule.js";
+
+
+import {
+  yhctDailyTreatmentContinuityRule,
+} from "./rules/yhct-daily-treatment-continuity.rule.js";
+
+import {
+  yhctClinicalProgressDuplicateRule,
+} from "./rules/yhct-clinical-progress-duplicate.rule.js";
+
+import {
+  yhctXml3Xml5TechniqueMatchRule,
+} from "./rules/yhct-xml3-xml5-technique-match.rule.js";
+
+import {
+  yhctDailyStaffConsistencyRule,
+} from "./rules/yhct-daily-staff-consistency.rule.js";
+
+import {
+  yhctClinicalProgressQualityRule,
+} from "./rules/yhct-clinical-progress-quality.rule.js";
+
+import {
+  yhctTreatmentEpisodeReviewRule,
+} from "./rules/yhct-treatment-episode-review.rule.js";
+
+import {
+  resultMatchServiceRule,
+} from "./rules/result-match-service.rule.js";
+
+import {
+  drugAgeRule,
+} from "./rules/drug-age.rule.js";
+
+import {
+  serviceAgeRule,
+} from "./rules/service-age.rule.js";
+
 export const ruleRegistry:
   Record<
     string,
@@ -168,4 +258,75 @@ DRUG_INTERACTION:
 
   ICD_WARNING:
   icdWarningRule,
+
+  KCB_TYPE_VALID: 
+  kcbTypeRule,
+
+  
+OUTPATIENT_TREATMENT_TIME:
+  outpatientTreatmentTimeRule,
+
+OUTPATIENT_DAILY_SERVICE:
+  outpatientDailyServiceRule,
+
+OUTPATIENT_CLINICAL_PROGRESS:
+  outpatientClinicalProgressRule,
+
+
+YHCT_CASE_IDENTIFICATION:
+  yhctCaseIdentificationRule,
+
+
+YHCT_SERVICE_DIAGNOSIS:
+  yhctServiceDiagnosisRule,
+
+
+OUTPATIENT_CLS_RESULT:
+  outpatientClsResultRule,
+
+YHCT_SERVICE_FREQUENCY:
+  yhctServiceFrequencyRule,
+
+
+YHCT_PERFORM_OVERLAP:
+  yhctPerformOverlapRule,
+
+YHCT_PERFORM_SCHEDULE:
+  yhctPerformScheduleRule,
+
+YHCT_ORDER_PERFORM_TIME: 
+yhctOrderPerformTimeRule,
+
+YHCT_DAILY_STAFF_WORKLOAD: 
+yhctDailyStaffWorkloadRule,
+
+YHCT_MACHINE_DAILY_USAGE:
+  yhctMachineDailyUsageRule,
+
+  YHCT_DAILY_TREATMENT_CONTINUITY:
+  yhctDailyTreatmentContinuityRule,
+
+  YHCT_CLINICAL_PROGRESS_DUPLICATE:
+  yhctClinicalProgressDuplicateRule,
+
+  YHCT_XML3_XML5_TECHNIQUE_MATCH:
+  yhctXml3Xml5TechniqueMatchRule,
+
+  YHCT_DAILY_STAFF_CONSISTENCY:
+  yhctDailyStaffConsistencyRule,
+
+  YHCT_CLINICAL_PROGRESS_QUALITY:
+  yhctClinicalProgressQualityRule,
+  YHCT_TREATMENT_EPISODE_REVIEW:
+  yhctTreatmentEpisodeReviewRule,
+
+  
+RESULT_MATCH_SERVICE:
+  resultMatchServiceRule,
+
+DRUG_AGE: drugAgeRule,
+
+SERVICE_AGE: serviceAgeRule,
+
+
 };

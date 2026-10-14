@@ -1,3 +1,4 @@
+
 import type { PoolClient } from "pg";
 
 import type {
@@ -5,6 +6,81 @@ import type {
   ValidationRule,
 } from "./rule.types.js";
 
+// ======================================================
+// TYPES
+// ======================================================
+
+export type MedicalCaseCheckStatus =
+  | "OK"
+  | "WARNING"
+  | "ERROR"
+  | "INCOMPLETE";
+
+export interface CaseStatusResult {
+  status: MedicalCaseCheckStatus;
+  errorCount: number;
+  warningCount: number;
+  incompleteCount: number;
+  passedRules: number;
+  failedRules: number;
+  skippedRules: number;
+  totalRules: number;
+}
+
+interface RuleResultRow {
+  result: string;
+  severity: string;
+  issue_count: number | string | null;
+  required: boolean | null;
+  blocks_ok: boolean | null;
+  details: unknown;
+}
+
+// ======================================================
+// HELPERS
+// ======================================================
+
+function getIssueCount(
+  value: unknown
+): number {
+  const parsed = Number(value);
+
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < 1
+  ) {
+    return 1;
+  }
+
+  return Math.floor(parsed);
+}
+
+function isExecutionFailure(
+  details: unknown
+): boolean {
+  if (
+    !details ||
+    typeof details !== "object" ||
+    Array.isArray(details)
+  ) {
+    return false;
+  }
+
+  const data = details as Record<
+    string,
+    unknown
+  >;
+
+  return (
+    data.executionError === true ||
+    data.execution_error === true ||
+    data.validatorError === true
+  );
+}
+
+// ======================================================
+// SAVE RULE RESULT
+// ======================================================
 
 export async function saveRuleResult(
   client: PoolClient,
@@ -12,14 +88,13 @@ export async function saveRuleResult(
   medicalCaseId: string,
   rule: ValidationRule,
   result: RuleResult
-) {
+): Promise<void> {
   const issueCount =
-    result.issueCount ??
-    (
-      result.status === "FAIL"
-        ? 1
-        : 0
-    );
+    result.status === "FAIL"
+      ? getIssueCount(
+          result.issueCount
+        )
+      : 0;
 
   await client.query(
     `
@@ -27,37 +102,29 @@ export async function saveRuleResult(
       check_run_id,
       rule_id,
       medical_case_id,
-
       result,
       severity,
       issue_count,
-
       message,
       details,
-
       checked_at
     )
     VALUES (
       $1,
       $2,
       $3,
-
       $4,
       $5,
       $6,
-
       $7,
       $8::jsonb,
-
       NOW()
     )
-
     ON CONFLICT (
       check_run_id,
       rule_id,
       medical_case_id
     )
-
     DO UPDATE SET
       result = EXCLUDED.result,
       severity = EXCLUDED.severity,
@@ -70,50 +137,56 @@ export async function saveRuleResult(
       checkRunId,
       rule.id,
       medicalCaseId,
-
       result.status,
       result.severity,
       issueCount,
-
       result.message,
-
       JSON.stringify(
         result.details ?? {}
       ),
     ]
   );
 }
+
+// ======================================================
+// CALCULATE CASE STATUS
+// ======================================================
+
 export async function calculateCaseStatus(
   client: PoolClient,
   checkRunId: string,
   medicalCaseId: string
-) {
-
-  // ==========================================
-  // LẤY TẤT CẢ KẾT QUẢ RULE CỦA HỒ SƠ
-  // TRONG LẦN CHECK HIỆN TẠI
-  // ==========================================
+): Promise<CaseStatusResult> {
+  // Lấy kết quả rule cùng cấu hình bắt buộc.
+  //
+  // LEFT JOIN để vẫn đọc được kết quả cũ
+  // nếu metadata của rule thay đổi.
 
   const resultQuery =
-    await client.query(
+    await client.query<RuleResultRow>(
       `
       SELECT
-        result,
-        severity,
+        rr.result,
+        rr.severity,
         COALESCE(
-          issue_count,
+          rr.issue_count,
           0
-        ) AS issue_count
-
-      FROM
-        validation.rule_results
-
+        ) AS issue_count,
+        COALESCE(
+          r.required,
+          FALSE
+        ) AS required,
+        COALESCE(
+          r.blocks_ok,
+          FALSE
+        ) AS blocks_ok,
+        rr.details
+      FROM validation.rule_results rr
+      LEFT JOIN validation.rules r
+        ON r.id = rr.rule_id
       WHERE
-        check_run_id = $1
-
-        AND
-
-        medical_case_id = $2
+        rr.check_run_id = $1
+        AND rr.medical_case_id = $2
       `,
       [
         checkRunId,
@@ -121,106 +194,143 @@ export async function calculateCaseStatus(
       ]
     );
 
+  let errorCount = 0;
+  let warningCount = 0;
+  let incompleteCount = 0;
 
-  let errorCount =
-    0;
-
-  let warningCount =
-    0;
-
-
-  // ==========================================
-  // ĐẾM LỖI THẬT
-  // ==========================================
+  let passedRules = 0;
+  let failedRules = 0;
+  let skippedRules = 0;
 
   for (
-    const row
-    of resultQuery.rows
+    const row of resultQuery.rows
   ) {
+    const result = String(
+      row.result ?? ""
+    ).toUpperCase();
 
-    const issueCount =
-      Number(
-        row.issue_count ??
-        0
+    const severity = String(
+      row.severity ?? ""
+    ).toUpperCase();
+
+    const required =
+      row.required === true;
+
+    const executionFailure =
+      isExecutionFailure(
+        row.details
       );
 
+    // ================================================
+    // PASS
+    // ================================================
 
-    // ========================================
-    // ERROR
-    // ========================================
-
-    if (
-      row.result === "FAIL" &&
-      row.severity === "ERROR"
-    ) {
-
-      errorCount +=
-        issueCount > 0
-          ? issueCount
-          : 1;
+    if (result === "PASS") {
+      passedRules++;
+      continue;
     }
 
+    // ================================================
+    // SKIP
+    // ================================================
 
-    // ========================================
-    // WARNING
-    // ========================================
+    if (result === "SKIP") {
+      skippedRules++;
 
-    if (
-      row.result === "FAIL" &&
-      row.severity === "WARNING"
-    ) {
+      // SKIP không mặc nhiên là lỗi.
+      //
+      // Chỉ đánh dấu chưa đủ cấu hình nếu:
+      // - rule bắt buộc không thực thi được; hoặc
+      // - validator báo lỗi thực thi.
+      //
+      // Rule không áp dụng cho hồ sơ vẫn
+      // được phép SKIP bình thường.
 
-      warningCount +=
-        issueCount > 0
-          ? issueCount
-          : 1;
+      if (
+        required &&
+        executionFailure
+      ) {
+        incompleteCount++;
+      }
+
+      continue;
     }
+
+    // ================================================
+    // FAIL
+    // ================================================
+
+    if (result === "FAIL") {
+      failedRules++;
+
+      const count = getIssueCount(
+        row.issue_count
+      );
+
+      if (severity === "ERROR") {
+        errorCount += count;
+      } else if (
+        severity === "WARNING"
+      ) {
+        warningCount += count;
+      } else if (
+        severity === "INFO"
+      ) {
+        // FAIL INFO chỉ cung cấp thông tin.
+        // Không chuyển thành ERROR/WARNING.
+      }
+
+      continue;
+    }
+
+    // Trạng thái không hợp lệ từ validator.
+    incompleteCount++;
   }
 
+  // ====================================================
+  // FINAL STATUS
+  //
+  // Mức ưu tiên:
+  // ERROR > INCOMPLETE > WARNING > OK
+  // ====================================================
 
-  // ==========================================
-  // CÓ LỖI THẬT
-  // ==========================================
+  let status: MedicalCaseCheckStatus =
+    "OK";
 
-  if (
-    errorCount > 0
+  if (errorCount > 0) {
+    status = "ERROR";
+  } else if (
+    incompleteCount > 0 ||
+    resultQuery.rows.length === 0
   ) {
-
-    return {
-      status:
-        "ERROR",
-
-      errorCount,
-
-      warningCount,
-    };
+    status = "INCOMPLETE";
+  } else if (
+    warningCount > 0
+  ) {
+    status = "WARNING";
   }
-
-
-  // ==========================================
-  // KHÔNG CÓ LỖI
-  //
-  // PASS hoặc SKIP đều không làm hồ sơ lỗi.
-  //
-  // => TỐT
-  // ==========================================
 
   return {
-    status:
-      "OK",
-
-    errorCount:
-      0,
-
+    status,
+    errorCount,
     warningCount,
+    incompleteCount,
+    passedRules,
+    failedRules,
+    skippedRules,
+    totalRules: resultQuery.rows.length,
   };
 }
+
+// ======================================================
+// UPDATE CASE STATUS
+// ======================================================
 
 export async function updateCaseStatus(
   client: PoolClient,
   checkRunId: string,
   medicalCaseId: string
-) {
+): Promise<CaseStatusResult> {
   const result =
     await calculateCaseStatus(
       client,
@@ -231,12 +341,10 @@ export async function updateCaseStatus(
   await client.query(
     `
     UPDATE core.medical_cases
-
     SET
       status = $2,
       error_count = $3,
       updated_at = NOW()
-
     WHERE id = $1
     `,
     [

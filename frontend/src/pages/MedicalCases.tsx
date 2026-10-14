@@ -70,6 +70,7 @@ interface MedicalCase {
   gioi_tinh?: string;
 
   ma_loai_kcb?: string;
+  treatment_group?: string | null;
 
   ngay_vao?: string;
   ngay_ra?: string;
@@ -557,6 +558,10 @@ export default function MedicalCases() {
     );
 
 
+  // Hai chiều lọc độc lập: loại KCB BHYT và nhóm nghiệp vụ.
+  const [kcbType, setKcbType] = useState<string>("ALL");
+  const [treatmentGroup, setTreatmentGroup] = useState<string>("ALL");
+
   const urlYear =
     searchParams.get(
       "year"
@@ -731,6 +736,14 @@ export default function MedicalCases() {
   }
 
 
+  // Lọc trên DB trước khi phân trang/tính tổng, không lọc trên 10 dòng hiện tại.
+  if (kcbType !== "ALL") {
+    where.ma_loai_kcb = { _eq: kcbType };
+  }
+  if (treatmentGroup !== "ALL") {
+    where.treatment_group = { _eq: treatmentGroup };
+  }
+
   if (
     year
   ) {
@@ -891,6 +904,14 @@ export default function MedicalCases() {
       }
 
 
+      // Gửi bộ lọc vào backend, không chỉ lọc các dòng trên giao diện.
+      // Không gửi ALL thành giá trị nhóm.
+
+      if (kcbType !== "ALL") {
+        message.warning("Kiểm tra theo loại KCB BHYT chưa được hỗ trợ tại backend. Hãy chọn Tất cả loại KCB.");
+        return;
+      }
+
       setChecking(
         true
       );
@@ -937,6 +958,7 @@ export default function MedicalCases() {
                 paymentDate:
                   paymentDate ??
                   null,
+                treatmentGroup: treatmentGroup !== "ALL" ? treatmentGroup : null,
               }),
           }
         );
@@ -1345,6 +1367,8 @@ export default function MedicalCases() {
         setStatus(
           "ALL"
         );
+        setKcbType("ALL");
+        setTreatmentGroup("ALL");
 
 
         setYear(
@@ -2117,6 +2141,44 @@ export default function MedicalCases() {
             }}
           />
 
+
+          {/* <Select
+            aria-label="Loại KCB BHYT"
+            value={kcbType}
+            style={{ width: 205 }}
+            onChange={(value: string) => {
+              setKcbType(value);
+              setPage(1);
+            }}
+            options={[
+              { value: "ALL", label: "Tất cả loại KCB" },
+              { value: "01", label: "01 - Khám bệnh" },
+              { value: "02", label: "02 - Điều trị ngoại trú" },
+              { value: "03", label: "03 - Điều trị nội trú" },
+              { value: "04", label: "04 - Điều trị nội trú ban ngày" },
+              { value: "05", label: "05 - Điều trị ngoại trú có khám và lĩnh thuốc" },
+              { value: "06", label: "06 - Điều trị lưu tại trạm y tế" },
+              { value: "07", label: "07 - Nhận thuốc theo hẹn" },
+              { value: "08", label: "08 - Ngoại trú có dịch vụ kỹ thuật" },
+              { value: "09", label: "09 - Điều trị nội trú dưới 4 giờ" },
+              { value: "10", label: "10 - Trường hợp khác" },
+            ]}
+          /> */}
+
+          <Select
+            aria-label="Nhóm hồ sơ"
+            value={treatmentGroup}
+            style={{ width: 205 }}
+            onChange={(value: string) => {
+              setTreatmentGroup(value);
+              setPage(1);
+            }}
+            options={[
+              { value: "ALL", label: "Tất cả nhóm hồ sơ KCB" },
+              { value: "GENERAL", label: "Khám bệnh Ngoại trú " },
+              { value: "YHCT", label: "Bệnh án Ngoại trú" },
+            ]}
+          />
 
           <Select
             value={
@@ -3781,6 +3843,8 @@ export default function MedicalCases() {
             ?.ho_ten ??
           ""
         }
+
+        treatmentGroup={resultCase?.treatment_group}
 
         onClose={closeCaseResults}
       />
