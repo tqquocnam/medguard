@@ -201,6 +201,15 @@ import {
   serviceChestXrayExclusionRule,
 } from "./rules/service-chest-xray-exclusion.rule.js";
 
+import {
+  yhctSameCaseServiceOverlapRule,
+} from "./rules/yhct-same-case-service-overlap.rule.js";
+
+
+import {
+  yhctExamPaymentRateRule,
+} from "./rules/yhct-exam-payment-rate.rule.js";
+
 
 export const ruleRegistry:
   Record<
@@ -351,4 +360,12 @@ SERVICE_CALCIUM_ELECTROLYTE_EXCLUSION:
 
   SERVICE_CHEST_XRAY_EXCLUSION:
   serviceChestXrayExclusionRule,
+
+  YHCT_SAME_CASE_SERVICE_OVERLAP:
+  yhctSameCaseServiceOverlapRule,
+
+  
+YHCT_EXAM_PAYMENT_RATE:
+  yhctExamPaymentRateRule,
+
 };

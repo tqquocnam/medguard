@@ -902,7 +902,21 @@ function buildErrorRows(
 
       findings.forEach((finding: any, index: number) => {
 
-        const content = String(finding?.message || rule.message || rule.rule_name);
+        // Older YHCT_PERFORM_OVERLAP results lack finding.message.
+        // Render each pair from structured details instead of repeating rule.message.
+        const overlapDetail = rule.rule_code === "YHCT_PERFORM_OVERLAP" && finding?.currentCode && finding?.otherCode
+          ? [
+              finding.type === "SAME_MACHINE_OVERLAP"
+                ? `Trùng thời gian sử dụng máy ${finding.machine || ""}`
+                : finding.type === "DIRECT_STAFF_OVERLAP"
+                  ? `Nhân viên ${finding.staff || ""} trùng thời gian thực hiện YHCT`
+                  : `Hai kỹ thuật YHCT giao nhau (nhân viên ${finding.staff || "không rõ"})`,
+              `${finding.currentCode} - ${finding.currentName || "DVKT"}: ${finding.currentStart || ""} → ${finding.currentEnd || ""}`,
+              `Hồ sơ khác: ${finding.otherCode} - ${finding.otherName || "DVKT"}: ${finding.otherStart || ""} → ${finding.otherEnd || ""}`,
+              `Chồng lấn ${finding.overlapMinutes ?? "?"} phút. Cần đối chiếu trước khi kết luận vi phạm.`,
+            ].join(" | ")
+          : "";
+        const content = String(finding?.message || overlapDetail || finding?.note || rule.message || rule.rule_name);
 
         const date = String(finding?.date || "");
 
@@ -1415,9 +1429,9 @@ export default function CaseCheckResultsModal({
 
         <div style={{ minWidth: 0 }}>
 
-          <div style={{ fontWeight: 700 }}>Chi tiết lỗi hồ sơ</div>
+          <div style={{ fontWeight: 700 }}>Chi tiết hồ sơ</div>
 
-          <Typography.Text type="secondary" style={{ fontSize: 18, overflowWrap: "anywhere", fontWeight:700 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 18, overflowWrap: "anywhere",fontWeight:700 }}>
 
             {patientCode || "-"}{patientName ? ` - ${patientName}` : ""}
 

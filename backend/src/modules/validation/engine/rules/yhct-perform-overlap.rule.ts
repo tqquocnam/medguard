@@ -40,6 +40,7 @@ interface Session {
   staffCodes: string[];
 
   machine: string;
+  machineDisplay: string;
 
   start: number;
   end: number;
@@ -50,6 +51,7 @@ interface Session {
 
 interface PeerRow {
   medical_case_id: string;
+  patient_name: string | null;
   raw_data: Row;
 }
 
@@ -265,6 +267,12 @@ function parseTime(
   return timestamp;
 }
 
+// Format a validated XML3 timestamp without timezone conversion.
+function formatBhytTime(value: string): string {
+  if (parseTime(value) === null) return value;
+  return `${value.slice(6, 8)}/${value.slice(4, 6)}/${value.slice(0, 4)} ${value.slice(8, 10)}:${value.slice(10, 12)}`;
+}
+
 // ======================================================
 // SESSION
 // ======================================================
@@ -319,6 +327,7 @@ function makeSession(
     staffCodes: parseStaffCodes(staffRaw),
 
     machine: normalizeMachine(row.MA_MAY),
+    machineDisplay: txt(row.MA_MAY),
 
     start,
     end,
@@ -602,6 +611,7 @@ export const yhctPerformOverlapRule:
         `
         SELECT
           e.medical_case_id,
+          mc.ho_ten AS patient_name,
           e.raw_data
 
         FROM core.medical_events e
@@ -807,6 +817,7 @@ export const yhctPerformOverlapRule:
           currentName: current.name,
 
           otherCaseId: other.caseId,
+          otherPatientName: txt(peer.patient_name) || null,
           otherStt: other.stt,
           otherCode: other.code,
           otherName: other.name,
@@ -835,6 +846,11 @@ export const yhctPerformOverlapRule:
 
           overlapMinutes: minutes,
           reviewRequired: true,
+
+          // Hiển thị theo cách trình bày của iCheck, giữ nguyên kết luận cần rà soát.
+          message: type === "SAME_MACHINE_OVERLAP"
+            ? `${current.machineDisplay || current.machine}[${current.name}: ${formatBhytTime(current.startRaw)} → ${formatBhytTime(current.endRaw)} (Trùng thời gian thực hiện máy)] ${txt(peer.patient_name) || `Hồ sơ ${other.caseId}`} - ${other.name}: ${formatBhytTime(other.startRaw)} → ${formatBhytTime(other.endRaw)}`
+            : `${commonStaff.join(";") || "Nhân viên"}[${current.name}: ${formatBhytTime(current.startRaw)} → ${formatBhytTime(current.endRaw)} (${type === "DIRECT_STAFF_OVERLAP" ? "Trùng thời gian nhân viên" : "Thời gian thực hiện giao nhau"})] ${txt(peer.patient_name) || `Hồ sơ ${other.caseId}`} - ${other.name}: ${formatBhytTime(other.startRaw)} → ${formatBhytTime(other.endRaw)}`,
 
           note:
             "Hai hoạt động YHCT có khoảng thời gian chồng lấn theo dữ liệu XML3. Cần đối chiếu hồ sơ và quy trình thực hiện trước khi kết luận.",
