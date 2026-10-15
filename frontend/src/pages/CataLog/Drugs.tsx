@@ -53,6 +53,7 @@ const {
 // ======================================================
 
 interface DrugItem {
+  id: string;
   code: string;
   name: string;
 
@@ -785,7 +786,7 @@ export default function Drugs() {
       const response =
         await apiFetch(
           `/catalog/drugs/${encodeURIComponent(
-            record.code
+            record.id
           )}`,
           {
             method:
@@ -1008,7 +1009,7 @@ export default function Drugs() {
       const endpoint =
         isEdit
           ? `/catalog/drugs/${encodeURIComponent(
-              editingDrug.code
+              editingDrug.id
             )}`
           : "/catalog/drugs";
 
@@ -1282,7 +1283,7 @@ export default function Drugs() {
             const response =
               await apiFetch(
                 `/catalog/drugs/${encodeURIComponent(
-                  record.code
+                  record.id
                 )}`,
                 {
                   method:
@@ -2762,7 +2763,7 @@ export default function Drugs() {
         <Table<DrugItem>
           className="drugs-table"
 
-          rowKey="code"
+          rowKey="id"
 
           size="middle"
 

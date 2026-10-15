@@ -266,23 +266,6 @@ null {
 
 
 // ======================================================
-// NORMALIZE CODE
-//
-// Dùng để so sánh MA_THUOC không phân biệt hoa thường.
-// ======================================================
-
-function normalizeCode(
-  value:
-    unknown
-): string {
-
-  return normalizeText(
-    value
-  ).toLowerCase();
-}
-
-
-// ======================================================
 // GET CELL TEXT
 // ======================================================
 
@@ -903,32 +886,10 @@ Promise<
     [];
 
 
-  // ====================================================
-  // File Generic 324 có rất nhiều MA_THUOC lặp.
-  //
-  // catalog.drugs.code hiện là PRIMARY KEY.
-  //
-  // Ví dụ:
-  // 40.817 có nhiều biệt dược.
-  //
-  // Vì rule DRUG_EXISTS hiện kiểm tra theo MA_THUOC,
-  // mỗi MA_THUOC chỉ cần 1 bản ghi.
-  //
-  // Giữ dòng đầu tiên.
-  // Các dòng trùng => skipped.
-  // ====================================================
-
-  const seenCodes =
-    new Set<
-      string
-    >();
-
+  // Các mã MA_THUOC lặp được chấp nhận nếu khác sản phẩm.
+  // Không loại trùng chỉ theo mã thuốc.
 
   let totalRows =
-    0;
-
-
-  let skippedDuplicates =
     0;
 
 
@@ -1038,33 +999,6 @@ Promise<
 
       continue;
     }
-
-
-    // ==================================================
-    // DUPLICATE MA_THUOC
-    // ==================================================
-
-    const normalizedCode =
-      normalizeCode(
-        code
-      );
-
-
-    if (
-      seenCodes.has(
-        normalizedCode
-      )
-    ) {
-
-      skippedDuplicates++;
-
-      continue;
-    }
-
-
-    seenCodes.add(
-      normalizedCode
-    );
 
 
     // ==================================================
@@ -1446,412 +1380,166 @@ Promise<
 
 
   // ====================================================
-  // 7. DB TRANSACTION
+  // TRANSACTION - REQUIRE PRIMARY KEY (id)
   // ====================================================
-
-  const client =
-    await db.connect();
-
-
+  const client = await db.connect();
   try {
+    await client.query("BEGIN");
 
-    await client.query(
-      "BEGIN"
-    );
+    // Khoá đồng thời các đợt import, tránh ghi trùng do 2 import song song.
+    await client.query("SELECT pg_advisory_xact_lock(91234, 2026)");
 
-
-    // ==================================================
-    // FIND EXISTING DRUG CODES
-    //
-    // So sánh case-insensitive.
-    // ==================================================
-
-    const normalizedCodes =
-      rows.map(
-        (
-          row
-        ) =>
-          normalizeCode(
-            row.code
-          )
-      );
-
-
-    const existingResult =
-      await client.query<{
-        code:
-          string;
-      }>(
-        `
-        SELECT
-          code
-
-        FROM
-          catalog.drugs
-
-        WHERE
-          LOWER(
-            BTRIM(
-              code
-            )
-          )
-          =
-          ANY(
-            $1::text[]
-          )
-        `,
-        [
-          normalizedCodes,
-        ]
-      );
-
-
-    const existingMap =
-      new Map<
-        string,
-        string
-      >();
-
-
-    for (
-      const existing
-      of existingResult.rows
+    // Không được import khi code vẫn là PRIMARY KEY.
+    const pkResult = await client.query<{ column_name: string }>(`
+      SELECT a.attname AS column_name
+      FROM pg_constraint c
+      JOIN pg_attribute a
+        ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+      WHERE c.conrelid = 'catalog.drugs'::regclass
+        AND c.contype = 'p'
+    `);
+    if (
+      pkResult.rows.length !== 1 ||
+      pkResult.rows[0]?.column_name !== "id"
     ) {
-
-      existingMap.set(
-        normalizeCode(
-          existing.code
-        ),
-        existing.code
+      throw new Error(
+        "Chưa chuyển PRIMARY KEY catalog.drugs sang id. Không thể import thuốc trùng mã an toàn."
       );
     }
 
+    let inserted = 0;
+    let updated = 0;
 
-    // ==================================================
-    // COUNT INSERT / UPDATE
-    // ==================================================
+    // Matching theo code + tên thuốc + hoạt chất + số đăng ký.
+    // Tên khác => hai thuốc khác nhau, kể cả cùng MA_THUOC và hoạt chất.
+    // Số đăng ký khác => cũng coi là hai bản ghi riêng.
+    for (const row of rows) {
+      const values: unknown[] = [
+        row.code,
+        row.activeIngredient,
+        row.name,
+        row.unit,
+        row.strength,
+        row.route,
+        row.routeCode,
+        row.dosageForm,
+        row.registrationNumber,
+        row.quantity,
+        row.unitPrice,
+        row.insuranceUnitPrice,
+        row.packaging,
+        row.manufacturer,
+        row.country,
+        row.contractor,
+        row.tenderInfo,
+        row.drugType,
+        row.scientificName,
+        row.origin,
+        row.processingMethod,
+        row.importedMaterialCode,
+        row.processedMaterialCode,
+        row.processingLossRate,
+        row.preservationLossRate,
+        row.qualityStandard
+      ];
 
-    let inserted =
-      0;
+      const existing = await client.query<{ id: string }>(
+        `
+        SELECT id
+        FROM catalog.drugs
+        WHERE LOWER(BTRIM(code)) = LOWER(BTRIM($1::text))
+          AND LOWER(BTRIM(name)) = LOWER(BTRIM($2::text))
+          AND LOWER(BTRIM(COALESCE(active_ingredient, '')))
+              = LOWER(BTRIM(COALESCE($3::text, '')))
+          AND LOWER(BTRIM(COALESCE(registration_number, '')))
+              = LOWER(BTRIM(COALESCE($4::text, '')))
+        ORDER BY id
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [row.code, row.name, row.activeIngredient, row.registrationNumber]
+      );
 
-
-    let updated =
-      0;
-
-
-    for (
-      const row
-      of rows
-    ) {
-
-      const normalized =
-        normalizeCode(
-          row.code
+      if (existing.rows[0]) {
+        await client.query(
+          `
+          UPDATE catalog.drugs
+          SET code = $1,
+              active_ingredient = $2,
+              name = $3,
+              unit = $4,
+              strength = $5,
+              route = $6,
+              route_code = $7,
+              dosage_form = $8,
+              registration_number = $9,
+              quantity = $10,
+              unit_price = $11,
+              insurance_unit_price = $12,
+              packaging = $13,
+              manufacturer = $14,
+              country = $15,
+              contractor = $16,
+              tender_info = $17,
+              drug_type = $18,
+              scientific_name = $19,
+              origin = $20,
+              processing_method = $21,
+              imported_material_code = $22,
+              processed_material_code = $23,
+              processing_loss_rate = $24,
+              preservation_loss_rate = $25,
+              quality_standard = $26,
+              updated_at = NOW()
+          WHERE id = $27::uuid
+          `,
+          [...values, existing.rows[0].id]
         );
-
-
-      const existingCode =
-        existingMap.get(
-          normalized
-        );
-
-
-      if (
-        existingCode
-      ) {
-
-        // Giữ nguyên đúng code đang có trong DB.
-
-        row.code =
-          existingCode;
-
-
         updated++;
-
       } else {
-
+        await client.query(
+          `
+          INSERT INTO catalog.drugs (
+            code,
+            active_ingredient,
+            name,
+            unit,
+            strength,
+            route,
+            route_code,
+            dosage_form,
+            registration_number,
+            quantity,
+            unit_price,
+            insurance_unit_price,
+            packaging,
+            manufacturer,
+            country,
+            contractor,
+            tender_info,
+            drug_type,
+            scientific_name,
+            origin,
+            processing_method,
+            imported_material_code,
+            processed_material_code,
+            processing_loss_rate,
+            preservation_loss_rate,
+            quality_standard
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+          `,
+          values
+        );
         inserted++;
       }
     }
 
-
-    // ==================================================
-    // 8. BATCH UPSERT
-    //
-    // 26 cột.
-    //
-    // KHÔNG update:
-    // active
-    // group_code
-    // decision_no
-    // insurance_payment_rate
-    // note
-    //
-    // => dữ liệu cấu hình riêng MedGuard được giữ nguyên.
-    // ==================================================
-
-    const batchSize =
-      300;
-
-
-    const columnCount =
-      26;
-
-
-    for (
-      let start =
-        0;
-
-      start <
-        rows.length;
-
-      start +=
-        batchSize
-    ) {
-
-      const batch =
-        rows.slice(
-          start,
-          start +
-          batchSize
-        );
-
-
-      const placeholders =
-        batch
-          .map(
-            (
-              _,
-              batchRowIndex
-            ) => {
-
-              const base =
-                batchRowIndex *
-                columnCount;
-
-
-              const rowPlaceholders =
-                Array.from(
-                  {
-                    length:
-                      columnCount,
-                  },
-                  (
-                    __,
-                    columnIndex
-                  ) =>
-                    `$${base + columnIndex + 1}`
-                );
-
-
-              return (
-                `(${rowPlaceholders.join(", ")})`
-              );
-            }
-          )
-          .join(
-            ",\n"
-          );
-
-
-      const values:
-        unknown[] =
-        [];
-
-
-      for (
-        const row
-        of batch
-      ) {
-
-        values.push(
-          row.code,
-          row.activeIngredient,
-          row.name,
-          row.unit,
-          row.strength,
-          row.route,
-          row.routeCode,
-          row.dosageForm,
-          row.registrationNumber,
-          row.quantity,
-          row.unitPrice,
-          row.insuranceUnitPrice,
-          row.packaging,
-          row.manufacturer,
-          row.country,
-          row.contractor,
-          row.tenderInfo,
-          row.drugType,
-          row.scientificName,
-          row.origin,
-          row.processingMethod,
-          row.importedMaterialCode,
-          row.processedMaterialCode,
-          row.processingLossRate,
-          row.preservationLossRate,
-          row.qualityStandard
-        );
-      }
-
-
-      await client.query(
-        `
-        INSERT INTO
-          catalog.drugs
-        (
-          code,
-          active_ingredient,
-          name,
-          unit,
-          strength,
-          route,
-          route_code,
-          dosage_form,
-          registration_number,
-          quantity,
-          unit_price,
-          insurance_unit_price,
-          packaging,
-          manufacturer,
-          country,
-          contractor,
-          tender_info,
-          drug_type,
-          scientific_name,
-          origin,
-          processing_method,
-          imported_material_code,
-          processed_material_code,
-          processing_loss_rate,
-          preservation_loss_rate,
-          quality_standard
-        )
-
-        VALUES
-          ${placeholders}
-
-        ON CONFLICT
-          (code)
-
-        DO UPDATE SET
-
-          active_ingredient =
-            EXCLUDED.active_ingredient,
-
-          name =
-            EXCLUDED.name,
-
-          unit =
-            EXCLUDED.unit,
-
-          strength =
-            EXCLUDED.strength,
-
-          route =
-            EXCLUDED.route,
-
-          route_code =
-            EXCLUDED.route_code,
-
-          dosage_form =
-            EXCLUDED.dosage_form,
-
-          registration_number =
-            EXCLUDED.registration_number,
-
-          quantity =
-            EXCLUDED.quantity,
-
-          unit_price =
-            EXCLUDED.unit_price,
-
-          insurance_unit_price =
-            EXCLUDED.insurance_unit_price,
-
-          packaging =
-            EXCLUDED.packaging,
-
-          manufacturer =
-            EXCLUDED.manufacturer,
-
-          country =
-            EXCLUDED.country,
-
-          contractor =
-            EXCLUDED.contractor,
-
-          tender_info =
-            EXCLUDED.tender_info,
-
-          drug_type =
-            EXCLUDED.drug_type,
-
-          scientific_name =
-            EXCLUDED.scientific_name,
-
-          origin =
-            EXCLUDED.origin,
-
-          processing_method =
-            EXCLUDED.processing_method,
-
-          imported_material_code =
-            EXCLUDED.imported_material_code,
-
-          processed_material_code =
-            EXCLUDED.processed_material_code,
-
-          processing_loss_rate =
-            EXCLUDED.processing_loss_rate,
-
-          preservation_loss_rate =
-            EXCLUDED.preservation_loss_rate,
-
-          quality_standard =
-            EXCLUDED.quality_standard,
-
-          updated_at =
-            NOW()
-        `,
-        values
-      );
-    }
-
-
-    // ==================================================
-    // 9. COMMIT
-    // ==================================================
-
-    await client.query(
-      "COMMIT"
-    );
-
-
-    return {
-      totalRows,
-
-      inserted,
-
-      updated,
-
-      skipped:
-        skippedDuplicates,
-    };
-
-  } catch (
-    error
-  ) {
-
-    await client.query(
-      "ROLLBACK"
-    );
-
-
+    await client.query("COMMIT");
+    return { totalRows, inserted, updated, skipped: 0 };
+  } catch (error) {
+    await client.query("ROLLBACK");
     throw error;
-
   } finally {
-
     client.release();
   }
 }

@@ -2868,7 +2868,8 @@ export async function listDepartments(
 
       ORDER BY
         d.name ASC,
-        d.code ASC
+        d.code ASC,
+        d.id ASC
 
       LIMIT
         $${limitIndex}
@@ -5410,6 +5411,7 @@ function mapDrugRow(
 ) {
 
   return {
+    id: String(row.id),
     code:
       String(
         row.code
@@ -5711,6 +5713,7 @@ function mapDrugRow(
 // ======================================================
 
 const DRUG_SELECT_COLUMNS = `
+  d.id,
   d.code,
   d.name,
   d.active_ingredient,
@@ -5981,22 +5984,22 @@ export async function listDrugs(
 // ======================================================
 
 export async function getDrug(
-  code:
+  id:
     string
 ) {
 
-  const normalizedCode =
+  const normalizedId =
     normalizeText(
-      code
+      id
     );
 
 
   if (
-    !normalizedCode
+    !normalizedId
   ) {
 
     throw new Error(
-      "Thiếu mã thuốc."
+      "Thiếu ID thuốc."
     );
   }
 
@@ -6011,12 +6014,12 @@ export async function getDrug(
         catalog.drugs d
 
       WHERE
-        d.code = $1
+        d.id = $1::uuid
 
       LIMIT 1
       `,
       [
-        normalizedCode,
+        normalizedId,
       ]
     );
 
@@ -6055,53 +6058,25 @@ export async function createDrug(
   // DUPLICATE
   // ====================================================
 
-  const duplicate =
-    await db.query(
-      `
-      SELECT
-        code
-
-      FROM
-        catalog.drugs
-
-      WHERE
-        LOWER(
-          BTRIM(
-            code
-          )
-        )
-        =
-        LOWER(
-          BTRIM(
-            $1
-          )
-        )
-
-      LIMIT 1
-      `,
-      [
-        validated.code,
-      ]
-    );
-
-
-  if (
-    duplicate.rowCount &&
-    duplicate.rowCount >
-    0
-  ) {
-
-    throw new Error(
-      `Mã thuốc "${validated.code}" đã tồn tại.`
-    );
+  const duplicate = await db.query(
+    `SELECT id FROM catalog.drugs
+     WHERE LOWER(BTRIM(code)) = LOWER(BTRIM($1))
+       AND LOWER(BTRIM(name)) = LOWER(BTRIM($2))
+       AND LOWER(BTRIM(COALESCE(active_ingredient,''))) = LOWER(BTRIM(COALESCE($3,'')))
+       AND LOWER(BTRIM(COALESCE(registration_number,''))) = LOWER(BTRIM(COALESCE($4,'')))
+     LIMIT 1`,
+    [validated.code, validated.name, validated.activeIngredient, validated.registrationNumber]
+  );
+  if ((duplicate.rowCount ?? 0) > 0) {
+    throw new Error("Thuốc trùng mã, tên, hoạt chất và số đăng ký đã tồn tại.");
   }
 
 
-  // ====================================================
+// ====================================================
   // INSERT
   // ====================================================
 
-  await db.query(
+  const insertedResult = await db.query<{id:string}>(
     `
     INSERT INTO
       catalog.drugs
@@ -6177,6 +6152,7 @@ export async function createDrug(
       NOW(),
       NOW()
     )
+    RETURNING id
     `,
     [
       validated.code,
@@ -6214,9 +6190,7 @@ export async function createDrug(
   );
 
 
-  return await getDrug(
-    validated.code
-  );
+  return await getDrug(insertedResult.rows[0].id);
 }
 
 
@@ -6227,25 +6201,25 @@ export async function createDrug(
 // ======================================================
 
 export async function updateDrug(
-  code:
+  id:
     string,
 
   data:
     DrugInput
 ) {
 
-  const normalizedCode =
+  const normalizedId =
     normalizeText(
-      code
+      id
     );
 
 
   if (
-    !normalizedCode
+    !normalizedId
   ) {
 
     throw new Error(
-      "Thiếu mã thuốc cần cập nhật."
+      "Thiếu ID thuốc cần cập nhật."
     );
   }
 
@@ -6264,12 +6238,12 @@ export async function updateDrug(
         catalog.drugs
 
       WHERE
-        code = $1
+        id = $1::uuid
 
       LIMIT 1
       `,
       [
-        normalizedCode,
+        normalizedId,
       ]
     );
 
@@ -6297,7 +6271,7 @@ export async function updateDrug(
       ...data,
 
       code:
-        normalizedCode,
+        String(current.rows[0].code),
     });
 
 
@@ -6406,11 +6380,11 @@ export async function updateDrug(
         NOW()
 
     WHERE
-      code =
-      $1
+      id =
+      $1::uuid
     `,
     [
-      normalizedCode,
+      normalizedId,
 
       validated.name,
 
@@ -6476,7 +6450,7 @@ export async function updateDrug(
 
 
   return await getDrug(
-    normalizedCode
+    normalizedId
   );
 }
 
@@ -6488,22 +6462,22 @@ export async function updateDrug(
 // ======================================================
 
 export async function deleteDrug(
-  code:
+  id:
     string
 ) {
 
-  const normalizedCode =
+  const normalizedId =
     normalizeText(
-      code
+      id
     );
 
 
   if (
-    !normalizedCode
+    !normalizedId
   ) {
 
     throw new Error(
-      "Thiếu mã thuốc."
+      "Thiếu ID thuốc."
     );
   }
 
@@ -6522,14 +6496,14 @@ export async function deleteDrug(
           NOW()
 
       WHERE
-        code =
-        $1
+        id =
+        $1::uuid
 
       RETURNING
-        code
+        id
       `,
       [
-        normalizedCode,
+        normalizedId,
       ]
     );
 
