@@ -43,9 +43,53 @@ import {
 
 import dayjs from "dayjs";
 
-import {
-  GET_MEDICAL_CASES,
-} from "../graphql/medicalCases";
+import { gql } from "@apollo/client";
+
+// Phân trang cần ORDER BY có khóa duy nhất: nếu chỉ sort ngày vào,
+// các hồ sơ cùng ngày có thể đổi chỗ giữa các lần gọi LIMIT/OFFSET.
+const GET_MEDICAL_CASES_STABLE = gql`
+  query GetMedicalCasesStable(
+    $limit: Int!
+    $offset: Int!
+    $where: core_medical_cases_bool_exp!
+  ) {
+    core_medical_cases(
+      limit: $limit
+      offset: $offset
+      where: $where
+      order_by: [{ ngay_vao: desc_nulls_last }, { id: desc }]
+    ) {
+      id
+      ma_lk
+      ma_bn
+      ho_ten
+      ma_the_bhyt
+      gioi_tinh
+      ma_loai_kcb
+      treatment_group
+      ngay_vao
+      ngay_ra
+      ngay_ttoan
+      t_tongchi
+      t_bhtt
+      t_bntt
+      nam_qt
+      thang_qt
+      status
+      error_count
+    }
+    core_medical_cases_aggregate(where: $where) {
+      aggregate {
+        count
+        sum {
+          t_tongchi
+          t_bhtt
+          t_bntt
+        }
+      }
+    }
+  }
+`;
 
 import CaseCheckResultsModal
   from "../components/CaseCheckResultsModal";
@@ -819,7 +863,7 @@ export default function MedicalCases() {
     useQuery<
       QueryResult
     >(
-      GET_MEDICAL_CASES,
+      GET_MEDICAL_CASES_STABLE,
       {
         variables: {
           limit:
@@ -2739,6 +2783,8 @@ export default function MedicalCases() {
             >
               className="medguard-case-table-fixed"
 
+              // Bắt AntD tạo body mới khi chuyển trang, tránh giữ vị trí scroll cũ.
+              key={`${page}-${pageSize}`}
               rowKey="id"
 
               loading={
