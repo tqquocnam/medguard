@@ -90,7 +90,16 @@ import {
   importIcdWarningsExcel,
 } from "./icd-warning-import.controller.js";
 
+import entForeignBodyRoutes
+  from "./ent-foreign-body.routes.js";
 
+
+import serviceCalciumElectrolyteRoutes
+  from "./service-calcium-electrolyte.routes.js";
+
+
+import serviceChestXrayRoutes
+  from "./service-chest-xray.routes.js";
 // ======================================================
 // ROUTER
 // ======================================================
@@ -170,7 +179,21 @@ router.use(
   requireAdmin
 );
 
+router.use(
+  "/service-chest-xray",
+  serviceChestXrayRoutes
+);
 
+router.use(
+  "/service-calcium-electrolyte",
+  serviceCalciumElectrolyteRoutes
+);
+
+
+router.use(
+  "/ent-foreign-body",
+  entForeignBodyRoutes
+);
 // ======================================================
 // EXAMINATION SERVICES
 // ======================================================

@@ -1184,11 +1184,9 @@ const dataDate =
 
 
 
-            numberOrZero(
-
-              tongHop.T_BNTT
-
-            ),
+            // Tien benh nhan phai thanh toan = tu tra + cung chi tra BHYT.
+            numberOrZero(tongHop.T_BNTT) +
+              numberOrZero(tongHop.T_BNCCT),
 
 
 

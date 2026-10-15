@@ -187,6 +187,21 @@ import {
   serviceAgeRule,
 } from "./rules/service-age.rule.js";
 
+import {
+  entForeignBodyCombinedPaymentRule,
+} from "./rules/ent-foreign-body-combined-payment.rule.js";
+
+
+import {
+  serviceCalciumElectrolyteExclusionRule,
+} from "./rules/service-calcium-electrolyte-exclusion.rule.js";
+
+
+import {
+  serviceChestXrayExclusionRule,
+} from "./rules/service-chest-xray-exclusion.rule.js";
+
+
 export const ruleRegistry:
   Record<
     string,
@@ -328,5 +343,12 @@ DRUG_AGE: drugAgeRule,
 
 SERVICE_AGE: serviceAgeRule,
 
+  ENT_FOREIGN_BODY_COMBINED_PAYMENT:
+    entForeignBodyCombinedPaymentRule,
 
+SERVICE_CALCIUM_ELECTROLYTE_EXCLUSION:
+  serviceCalciumElectrolyteExclusionRule,
+
+  SERVICE_CHEST_XRAY_EXCLUSION:
+  serviceChestXrayExclusionRule,
 };

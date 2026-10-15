@@ -60,6 +60,18 @@ import ServiceStaff
 import IcdWarnings
   from "./pages/CataLog/IcdWarnings";
 
+
+import EntForeignBody
+  from "./pages/CataLog/EntForeignBody";
+
+ 
+import ServiceCalciumElectrolyte
+  from "./pages/CataLog/ServiceCalciumElectrolyte"; 
+
+
+import ServiceChestXray from "./pages/CataLog/ServiceChestXray";
+
+
 export default function App() {
 
   return (
@@ -276,6 +288,21 @@ export default function App() {
     <IcdWarnings />
   }
 />
+
+<Route
+  path="/catalog/ent-foreign-body"
+  element={<EntForeignBody />}
+/>
+<Route
+  path="/catalog/service-calcium-electrolyte"
+  element={<ServiceCalciumElectrolyte />}
+/>
+
+<Route
+  path="/catalog/service-chest-xray"
+  element={<ServiceChestXray />}
+/>
+
 
 
           {/* ============================================= */}
