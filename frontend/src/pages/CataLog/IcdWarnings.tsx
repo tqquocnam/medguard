@@ -35,6 +35,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -133,6 +134,66 @@ interface IcdWarningFilters {
 // ======================================================
 
 export default function IcdWarnings() {
+
+  // Đo chiều cao khả dụng dựa trên vị trí thực tế của trang.
+  // Table chỉ cuộn nội bộ; pagination luôn nằm ngoài vùng cuộn.
+  const pageRef = useRef<HTMLDivElement>(null);
+  const tableRegionRef = useRef<HTMLDivElement>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [tableScrollY, setTableScrollY] = useState(300);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const measure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const pageElement = pageRef.current;
+        const tableElement = tableRegionRef.current;
+        if (!pageElement || !tableElement) return;
+
+        const isCompact = window.matchMedia(
+          "(max-width: 900px), (max-height: 650px)"
+        ).matches;
+
+        if (isCompact) {
+          setViewportHeight(null);
+          setTableScrollY(320);
+          return;
+        }
+
+        const pageTop = pageElement.getBoundingClientRect().top;
+        const availablePageHeight = Math.max(
+          320,
+          Math.floor(window.innerHeight - pageTop - 18)
+        );
+        setViewportHeight((previous) =>
+          previous === availablePageHeight
+            ? previous
+            : availablePageHeight
+        );
+
+        // Ant Design: ~44px tiêu đề bảng + ~64px phân trang/đệm.
+        const regionHeight = tableElement.getBoundingClientRect().height;
+        const nextY = Math.max(90, Math.floor(regionHeight - 115));
+        setTableScrollY((previous) =>
+          previous === nextY ? previous : nextY
+        );
+      });
+    };
+
+    const observer = new ResizeObserver(measure);
+    if (pageRef.current) observer.observe(pageRef.current);
+    if (tableRegionRef.current) observer.observe(tableRegionRef.current);
+    window.addEventListener("resize", measure);
+    measure();
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", measure);
+      observer.disconnect();
+    };
+  }, []);
 
   // ====================================================
   // FORM
@@ -1667,7 +1728,9 @@ export default function IcdWarnings() {
     <>
 
       <div
+        ref={pageRef}
         className="icd-warning-page"
+        style={viewportHeight ? { height: viewportHeight } : undefined}
       >
 
         {/* ===============================================
@@ -1946,6 +2009,7 @@ export default function IcdWarnings() {
             TABLE
         =============================================== */}
 
+        <div className="icd-table-region" ref={tableRegionRef}>
         <Table<IcdWarningItem>
           className="medguard-icd-table"
 
@@ -1968,8 +2032,8 @@ export default function IcdWarnings() {
           tableLayout="fixed"
 
           scroll={{
-            x:
-              1200,
+            x: 1200,
+            y: tableScrollY,
           }}
 
           pagination={{
@@ -2032,6 +2096,7 @@ export default function IcdWarnings() {
               "Chưa có dữ liệu ICD cảnh báo",
           }}
         />
+        </div>
 
       </div>
 
@@ -2594,8 +2659,57 @@ export default function IcdWarnings() {
 
       <style>
         {`
+          /* Trang ICD không làm cuộn khung trình duyệt trên desktop. */
+          body:has(.icd-warning-page) {
+            overflow-y: hidden !important;
+          }
+
           .icd-warning-page {
             width: 100%;
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+
+          .icd-warning-page > .icd-breadcrumb,
+          .icd-warning-page > .icd-header,
+          .icd-warning-page > .icd-filter-grid {
+            flex: 0 0 auto;
+          }
+
+          .icd-table-region {
+            flex: 1 1 auto;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
+          }
+
+          .icd-table-region .ant-table-body {
+            overflow-y: auto !important;
+          }
+
+          .icd-table-region .ant-pagination {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+            margin: 10px 10px 8px !important;
+          }
+
+          @media (max-width: 900px), (max-height: 650px) {
+            body:has(.icd-warning-page) {
+              overflow-y: auto !important;
+            }
+            .icd-warning-page {
+              height: auto !important;
+              overflow: visible;
+            }
+            .icd-table-region {
+              overflow: visible;
+            }
           }
 
           .icd-breadcrumb {

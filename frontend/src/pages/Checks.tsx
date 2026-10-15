@@ -4155,11 +4155,8 @@ export default function Checks() {
 
 
           scroll={{
-
-            x:
-
-              1450,
-
+            x: 1450,
+            y: "clamp(100px, calc(100dvh - 620px), 440px)",
           }}
 
 
@@ -5125,23 +5122,14 @@ styles={{
         {`
 
           .checks-page {
-
-            display:
-
-              flex;
-
-
-
-            flex-direction:
-
-              column;
-
-
-
-            gap:
-
-              16px;
-
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+            height: 100%;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
           }
 
 
@@ -6132,6 +6120,51 @@ styles={{
 
 }
 
+
+          /* FIX: không ép .ant-table thành flex, vì có thể ẩn toàn bộ table */
+          .checks-page .checks-header,
+          .checks-page .checks-stat-grid,
+          .checks-page .checks-filter-card { flex-shrink: 0; }
+          .checks-page .checks-stat-grid { row-gap: 8px !important; }
+          .checks-page .checks-stat-card .ant-card-body { padding: 10px 14px; }
+          .checks-page .checks-stat-card .ant-statistic-content { font-size: 20px; }
+          .checks-page .checks-filter-card .ant-card-body { padding: 10px 14px; }
+          .checks-page .checks-filter-title { margin-bottom: 6px; }
+          .checks-page .checks-filter-label { margin-bottom: 3px; }
+          .checks-page .checks-table-card {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: auto;
+          }
+          .checks-page .checks-table-card > .ant-card-body {
+            display: block;
+            min-height: 0;
+            overflow: visible;
+          }
+          .checks-page .checks-table-header { padding: 9px 12px; }
+          .checks-page .checks-table-card .ant-table-wrapper,
+          .checks-page .checks-table-card .ant-spin-nested-loading,
+          .checks-page .checks-table-card .ant-spin-container,
+          .checks-page .checks-table-card .ant-table,
+          .checks-page .checks-table-card .ant-table-container {
+            display: block;
+            height: auto;
+            min-height: auto;
+            overflow: visible;
+          }
+          .checks-page .checks-table-card .ant-table-body {
+            max-height: clamp(100px, calc(100dvh - 620px), 440px);
+            overflow-y: auto !important;
+          }
+          .checks-page .checks-table-card .ant-pagination {
+            margin: 8px 12px !important;
+          }
+          @media (max-height: 740px) {
+            .checks-page { gap: 7px; }
+            .checks-page .checks-stat-card .ant-card-body { padding: 6px 10px; }
+            .checks-page .checks-filter-card .ant-card-body { padding: 7px 10px; }
+            .checks-page .checks-table-header { padding: 6px 10px; }
+          }
         `}
 
       </style>

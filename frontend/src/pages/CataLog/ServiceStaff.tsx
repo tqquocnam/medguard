@@ -38,6 +38,7 @@ import type {
 
 import {
   useEffect,
+  useRef,
   useMemo,
   useState,
 } from "react";
@@ -210,6 +211,44 @@ function getActivityLabel(
 }
 
 export default function ServiceStaff() {
+  // Chiều cao vùng cuộn được tính theo không gian còn lại của màn hình.
+  // Chỉ cuộn nội dung bảng, không thay đổi dữ liệu hoặc phân trang.
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [tableScrollHeight, setTableScrollHeight] = useState(320);
+
+  // Phân trang được kiểm soát bằng state: đổi 10/20/50/100 sẽ không bị
+  // reset về 10 khi React render lại.
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+
+  useEffect(() => {
+    const updateHeight = () => {
+      const element = tableContainerRef.current;
+      if (!element) return;
+
+      // Tính theo CHIỀU CAO THỰC của vùng bảng, không theo khoảng cách
+      // tới đáy cửa sổ. Trừ header bảng (~40px), pagination (~66px)
+      // và khoảng đệm. Nếu không trừ, pagination sẽ bị cắt.
+      const available = element.getBoundingClientRect().height - 130;
+      setTableScrollHeight(Math.max(80, Math.floor(available)));
+    };
+
+    const raf = window.requestAnimationFrame(updateHeight);
+    window.addEventListener("resize", updateHeight);
+
+    const observer = new ResizeObserver(updateHeight);
+    if (tableContainerRef.current) {
+      observer.observe(tableContainerRef.current);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateHeight);
+      observer.disconnect();
+    };
+  }, []);
+
   const navigate =
     useNavigate();
 
@@ -894,6 +933,17 @@ export default function ServiceStaff() {
       ]
     );
 
+  // Khi thay đổi bộ lọc, quay về trang đầu để không bị rỗng bảng.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterServiceCode, filterStaffCode, filterActivityType]);
+
+  // Khi số bản ghi giảm (xóa/import/lọc), đảm bảo currentPage vẫn hợp lệ.
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+    setCurrentPage((page) => Math.min(page, maxPage));
+  }, [filteredRows.length, pageSize]);
+
   function resetFilters() {
     setFilterServiceCode(
       undefined
@@ -1561,6 +1611,23 @@ export default function ServiceStaff() {
     ColumnsType<
       ServiceStaffRow
     > = [
+      
+{
+  title: "STT",
+  key: "stt",
+  width: 65,
+  align: "center" as const,
+  render: (
+    _value: unknown,
+    _record: ServiceStaffRow,
+    index: number
+  ) => (
+    <span style={{ fontWeight: 600 }}>
+      {(currentPage - 1) * pageSize + index + 1}
+    </span>
+  ),
+},
+
       {
         title:
           "DVKT",
@@ -2314,6 +2381,7 @@ export default function ServiceStaff() {
         </Button>
       </div>
 
+      <div className="service-staff-table-wrap" ref={tableContainerRef}>
       <Card
         className="service-staff-table-card"
 
@@ -2344,29 +2412,27 @@ export default function ServiceStaff() {
           size="middle"
 
           scroll={{
-            x:
-              1250,
+            x: 1250,
+            y: tableScrollHeight,
           }}
 
           pagination={{
-            pageSize:
-              10,
-
-            showSizeChanger:
-              true,
-
-            pageSizeOptions: [
-              "10",
-              "20",
-              "50",
-              "100",
-            ],
-
-            showTotal:
-              (
-                total
-              ) =>
-                `Tổng số: ${total}`,
+            current: currentPage,
+            pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "20", "50", "100"],
+            onChange: (nextPage, nextPageSize) => {
+              // Khi chọn pageSize, Ant Design gọi onChange cùng pageSize mới.
+              // Chuyển về trang 1 để tránh trạng thái trang không còn tồn tại.
+              if (nextPageSize !== pageSize) {
+                setPageSize(nextPageSize);
+                setCurrentPage(1);
+              } else {
+                setCurrentPage(nextPage);
+              }
+            },
+            showTotal: (total, range) =>
+              `Hiển thị ${range[0]}-${range[1]} / Tổng số: ${total}`,
           }}
 
           locale={{
@@ -2375,6 +2441,7 @@ export default function ServiceStaff() {
           }}
         />
       </Card>
+      </div>
 
       <Modal
         className="service-staff-modal"
@@ -2980,10 +3047,50 @@ export default function ServiceStaff() {
 
       <style>
         {`
+          /* Chỉ áp dụng khi mở trang DVKT - Nhân viên */
+          body:has(.service-staff-page) {
+            overflow: hidden !important;
+          }
+
           .service-staff-page {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
+            width: 100%;
+            min-width: 0;
+            height: calc(100dvh - 165px);
+            min-height: 0;
+            overflow: hidden;
+          }
+
+          .service-staff-page > .ant-breadcrumb,
+          .service-staff-page > .service-staff-header,
+          .service-staff-page > .service-staff-filter {
+            flex-shrink: 0;
+          }
+
+          .service-staff-table-wrap {
+            flex: 1 1 auto;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
+          }
+
+          .service-staff-table-wrap .ant-table-body {
+            overflow-y: auto !important;
+          }
+
+          @media (max-height: 650px), (max-width: 700px) {
+            body:has(.service-staff-page) {
+              overflow-y: auto !important;
+            }
+            .service-staff-page {
+              height: auto;
+              overflow: visible;
+            }
+            .service-staff-table-wrap {
+              overflow: visible;
+            }
           }
 
           .service-staff-header {
@@ -3158,10 +3265,8 @@ export default function ServiceStaff() {
 
           .service-staff-table-card
           .ant-pagination {
-            padding:
-              0
-              12px
-              10px;
+            margin: 10px 12px 8px !important;
+            padding: 0;
           }
 
           .service-staff-modal
