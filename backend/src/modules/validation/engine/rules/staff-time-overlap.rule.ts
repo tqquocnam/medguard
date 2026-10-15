@@ -221,8 +221,23 @@ export const staffTimeOverlapRule:
         NULL
 
     END
-      AS order_time
+      AS order_time,
 
+    CASE
+      WHEN TRIM(COALESCE(e.raw_data ->> 'NGAY_TH_YL', '')) ~ '^[0-9]{14}$'
+        THEN TO_TIMESTAMP(TRIM(e.raw_data ->> 'NGAY_TH_YL'), 'YYYYMMDDHH24MISS')::timestamp without time zone
+      WHEN TRIM(COALESCE(e.raw_data ->> 'NGAY_TH_YL', '')) ~ '^[0-9]{12}$'
+        THEN TO_TIMESTAMP(TRIM(e.raw_data ->> 'NGAY_TH_YL'), 'YYYYMMDDHH24MI')::timestamp without time zone
+      ELSE NULL
+    END AS execution_start,
+
+    CASE
+      WHEN TRIM(COALESCE(e.raw_data ->> 'NGAY_KQ', '')) ~ '^[0-9]{14}$'
+        THEN TO_TIMESTAMP(TRIM(e.raw_data ->> 'NGAY_KQ'), 'YYYYMMDDHH24MISS')::timestamp without time zone
+      WHEN TRIM(COALESCE(e.raw_data ->> 'NGAY_KQ', '')) ~ '^[0-9]{12}$'
+        THEN TO_TIMESTAMP(TRIM(e.raw_data ->> 'NGAY_KQ'), 'YYYYMMDDHH24MI')::timestamp without time zone
+      ELSE NULL
+    END AS execution_end
 
   FROM
     core.medical_events e
@@ -616,6 +631,70 @@ export const staffTimeOverlapRule:
               )
               LIKE 'khám%'
             )
+          UNION ALL
+
+          -- NHANH THU NGHIEM: chi noi soi co khoang thuc hien.
+          -- Gio NGAY_TH_YL / NGAY_KQ phai gan NGUOI_THUC_HIEN.
+          -- Khong fallback ve doctor_code neu thieu nguoi thuc hien.
+          -- Giu nguyen SERVICE_ORDER dung NGAY_YL o phia tren.
+          SELECT
+            e.id AS event_id,
+            e.medical_case_id,
+            NULLIF(TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'), '') AS staff_code,
+            'SERVICE_EXECUTION' AS activity_type,
+            e.item_code,
+            e.item_name,
+            e.execution_start AS activity_start,
+            e.execution_end AS activity_end
+          FROM event_times e
+          WHERE UPPER(COALESCE(e.event_type, '')) IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
+            AND LOWER(COALESCE(e.item_name, '')) LIKE '%nội soi%'
+            AND NULLIF(TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'), '') IS NOT NULL
+            AND e.execution_start IS NOT NULL
+            AND e.execution_end IS NOT NULL
+            AND e.execution_end > e.execution_start
+
+          UNION ALL
+
+          -- NHANH BO SUNG: Ket qua dien tim (NGAY_KQ) la mot thoi diem.
+          -- Moc NGAY_KQ gan cho NGUOI_THUC_HIEN, khong gan cho MA_BAC_SI.
+          -- Chi so sanh voi y lenh thuoc neu ma nhan vien trung nhau.
+          -- Khong doi NGAY_YL, khoang noi soi hay cong kham hien co.
+          SELECT
+            e.id AS event_id,
+            e.medical_case_id,
+            NULLIF(TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'), '') AS staff_code,
+            'ECG_RESULT_POINT' AS activity_type,
+            e.item_code,
+            e.item_name,
+            e.execution_end AS activity_start,
+            e.execution_end AS activity_end
+          FROM event_times e
+          WHERE UPPER(COALESCE(e.event_type, '')) IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
+            AND LOWER(COALESCE(e.item_name, '')) LIKE '%điện tim%'
+            AND NULLIF(TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'), '') IS NOT NULL
+            AND e.execution_end IS NOT NULL
+
+          UNION ALL
+
+          -- DOI CHIEU THEO ICHECK (RIENG): NGAY_KQ DIEN TIM VOI CONG KHAM
+          -- Day KHONG phai thoi gian thuc hien cua bac si; nhan vien thuc hien
+          -- van duoc xet o ECG_RESULT_POINT bang NGUOI_THUC_HIEN o tren.
+          SELECT
+            e.id AS event_id,
+            e.medical_case_id,
+            NULLIF(TRIM(e.doctor_code), '') AS staff_code,
+            'ECG_RESULT_DOCTOR_EXAM' AS activity_type,
+            e.item_code,
+            e.item_name,
+            e.execution_end AS activity_start,
+            e.execution_end AS activity_end
+          FROM event_times e
+          WHERE UPPER(COALESCE(e.event_type, '')) IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
+            AND LOWER(COALESCE(e.item_name, '')) LIKE '%điện tim%'
+            AND NULLIF(TRIM(e.doctor_code), '') IS NOT NULL
+            AND e.execution_end IS NOT NULL
+
         ),
 
 
@@ -759,8 +838,29 @@ export const staffTimeOverlapRule:
             b.event_id
 
 
+            -- Khong doi logic hien tai, chi bo sung hai cap da duoc doi chieu iCheck.
+            AND (
+              (a.activity_type <> 'SERVICE_EXECUTION' AND b.activity_type <> 'SERVICE_EXECUTION')
+              OR (a.activity_type = 'SERVICE_EXECUTION' AND b.activity_type IN ('EXAM', 'DRUG_ORDER'))
+              OR (b.activity_type = 'SERVICE_EXECUTION' AND a.activity_type IN ('EXAM', 'DRUG_ORDER'))
+              OR (a.activity_type = 'ECG_RESULT_POINT' AND b.activity_type = 'DRUG_ORDER')
+              OR (b.activity_type = 'ECG_RESULT_POINT' AND a.activity_type = 'DRUG_ORDER')
+              OR (a.activity_type = 'ECG_RESULT_DOCTOR_EXAM' AND b.activity_type = 'EXAM')
+              OR (b.activity_type = 'ECG_RESULT_DOCTOR_EXAM' AND a.activity_type = 'EXAM')
+            )
+
             AND
 
+            (
+              -- Nhanh goc: KHONG thay doi bat ky dieu kien nao.
+              (
+                a.activity_type <> 'SERVICE_EXECUTION'
+                AND b.activity_type <> 'SERVICE_EXECUTION'
+                AND a.activity_type <> 'ECG_RESULT_POINT'
+                AND b.activity_type <> 'ECG_RESULT_POINT'
+                AND a.activity_type <> 'ECG_RESULT_DOCTOR_EXAM'
+                AND b.activity_type <> 'ECG_RESULT_DOCTOR_EXAM'
+                AND
             (
 
               -- =========================================
@@ -882,79 +982,71 @@ export const staffTimeOverlapRule:
                   b.activity_start
               )
             )
-        ),
-
-
-        -- ===============================================
-        -- 7. CHỌN 1 HỒ SƠ B
-        --
-        -- Rule hiện tại:
-        --
-        -- A kiểm tra lần lượt với các hồ sơ khác.
-        --
-        -- Khi tìm thấy hồ sơ đầu tiên có xung đột
-        -- thì chọn hồ sơ đó.
-        --
-        -- Không kéo thêm hồ sơ C/D/E vào cùng lần check A.
-        -- ===============================================
-
-        selected_case AS (
-
-          SELECT
-            conflict_case_id,
-
-
-            MIN(
-              conflict_case_start
+              )
+              OR
+              -- Gio ket qua DIEN TIM va gio NGAY_YL THUOC trung dung phut.
+              (
+                a.activity_type = 'ECG_RESULT_POINT'
+                AND b.activity_type = 'DRUG_ORDER'
+                AND a.activity_start = b.activity_start
+              )
+              OR
+              (
+                b.activity_type = 'ECG_RESULT_POINT'
+                AND a.activity_type = 'DRUG_ORDER'
+                AND b.activity_start = a.activity_start
+              )
+              OR
+              -- TUONG THICH ICHECK: NGAY_KQ cua dien tim theo MA_BAC_SI
+              -- Su dung activity_end cua cong kham DA tinh tu case_flags:
+              -- ho so co CLS => moc bat dau, khong CLS => khoang 5 phut.
+              -- Khong so voi thuoc trong nhanh tuong thich nay.
+              (
+                a.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
+                AND b.activity_type = 'EXAM'
+                AND a.activity_start BETWEEN b.activity_start AND b.activity_end
+              )
+              OR
+              (
+                b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
+                AND a.activity_type = 'EXAM'
+                AND b.activity_start BETWEEN a.activity_start AND a.activity_end
+              )
+              OR
+              -- Noi soi execution voi thuoc: khoang [bat dau, ket thuc], gom diem ket thuc.
+              (
+                a.activity_type = 'SERVICE_EXECUTION'
+                AND b.activity_type = 'DRUG_ORDER'
+                AND b.activity_start BETWEEN a.activity_start AND a.activity_end
+              )
+              OR
+              (
+                b.activity_type = 'SERVICE_EXECUTION'
+                AND a.activity_type = 'DRUG_ORDER'
+                AND a.activity_start BETWEEN b.activity_start AND b.activity_end
+              )
+              OR
+              -- Cong kham 5 phut CHI khi doi chieu voi noi soi.
+              (
+                a.activity_type = 'SERVICE_EXECUTION'
+                AND b.activity_type = 'EXAM'
+                AND a.activity_start < b.activity_start + ($2::integer * interval '1 minute')
+                AND a.activity_end >= b.activity_start
+              )
+              OR
+              (
+                b.activity_type = 'SERVICE_EXECUTION'
+                AND a.activity_type = 'EXAM'
+                AND b.activity_start < a.activity_start + ($2::integer * interval '1 minute')
+                AND b.activity_end >= a.activity_start
+              )
             )
-              AS case_start,
-
-
-            MIN(
-              conflict_start
-            )
-              AS first_conflict_time
-
-
-          FROM
-            conflict_pairs
-
-
-          GROUP BY
-            conflict_case_id
-
-
-          ORDER BY
-            case_start ASC
-              NULLS LAST,
-
-            first_conflict_time ASC,
-
-            conflict_case_id ASC
-
-
-          LIMIT 1
         )
 
 
-        -- ===============================================
-        -- 8. SAU KHI CHỌN ĐƯỢC B
-        --
-        -- LẤY HẾT TẤT CẢ CẶP HOẠT ĐỘNG
-        -- CỦA A ↔ B BỊ TRÙNG.
-        --
-        -- VD:
-        --
-        -- Thuốc 1 ↔ Khám
-        -- Thuốc 1 ↔ Thuốc A
-        -- Thuốc 1 ↔ Thuốc B
-        --
-        -- Thuốc 2 ↔ Khám
-        -- Thuốc 2 ↔ Thuốc A
-        -- ...
-        --
-        -- Hiển thị hết giống web mẫu.
-        -- ===============================================
+        -- 7. Trả về TẤT CẢ các cặp xung đột A-B, A-C, A-D...
+        -- Không thay đổi logic thời gian khám của bản gốc.
+        -- CTE conflict_pairs đã loại những cặp không xung đột.
 
         SELECT DISTINCT
           cp.source_event_id,
@@ -992,14 +1084,6 @@ export const staffTimeOverlapRule:
 
         FROM
           conflict_pairs cp
-
-
-        INNER JOIN
-          selected_case sc
-
-          ON
-            sc.conflict_case_id =
-            cp.conflict_case_id
 
 
         ORDER BY
@@ -1074,6 +1158,24 @@ export const staffTimeOverlapRule:
     const first =
       conflicts[0];
 
+
+    // Các hồ sơ đối chiếu duy nhất, để modal hiển thị A với B/C/D...
+    const conflictCaseMap = new Map<
+      string,
+      { caseId: string; maBn: string | null; hoTen: string | null }
+    >();
+
+    for (const row of conflicts) {
+      if (!conflictCaseMap.has(row.conflict_case_id)) {
+        conflictCaseMap.set(row.conflict_case_id, {
+          caseId: row.conflict_case_id,
+          maBn: row.conflict_ma_bn,
+          hoTen: row.conflict_patient_name,
+        });
+      }
+    }
+
+    const conflictCases = Array.from(conflictCaseMap.values());
 
     // ==================================================
     // FORMAT DANH SÁCH LỖI
@@ -1263,7 +1365,7 @@ export const staffTimeOverlapRule:
 
       message:
         `Phát hiện ${violations.length} hoạt động trùng thời gian với ` +
-        `${first.conflict_patient_name ?? "một hồ sơ khác"}.`,
+        `${conflictCases.length} hồ sơ khác.`,
 
       details: {
 
@@ -1288,6 +1390,8 @@ export const staffTimeOverlapRule:
         conflictCount:
           violations.length,
 
+        conflictCaseCount: conflictCases.length,
+        conflictCases,
 
         violations,
       },
