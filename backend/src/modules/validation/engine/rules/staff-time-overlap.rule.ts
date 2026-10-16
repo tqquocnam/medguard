@@ -118,7 +118,7 @@ export const staffTimeOverlapRule:
     // ==================================================
     // CÔNG KHÁM MẶC ĐỊNH 5 PHÚT
     //
-    // CHỈ áp dụng khi hồ sơ KHÔNG có CLS/XN/DVKT.
+    // CHỈ áp dụng khi CÔNG KHÁM không có CLS/XN/DVKT do bác sĩ đó chỉ định.
     // ==================================================
 
     const examWindowMinutes =
@@ -137,6 +137,22 @@ export const staffTimeOverlapRule:
       await client.query<ConflictRow>(
         `
         WITH
+        -- Gioi han tap ho so doi chieu quanh ngay thanh toan cua ho so A.
+        -- Cong/tru 1 ngay de khong bo sot su kien qua nua dem.
+        source_day AS MATERIALIZED (
+          SELECT ngay_ttoan::date AS payment_day
+          FROM core.medical_cases
+          WHERE id = $1::uuid
+        ),
+        scope_cases AS MATERIALIZED (
+          SELECT mc.id
+          FROM core.medical_cases mc
+          CROSS JOIN source_day sd
+          WHERE mc.ngay_ttoan >= sd.payment_day - INTERVAL '1 day'
+            AND mc.ngay_ttoan < sd.payment_day + INTERVAL '2 day'
+          UNION
+          SELECT $1::uuid
+        ),
 
         -- ===============================================
         -- 1. ĐỌC DUY NHẤT NGAY_YL
@@ -150,7 +166,7 @@ export const staffTimeOverlapRule:
         -- thời gian dùng để check bác sĩ = NGAY_YL.
         -- ===============================================
 
-        event_times AS (
+        event_times AS MATERIALIZED (
 
   SELECT
     e.*,
@@ -241,78 +257,58 @@ export const staffTimeOverlapRule:
 
   FROM
     core.medical_events e
+  INNER JOIN scope_cases sc ON sc.id = e.medical_case_id
 ),
 
         -- ===============================================
-        -- 2. XÁC ĐỊNH HỒ SƠ CÓ
-        -- CLS / XÉT NGHIỆM / DVKT HAY KHÔNG
-        --
-        -- has_cls = FALSE:
-        --
-        -- chỉ có công khám
-        -- 07:24
-        -- =>
-        -- 07:24 -> 07:29
-        --
-        --
-        -- has_cls = TRUE:
-        --
-        -- có chỉ định CLS
-        -- công khám chỉ lấy giờ bắt đầu
-        -- VD:
-        -- 07:24
-        -- =>
-        -- POINT 07:24
+        -- 2. XAC DINH CLS RIENG CHO TUNG CONG KHAM
+        -- Khong gop CLS cua cac bac si khac vao cung ho so.
+        -- Mot chi dinh thuoc ve cong kham neu:
+        --   * cung MA_BAC_SI
+        --   * NGAY_YL >= gio bat dau kham
+        --   * truoc cong kham TIEP THEO cua cung bac si
+        -- Thuoc (XML2) khong tinh la CLS.
         -- ===============================================
-
-        case_flags AS (
-
+        -- Tim lan kham ke tiep cua CUNG bac si trong CUNG ho so.
+        -- Dung cua so SQL thay cho NOT EXISTS long nhau tren toan bo event_times.
+        exam_windows AS MATERIALIZED (
           SELECT
-            e.medical_case_id,
-
-            BOOL_OR(
-
-              UPPER(
-                COALESCE(
-                  e.event_type,
-                  ''
-                )
-              )
-              IN (
-                'SERVICE',
-                'LAB',
-                'CLS',
-                'DVKT'
-              )
-
-              AND
-
-              LOWER(
-                COALESCE(
-                  e.item_name,
-                  ''
-                )
-              )
-              NOT LIKE 'khám%'
-
+            ex.id AS exam_event_id,
+            ex.medical_case_id,
+            NULLIF(TRIM(ex.doctor_code), '') AS doctor_code,
+            ex.start_time,
+            LEAD(ex.start_time) OVER (
+              PARTITION BY ex.medical_case_id, NULLIF(TRIM(ex.doctor_code), '')
+              ORDER BY ex.start_time, ex.id
+            ) AS next_exam_start
+          FROM event_times ex
+          WHERE ex.start_time IS NOT NULL
+            AND (
+              UPPER(COALESCE(ex.event_type, '')) = 'EXAM'
+              OR LOWER(TRIM(COALESCE(ex.item_name, ''))) LIKE 'khám%'
             )
-              AS has_cls
-
-
-          FROM
-            core.medical_events e
-
-
-          GROUP BY
-            e.medical_case_id
         ),
-
+        exam_flags AS MATERIALIZED (
+          SELECT
+            ex.exam_event_id,
+            COUNT(svc.id) > 0 AS has_cls
+          FROM exam_windows ex
+          LEFT JOIN event_times svc
+            ON svc.medical_case_id = ex.medical_case_id
+           AND NULLIF(TRIM(svc.doctor_code), '') = ex.doctor_code
+           AND UPPER(COALESCE(svc.event_type, ''))
+               IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
+           AND LOWER(TRIM(COALESCE(svc.item_name, ''))) NOT LIKE 'khám%'
+           AND svc.order_time >= ex.start_time
+           AND (ex.next_exam_start IS NULL OR svc.order_time < ex.next_exam_start)
+          GROUP BY ex.exam_event_id
+        ),
 
         -- ===============================================
         -- 3. DANH SÁCH HOẠT ĐỘNG ĐEM SO
         -- ===============================================
 
-        activities AS (
+        activities AS MATERIALIZED (
 
 
           -- =============================================
@@ -394,11 +390,11 @@ export const staffTimeOverlapRule:
 
 
           LEFT JOIN
-            case_flags cf
+            exam_flags cf
 
             ON
-              cf.medical_case_id =
-              e.medical_case_id
+              cf.exam_event_id =
+              e.id
 
 
           WHERE
@@ -837,6 +833,35 @@ export const staffTimeOverlapRule:
             a.event_id <>
             b.event_id
 
+            -- Quy loi mot chieu cho cap THUOC <-> CONG KHAM:
+            -- Ho so EXAM khong bi FAIL chi vi thuoc cua ho so khac.
+            -- Chieu DRUG_ORDER -> EXAM van duoc giu nguyen.
+            AND NOT (
+              a.activity_type = 'EXAM'
+              AND b.activity_type = 'DRUG_ORDER'
+            )
+
+            -- Quy loi mot chieu cho Y LENH THUOC <-> Y LENH DICH VU:
+            -- Chi ghi loi ho so co DRUG_ORDER; khong ghi loi chieu nguoc.
+            -- Giu DRUG_ORDER -> SERVICE_ORDER.
+            AND NOT (
+              a.activity_type = 'SERVICE_ORDER'
+              AND b.activity_type = 'DRUG_ORDER'
+            )
+
+            -- Noi soi <-> thuoc: chi ghi loi o ho so ra y lenh thuoc.
+            -- Giu DRUG_ORDER -> SERVICE_EXECUTION (bao gom moc ket thuc).
+            AND NOT (
+              a.activity_type = 'SERVICE_EXECUTION'
+              AND b.activity_type = 'DRUG_ORDER'
+            )
+
+            -- Quy loi mot chieu cho dien tim NGAY_KQ voi cong kham:
+            -- Giu ECG_RESULT_DOCTOR_EXAM -> EXAM; khong quy loi nguoc.
+            AND NOT (
+              a.activity_type = 'EXAM'
+              AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
+            )
 
             -- Khong doi logic hien tai, chi bo sung hai cap da duoc doi chieu iCheck.
             AND (
@@ -847,6 +872,9 @@ export const staffTimeOverlapRule:
               OR (b.activity_type = 'ECG_RESULT_POINT' AND a.activity_type = 'DRUG_ORDER')
               OR (a.activity_type = 'ECG_RESULT_DOCTOR_EXAM' AND b.activity_type = 'EXAM')
               OR (b.activity_type = 'ECG_RESULT_DOCTOR_EXAM' AND a.activity_type = 'EXAM')
+              -- Y lenh thuoc (NGAY_YL) trung NGAY_KQ dien tim cua cung bac si.
+              -- Chi ghi loi cho ho so chua y lenh thuoc (theo doi chieu iCheck).
+              OR (a.activity_type = 'DRUG_ORDER' AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM')
             )
 
             AND
@@ -889,6 +917,25 @@ export const staffTimeOverlapRule:
 
                 b.activity_start <
                   a.activity_end
+              )
+
+
+              OR
+
+
+              -- =========================================
+              -- EXAM -> EXAM: chi cham moc ket thuc.
+              -- Quy loi cho ho so kham TRUOC (a),
+              -- khong tu dong quy loi ho so kham SAU (b).
+              -- Vi du: a 14:17-14:22, b 14:22-14:27.
+              -- KHONG ap dung cho hoat dong khac.
+              -- =========================================
+              (
+                a.activity_type = 'EXAM'
+                AND b.activity_type = 'EXAM'
+                AND a.activity_end > a.activity_start
+                AND b.activity_end > b.activity_start
+                AND a.activity_end = b.activity_start
               )
 
 
@@ -997,6 +1044,14 @@ export const staffTimeOverlapRule:
                 AND b.activity_start = a.activity_start
               )
               OR
+              -- Thuoc: NGAY_YL; dien tim: NGAY_KQ. Cung doctor_code, dung phut.
+              -- source = thuoc, target = dien tim (khong tu dong quy loi nguoc).
+              (
+                a.activity_type = 'DRUG_ORDER'
+                AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
+                AND a.activity_start = b.activity_start
+              )
+              OR
               -- TUONG THICH ICHECK: NGAY_KQ cua dien tim theo MA_BAC_SI
               -- Su dung activity_end cua cong kham DA tinh tu case_flags:
               -- ho so co CLS => moc bat dau, khong CLS => khoang 5 phut.
@@ -1013,31 +1068,36 @@ export const staffTimeOverlapRule:
                 AND b.activity_start BETWEEN a.activity_start AND a.activity_end
               )
               OR
-              -- Noi soi execution voi thuoc: khoang [bat dau, ket thuc], gom diem ket thuc.
+              -- Noi soi execution voi thuoc: [bat dau, ket thuc], bao gom moc ket thuc.
+              -- Khoi phuc dieu kien truoc thu nghiem half-open.
               (
                 a.activity_type = 'SERVICE_EXECUTION'
                 AND b.activity_type = 'DRUG_ORDER'
-                AND b.activity_start BETWEEN a.activity_start AND a.activity_end
+                AND b.activity_start >= a.activity_start
+                AND b.activity_start <= a.activity_end
               )
               OR
               (
                 b.activity_type = 'SERVICE_EXECUTION'
                 AND a.activity_type = 'DRUG_ORDER'
-                AND a.activity_start BETWEEN b.activity_start AND b.activity_end
+                AND a.activity_start >= b.activity_start
+                AND a.activity_start <= b.activity_end
               )
               OR
-              -- Cong kham 5 phut CHI khi doi chieu voi noi soi.
+              -- Noi soi va cong kham: dung activity_end da tinh theo CLS cua TUNG cong kham.
+              -- Cong kham co CLS la POINT; khong co CLS moi la khoang 5 phut.
+              -- Khong tu cong them 5 phut o nhanh nay.
               (
                 a.activity_type = 'SERVICE_EXECUTION'
                 AND b.activity_type = 'EXAM'
-                AND a.activity_start < b.activity_start + ($2::integer * interval '1 minute')
+                AND a.activity_start <= b.activity_end
                 AND a.activity_end >= b.activity_start
               )
               OR
               (
                 b.activity_type = 'SERVICE_EXECUTION'
                 AND a.activity_type = 'EXAM'
-                AND b.activity_start < a.activity_start + ($2::integer * interval '1 minute')
+                AND b.activity_start <= a.activity_end
                 AND b.activity_end >= a.activity_start
               )
             )

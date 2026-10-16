@@ -140,6 +140,58 @@ function getDrugName(
 
 
 // ======================================================
+// NHAN DIEN CAC DONG TACH SO LUONG CUA CUNG MOT LIEU TRINH
+// Bao thu khi thieu bat ky du lieu xac minh nao.
+// ======================================================
+
+function parseDrugQuantity(value: unknown): number | null {
+  const text = normalizeText(value).replace(/\s/g, "");
+  if (!/^\d+(?:[.,]\d+)?$/.test(text)) return null;
+  const amount = Number(text.replace(",", "."));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function expectedCourseQuantity(dosage: unknown): number | null {
+  // Vi du: "1 Vien/lan * 2 lan/ngay * 7 ngay [2 Vien/ngay]"
+  const text = normalize(dosage);
+  const match = text.match(
+    /(\d+(?:[.,]\d+)?)\s*[^*\n]{0,35}\/lan\s*\*\s*(\d+(?:[.,]\d+)?)\s*lan\/ngay\s*\*\s*(\d+(?:[.,]\d+)?)\s*ngay/
+  );
+  if (!match) return null;
+  const doses = match.slice(1, 4).map(v => Number(v.replace(",", ".")));
+  if (doses.some(v => !Number.isFinite(v) || v <= 0)) return null;
+  return doses[0] * doses[1] * doses[2];
+}
+
+function isSplitDispensingOfOneCourse(items: any[]): boolean {
+  if (items.length < 2) return false;
+  const first = items[0]?.raw_data ?? {};
+  // Khong suy dien tu thuoc cung ma ma thieu NGAY_YL/khoa/bac si/lieu.
+  const signatureKeys = ["NGAY_YL", "MA_KHOA", "LIEU_DUNG"];
+  if (signatureKeys.some(k => !normalizeText(first[k]))) return false;
+  const firstDoctor = normalizeCode(items[0]?.doctor_code || first.MA_BAC_SI);
+  if (!firstDoctor) return false;
+  const expected = expectedCourseQuantity(first.LIEU_DUNG);
+  if (expected === null) return false;
+
+  let total = 0;
+  for (const item of items) {
+    const raw = item?.raw_data ?? {};
+    const doctor = normalizeCode(item?.doctor_code || raw.MA_BAC_SI);
+    if (doctor !== firstDoctor) return false;
+    if (signatureKeys.some(k => normalize(raw[k]) !== normalize(first[k]))) return false;
+    // Neu ca hai dong co NGAY_TH_YL, yeu cau cung gio thuc hien.
+    if (normalizeText(raw.NGAY_TH_YL) !== normalizeText(first.NGAY_TH_YL)) return false;
+    const amount = parseDrugQuantity(raw.SO_LUONG);
+    if (amount === null || amount >= expected) return false;
+    total += amount;
+  }
+  // Tong khoi luong bang DUNG mot lieu trinh, khong du ra hai lieu trinh.
+  return Math.abs(total - expected) < 1e-6;
+}
+
+
+// ======================================================
 // DRUG INTERACTION RULE
 //
 // Trách nhiệm:
@@ -516,6 +568,13 @@ export const drugInteractionRule:
           items.length <=
           1
         ) {
+          continue;
+        }
+
+
+        // Cung ma thuoc nhung SO_LUONG bi tach ra de du mot lieu trinh:
+        // khong tinh la hai lan ke don. Neu khong du du lieu thi van bao loi.
+        if (isSplitDispensingOfOneCourse(items)) {
           continue;
         }
 

@@ -210,6 +210,9 @@ import {
   yhctExamPaymentRateRule,
 } from "./rules/yhct-exam-payment-rate.rule.js";
 
+import {
+  machineTimeOverlapRule,
+} from "./rules/machine-time-overlap.rule.js";
 
 export const ruleRegistry:
   Record<
@@ -367,5 +370,8 @@ SERVICE_CALCIUM_ELECTROLYTE_EXCLUSION:
   
 YHCT_EXAM_PAYMENT_RATE:
   yhctExamPaymentRateRule,
+
+  MACHINE_TIME_OVERLAP:
+  machineTimeOverlapRule,
 
 };
