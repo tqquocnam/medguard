@@ -1,8 +1,8 @@
-{
+﻿{
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://desktop-8532rq2.tail2d1abe.ts.net/api/:path*"
+      "destination": "https://14-225-222-26.sslip.io/api/:path*"
     },
     {
       "source": "/(.*)",
