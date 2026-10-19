@@ -2866,10 +2866,9 @@ export async function listDepartments(
 
       ${whereSql}
 
-      ORDER BY
-        d.name ASC,
-        d.code ASC,
-        d.id ASC
+     ORDER BY
+  d.name ASC,
+  d.code ASC
 
       LIMIT
         $${limitIndex}
