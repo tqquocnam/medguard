@@ -519,6 +519,8 @@ export type TreatmentGroup = "GENERAL" | "YHCT";
 const YHCT_CODES = new Set([
   "08.0313.0230", "08.0278.0230",
   "08.0432.0280", "08.0392.0280",
+  // Cấy chỉ: mã đã được xác minh tại danh mục DVKT của bệnh viện.
+  "08.0241.0227", "08.0246.0227",
 ]);
 
 function xml3DetailRows(parsed: any): any[] {
