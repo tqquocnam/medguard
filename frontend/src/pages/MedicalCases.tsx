@@ -99,6 +99,14 @@ import {
 } from "../api/apiClient";
 
 
+// Danh mục bác sĩ công khám được backend tổng hợp từ XML3 (MA_NHOM=13).
+type ExamDoctorItem = {
+  code: string;
+  name?: string | null;
+  caseCount: number;
+  maLks: string[];
+};
+
 // ======================================================
 // TYPES
 // ======================================================
@@ -317,9 +325,109 @@ const statusTagStyle:
   };
 
 
+  
+ 
+const MEDGUARD_QUOTES = [
+  // TÌNH YÊU - SÂU LẮNG
+  "Có những người đi ngang đời ta, nhưng để lại thương nhớ rất lâu.",
+  "Đúng người, những ngày bình thường cũng trở nên đặc biệt.",
+  "Yêu thương thật lòng không cần ồn ào, chỉ cần bền bỉ.",
+  "Đôi khi, im lặng là câu trả lời rõ ràng nhất.",
+  "Không phải ai ta nhớ cũng là người ta nên quay về.",
+  "Tình yêu đẹp không phải không có giông bão, mà là cùng nhau vượt qua.",
+  "Có những lời chưa kịp nói, đã trở thành điều tiếc nuối.",
+  "Người thương bạn thật lòng sẽ thương cả những ngày bạn không rực rỡ.",
+  "Hạnh phúc đôi khi chỉ là có một người để kể chuyện mỗi ngày.",
+  "Thương một người là muốn họ bình yên, dù có mình hay không.",
+  "Có những cuộc gặp gỡ không kéo dài, nhưng đủ làm ta thay đổi.",
+  "Đừng vì cô đơn mà nắm nhầm một bàn tay.",
+  "Người ở lại lúc khó khăn mới hiểu hết hai chữ chân tình.",
+  "Tình yêu cần hai người vun đắp, không phải một người cố gắng.",
+  "Đôi khi, buông tay là cách cuối cùng để giữ lại sự bình yên.",
+
+  // CUỘC SỐNG - NHÂN SINH
+  "Cuộc đời không lấy đi tất cả, đôi khi chỉ đang dạy ta cách bắt đầu lại.",
+  "Trưởng thành là khi bình yên quý hơn những lời hơn thua.",
+  "Có những ngày không cần chiến thắng, chỉ cần không bỏ cuộc.",
+  "Đừng so sánh chương đầu của mình với chương cuối của người khác.",
+  "Không phải con đường nào khó đi cũng dẫn đến nơi sai.",
+  "Cuộc sống không cần hoàn hảo, chỉ cần mỗi ngày tốt hơn một chút.",
+  "Đi chậm không đáng sợ, đáng sợ là không còn muốn bước tiếp.",
+  "Người mạnh mẽ không phải người chưa từng khóc.",
+  "Bình yên là khi lòng mình không còn phải chứng minh điều gì.",
+  "Thời gian không chữa lành tất cả, nhưng dạy ta cách sống cùng những vết thương.",
+  "Một ngày bình thường cũng là món quà đáng quý.",
+  "Có những mất mát giúp ta nhận ra điều gì thật sự quan trọng.",
+  "Đừng đánh đổi sức khỏe và bình yên để chạy theo ánh nhìn người khác.",
+  "Không ai có thể quay lại bắt đầu, nhưng ai cũng có thể bắt đầu từ hôm nay.",
+  "Đời người ngắn lắm, hãy dành thời gian cho những điều xứng đáng.",
+
+  // BÀI HỌC - LÒNG NGƯỜI
+  "Lòng tốt cần có giới hạn, sự chân thành cần đặt đúng người.",
+  "Đừng đánh giá một người chỉ qua một khoảnh khắc.",
+  "Người hiểu bạn không cần quá nhiều lời giải thích.",
+  "Không phải ai mỉm cười với bạn cũng thật lòng với bạn.",
+  "Cách một người đối xử với người yếu thế nói lên nhiều điều về họ.",
+  "Đừng vì một người không tốt mà đánh mất lòng tin vào tất cả.",
+  "Có những bài học phải trả bằng nước mắt mới nhớ được.",
+  "Biết đủ là giàu, biết dừng là khôn.",
+  "Sống tử tế không bảo đảm mọi điều tốt đẹp, nhưng giúp lòng mình thanh thản.",
+  "Đừng hứa khi vui, đừng quyết định khi giận.",
+  "Một lời nói có thể sưởi ấm, cũng có thể làm tổn thương.",
+  "Sự tôn trọng không nằm ở lời nói, mà ở cách hành xử.",
+  "Người khôn ngoan biết khi nào nên nói và khi nào nên lắng nghe.",
+  "Đừng để một phút nóng giận phá hỏng nhiều năm vun đắp.",
+  "Nhân cách là điều còn lại khi không ai nhìn thấy.",
+
+  // NGHỊ LỰC - THÀNH CÔNG
+  "Có công mài sắt, có ngày nên kim.",
+  "Kiến tha lâu cũng đầy tổ.",
+  "Lửa thử vàng, gian nan thử sức.",
+  "Chớ thấy sóng cả mà ngã tay chèo.",
+  "Có chí thì nên.",
+  "Thất bại là mẹ thành công.",
+  "Đường dài mới biết ngựa hay.",
+  "Tích tiểu thành đại.",
+  "Năng nhặt chặt bị.",
+  "Thua keo này, bày keo khác.",
+  "Không ai thành công chỉ nhờ những ngày thuận lợi.",
+  "Mỗi bước nhỏ hôm nay là nền móng cho ngày mai.",
+  "Ngã xuống không đáng sợ, miễn là còn đủ can đảm đứng lên.",
+  "Đừng sợ bắt đầu lại, lần này bạn đã có kinh nghiệm.",
+  "Cây lớn cũng bắt đầu từ một hạt mầm.",
+
+  // CA DAO - TỤC NGỮ VIỆT NAM
+  "Uống nước nhớ nguồn.",
+  "Ăn quả nhớ kẻ trồng cây.",
+  "Lá lành đùm lá rách.",
+  "Thương người như thể thương thân.",
+  "Một cây làm chẳng nên non, ba cây chụm lại nên hòn núi cao.",
+  "Gần mực thì đen, gần đèn thì sáng.",
+  "Tốt gỗ hơn tốt nước sơn.",
+  "Đói cho sạch, rách cho thơm.",
+  "Đi một ngày đàng, học một sàng khôn.",
+  "Học thầy không tày học bạn.",
+  "Không thầy đố mày làm nên.",
+  "Một miếng khi đói bằng một gói khi no.",
+  "Ở hiền gặp lành.",
+  "Thuận vợ thuận chồng, tát Biển Đông cũng cạn.",
+  "Yêu nhau mấy núi cũng trèo, mấy sông cũng lội, mấy đèo cũng qua.",
+
+  // CHÂM NGÔN NGẮN - ĐÁNG SUY NGẪM
+  "Ít kỳ vọng hơn, nhiều bình yên hơn.",
+  "Thứ quý giá nhất đôi khi là những điều ta đang có.",
+  "Không phải điều gì mất đi cũng là mất mát.",
+  "Trân trọng hiện tại, vì ngày hôm nay sẽ không trở lại.",
+  "Học cách tha thứ, nhưng đừng quên bài học.",
+
+];
+
+
+
 // ======================================================
 // COMPONENT
 // ======================================================
+
 
 export default function MedicalCases() {
 
@@ -515,6 +623,33 @@ export default function MedicalCases() {
       false
     );
 
+const [quoteIndex, setQuoteIndex] = useState(() =>
+  Math.floor(Math.random() * MEDGUARD_QUOTES.length)
+);
+
+useEffect(() => {
+  if (!checking) return;
+
+  // Chọn ngẫu nhiên một câu khi bắt đầu kiểm tra.
+  setQuoteIndex(
+    Math.floor(Math.random() * MEDGUARD_QUOTES.length)
+  );
+
+  const timer = window.setInterval(() => {
+    setQuoteIndex((previous) => {
+      const offset =
+        1 +
+        Math.floor(
+          Math.random() * (MEDGUARD_QUOTES.length - 1)
+        );
+
+      return (previous + offset) % MEDGUARD_QUOTES.length;
+    });
+  }, 5000);
+
+  return () => window.clearInterval(timer);
+}, [checking]);
+
 
   const [
     checkProgress,
@@ -603,6 +738,51 @@ export default function MedicalCases() {
 
 
   // Hai chiều lọc độc lập: loại KCB BHYT và nhóm nghiệp vụ.
+  const [examDoctorCode, setExamDoctorCode] = useState<string | undefined>();
+  const [examDoctors, setExamDoctors] = useState<ExamDoctorItem[]>([]);
+  const [examDoctorLoading, setExamDoctorLoading] = useState(true);
+  const [examDoctorError, setExamDoctorError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadExamDoctors() {
+      try {
+        setExamDoctorLoading(true);
+        const response = await apiFetch("/medical-cases/exam-doctors");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = await response.json();
+        const items: ExamDoctorItem[] = Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json?.items)
+            ? json.items
+            : [];
+        if (mounted) {
+          setExamDoctors(items);
+          setExamDoctorError(null);
+        }
+      } catch (err) {
+        if (mounted) {
+          setExamDoctorError(err instanceof Error ? err.message : "Lỗi kết nối");
+          setExamDoctors([]);
+        }
+      } finally {
+        if (mounted) setExamDoctorLoading(false);
+      }
+    }
+    void loadExamDoctors();
+    return () => { mounted = false; };
+  }, []);
+
+  const examDoctorByCode = new Map(examDoctors.map(d => [d.code, d]));
+  const examDoctorByMaLk = new Map<string, ExamDoctorItem[]>();
+  for (const doctor of examDoctors) {
+    for (const maLk of doctor.maLks) {
+      const current = examDoctorByMaLk.get(maLk) || [];
+      current.push(doctor);
+      examDoctorByMaLk.set(maLk, current);
+    }
+  }
+
   const [kcbType, setKcbType] = useState<string>("ALL");
   const [treatmentGroup, setTreatmentGroup] = useState<string>("ALL");
 
@@ -635,29 +815,29 @@ export default function MedicalCases() {
         ? Number(
             urlYear
           )
-        : 2026
+        : dayjs().year()
     );
 
 
-  const [
-    month,
-    setMonth,
-  ] =
-    useState<
-      number |
-      undefined
-    >(
-      urlMonth &&
-      !Number.isNaN(
-        Number(
-          urlMonth
-        )
-      )
-        ? Number(
-            urlMonth
-          )
-        : undefined
-    );
+  
+const [month, setMonth] = useState<number | undefined>(() => {
+  const currentMonth = dayjs().month() + 1;
+
+  if (urlMonth) {
+    const parsedMonth = Number(urlMonth);
+
+    if (
+      Number.isInteger(parsedMonth) &&
+      parsedMonth >= 1 &&
+      parsedMonth <= 12
+    ) {
+      return parsedMonth;
+    }
+  }
+
+  return currentMonth;
+});
+
 
 
   useEffect(
@@ -698,33 +878,23 @@ export default function MedicalCases() {
       }
 
 
-      if (
-        monthParam
-      ) {
+      
+if (monthParam) {
+  const nextMonth = Number(monthParam);
 
-        const nextMonth =
-          Number(
-            monthParam
-          );
+  if (
+    Number.isInteger(nextMonth) &&
+    nextMonth >= 1 &&
+    nextMonth <= 12
+  ) {
+    setMonth(nextMonth);
+  } else {
+    setMonth(dayjs().month() + 1);
+  }
+} else {
+  setMonth(dayjs().month() + 1);
+}
 
-
-        if (
-          !Number.isNaN(
-            nextMonth
-          )
-        ) {
-          setMonth(
-            nextMonth
-          );
-        }
-
-      } else {
-
-        setMonth(
-          undefined
-        );
-
-      }
 
 
       setPage(
@@ -786,6 +956,14 @@ export default function MedicalCases() {
   }
   if (treatmentGroup !== "ALL") {
     where.treatment_group = { _eq: treatmentGroup };
+  }
+
+  // Lọc trên Hasura TRƯỚC LIMIT/OFFSET và aggregate.
+  // Không áp bộ lọc khi chưa có danh sách chính xác từ API.
+  if (examDoctorCode && !examDoctorLoading && !examDoctorError) {
+    where.ma_lk = {
+      _in: examDoctorByCode.get(examDoctorCode)?.maLks ?? [],
+    };
   }
 
   if (
@@ -1413,16 +1591,11 @@ export default function MedicalCases() {
         );
         setKcbType("ALL");
         setTreatmentGroup("ALL");
+        setExamDoctorCode(undefined);
 
 
-        setYear(
-          2026
-        );
-
-
-        setMonth(
-          undefined
-        );
+        setYear(dayjs().year());
+setMonth(dayjs().month() + 1);
 
 
         setPaymentDate(
@@ -2023,619 +2196,354 @@ export default function MedicalCases() {
           FILTER
       ================================================== */}
 
-      <Card
+{/* ==================================================
+    MEDGUARD - MODERN FILTER PANEL
+================================================== */}
+
+<Card
+  className="medguard-filter-panel"
+  style={{
+    ...panelStyle,
+    flexShrink: 0,
+    border: "1px solid #e3ebf6",
+    borderRadius: 16,
+    boxShadow: "0 4px 18px rgba(15,23,42,0.035)",
+  }}
+  styles={{
+    body: {
+      padding: "13px 16px 12px",
+    },
+  }}
+>
+  {/* HEADER */}
+  <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 5,
+    flexWrap: "wrap",
+  }}
+>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div
         style={{
-          ...panelStyle,
-
-          flexShrink:
-            0,
-        }}
-
-        styles={{
-          body: {
-            padding:
-              "10px 14px",
-          },
+          width: 26,
+          height: 26,
+          borderRadius: 7,
+          background: "#eff6ff",
+          color: "#1677ff",
+          display: "grid",
+          placeItems: "center",
+          fontSize: 17,
         }}
       >
+        <SearchOutlined />
+      </div>
 
-        <div
+      <div>
+        <Typography.Text
+          strong
           style={{
-            display:
-              "flex",
-
-            alignItems:
-              "center",
-
-            justifyContent:
-              "space-between",
-
-            gap:
-              10,
-
-            marginBottom:
-              8,
+            display: "block",
+            fontSize: 14,
+            color: "#14233b",
           }}
         >
+          Bộ lọc hồ sơ
+        </Typography.Text>
 
-          <div>
-
-            <Typography.Text
-              strong
-
-              style={{
-                fontSize:
-                  14,
-              }}
-            >
-              Bộ lọc hồ sơ
-            </Typography.Text>
-
-
-            <Typography.Text
-              type="secondary"
-
-              style={{
-                display:
-                  "block",
-
-                marginTop:
-                  1,
-
-                fontSize:
-                  11,
-              }}
-            >
-              Tìm nhanh theo bệnh nhân, trạng thái và thời gian
-            </Typography.Text>
-
-          </div>
-
-        </div>
-
-
-        <Space
-          wrap
-
-          size={
-            8
-          }
+        <Typography.Text
+          type="secondary"
+          style={{ display: "block", fontSize: 11 }}
         >
+          Tra cứu hồ sơ theo bệnh nhân, bác sĩ và thời gian
+        </Typography.Text>
+      </div>
+    </div>
 
-          <Input
-            value={
-              maBn
+    {/* {examDoctorCode && (
+      <Tag
+        color="blue"
+        style={{
+          margin: 0,
+          borderRadius: 8,
+          padding: "4px 10px",
+          fontWeight: 600,
+        }}
+      >
+        Bác sĩ: {examDoctorByCode.get(examDoctorCode)?.name ||
+          examDoctorCode}
+      </Tag>
+    )} */}
+  </div>
+
+  {examDoctorError && (
+    <Alert
+      type="warning"
+      showIcon
+      style={{ marginBottom: 12, borderRadius: 10 }}
+      message="Không tải được danh sách bác sĩ công khám"
+      description="Kiểm tra kết nối API bác sĩ công khám."
+    />
+  )}
+
+  {/* HÀNG 1 - BỘ LỌC CHÍNH */}
+  <div
+    className="medguard-filter-grid"
+    style={{
+      display: "grid",
+      gridTemplateColumns:
+        "minmax(120px, 0.85fr) minmax(160px, 1.1fr) minmax(220px, 1.6fr) minmax(180px, 1.2fr) minmax(155px, 1fr)",
+      gap: 10,
+      alignItems: "end",
+    }}
+  >
+    <div className="medguard-filter-field">
+      <div className="medguard-filter-label">Mã bệnh nhân</div>
+      <Input
+        size="large"
+        value={maBn}
+        allowClear
+        prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+        placeholder="Nhập mã BN"
+        onChange={(e) => {
+          setMaBn(e.target.value);
+          setPage(1);
+        }}
+      />
+    </div>
+
+    <div className="medguard-filter-field">
+      <div className="medguard-filter-label">Tên bệnh nhân</div>
+      <Input
+        size="large"
+        value={hoTen}
+        allowClear
+        prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+        placeholder="Tìm họ và tên"
+        onChange={(e) => {
+          setHoTen(e.target.value);
+          setPage(1);
+        }}
+      />
+    </div>
+
+    <div className="medguard-filter-field">
+      <div className="medguard-filter-label">
+        <span>Bác sĩ công khám</span>
+        
+      </div>
+
+      <Select
+        size="large"
+        aria-label="Bác sĩ công khám"
+        style={{ width: "100%" }}
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        loading={examDoctorLoading}
+        disabled={examDoctorLoading || !!examDoctorError}
+        placeholder="Tất cả bác sĩ công khám"
+        value={examDoctorCode}
+        onChange={(code: string | undefined) => {
+          setExamDoctorCode(code);
+          setPage(1);
+        }}
+        options={examDoctors.map((d) => ({
+          value: d.code,
+          label: `${d.name?.trim() || d.code}`,
+        }))}
+      />
+    </div>
+
+    <div className="medguard-filter-field">
+      <div className="medguard-filter-label">Nhóm hồ sơ</div>
+      <Select
+        size="large"
+        value={treatmentGroup}
+        style={{ width: "100%" }}
+        onChange={(value: string) => {
+          setTreatmentGroup(value);
+          setPage(1);
+        }}
+        options={[
+          { value: "ALL", label: "Tất cả nhóm KCB" },
+          { value: "GENERAL", label: "Khám bệnh ngoại trú" },
+          { value: "YHCT", label: "Bệnh án ngoại trú" },
+        ]}
+      />
+    </div>
+
+    <div className="medguard-filter-field">
+      <div className="medguard-filter-label">Trạng thái</div>
+      <Select
+        size="large"
+        value={status}
+        style={{ width: "100%" }}
+        onChange={(value: string) => {
+          setStatus(value);
+          setPage(1);
+        }}
+        options={[
+          { value: "ALL", label: "Tất cả trạng thái" },
+          { value: "OK", label: statusFilterLabel("OK") },
+          { value: "ERROR", label: statusFilterLabel("ERROR") },
+        ]}
+      />
+    </div>
+  </div>
+
+  {/* HÀNG 2 - THỜI GIAN VÀ THAO TÁC */}
+  <div className="medguard-filter-actions-row">
+    <div className="medguard-filter-date-fields">
+      <div className="medguard-filter-field">
+        <div className="medguard-filter-label">Năm</div>
+        <Select
+          size="large"
+          allowClear
+          placeholder="Năm"
+          style={{ width: "100%" }}
+          value={year}
+          onChange={(value) => {
+            setYear(value);
+            setPage(1);
+          }}
+          options={[
+            { value: 2026, label: "2026" },
+            { value: 2025, label: "2025" },
+            { value: 2024, label: "2024" },
+          ]}
+        />
+      </div>
+
+      <div className="medguard-filter-field">
+        <div className="medguard-filter-label">Tháng</div>
+        <Select
+          size="large"
+          allowClear
+          placeholder="Tất cả tháng"
+          style={{ width: "100%" }}
+          value={month}
+          onChange={(value) => {
+            setMonth(value);
+            setPage(1);
+          }}
+          options={Array.from({ length: 12 }, (_, i) => ({
+            value: i + 1,
+            label: `Tháng ${i + 1}`,
+          }))}
+        />
+      </div>
+
+      <div className="medguard-filter-field">
+        <div className="medguard-filter-label">
+          Ngày thanh toán
+        </div>
+        <DatePicker
+          size="large"
+          value={paymentDate ? dayjs(paymentDate) : null}
+          format="DD/MM/YYYY"
+          placeholder="Chọn ngày"
+          allowClear
+          disabled={clearingPaymentDate}
+          style={{
+            width: "100%",
+            opacity: clearingPaymentDate ? 0.6 : 1,
+          }}
+          onChange={(date) => {
+            if (clearPaymentTimer.current) {
+              clearTimeout(clearPaymentTimer.current);
+              clearPaymentTimer.current = null;
             }
 
-            placeholder="Mã BN"
-
-            allowClear
-
-            prefix={
-              <SearchOutlined
-                style={{
-                  color:
-                    "#bfbfbf",
-                }}
-              />
+            if (date) {
+              setClearingPaymentDate(false);
+              setPaymentDate(date.format("YYYY-MM-DD"));
+            } else {
+              setClearingPaymentDate(false);
+              setPaymentDate(undefined);
             }
 
-            style={{
-              width:
-                150,
-            }}
+            setPage(1);
+          }}
+        />
+      </div>
+    </div>
+
+    <div className="medguard-filter-buttons">
+      <Button
+        size="large"
+        icon={<ReloadOutlined />}
+        disabled={refreshing}
+        loading={refreshing}
+        onClick={handleReset}
+        style={{
+          borderRadius: 10,
+          fontWeight: 600,
+          minWidth: 115,
+          height: 40,
+        }}
+      >
+        Làm mới
+      </Button>
+
+      <Button
+        size="large"
+        type="primary"
+        icon={
+          checking
+            ? <LoadingOutlined />
+            : <SafetyCertificateOutlined />
+        }
+        loading={checking}
+        onClick={handleRunChecks}
+        style={{
+          borderRadius: 10,
+          fontWeight: 700,
+          height: 40,
+          minWidth: 170,
+          background: "#1677ff",
+          boxShadow: "0 4px 12px rgba(22,119,255,0.18)",
+        }}
+      >
+        {checking ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
+      </Button>
+    </div>
+  </div>
+
+  {/* THÔNG TIN BỘ LỌC */}
+  {examDoctorCode && (
+    <div className="medguard-filter-active">
+      <InfoCircleFilled style={{ color: "#1677ff" }} />
+
+      <span>
+        Đang xem hồ sơ có công khám của BS{" "}
+        <strong>
+          {examDoctorByCode.get(examDoctorCode)?.name ||
+            examDoctorCode}
+        </strong>
+      </span>
+
+      <span style={{ color: "#64748b" }}>
+        • {total.toLocaleString("vi-VN")} hồ sơ theo bộ lọc
+      </span>
+
+      <Button
+        type="link"
+        size="small"
+        onClick={() => {
+          setExamDoctorCode(undefined);
+          setPage(1);
+        }}
+      >
+        Bỏ lọc bác sĩ
+      </Button>
+    </div>
+  )}
+</Card>
 
-            onChange={(
-              event
-            ) => {
-
-              setMaBn(
-                event
-                  .target
-                  .value
-              );
-
-
-              setPage(
-                1
-              );
-
-            }}
-          />
-
-
-          <Input
-            value={
-              hoTen
-            }
-
-            placeholder="Họ tên"
-
-            allowClear
-
-            prefix={
-              <SearchOutlined
-                style={{
-                  color:
-                    "#bfbfbf",
-                }}
-              />
-            }
-
-            style={{
-              width:
-                180,
-            }}
-
-            onChange={(
-              event
-            ) => {
-
-              setHoTen(
-                event
-                  .target
-                  .value
-              );
-
-
-              setPage(
-                1
-              );
-
-            }}
-          />
-
-
-          {/* <Select
-            aria-label="Loại KCB BHYT"
-            value={kcbType}
-            style={{ width: 205 }}
-            onChange={(value: string) => {
-              setKcbType(value);
-              setPage(1);
-            }}
-            options={[
-              { value: "ALL", label: "Tất cả loại KCB" },
-              { value: "01", label: "01 - Khám bệnh" },
-              { value: "02", label: "02 - Điều trị ngoại trú" },
-              { value: "03", label: "03 - Điều trị nội trú" },
-              { value: "04", label: "04 - Điều trị nội trú ban ngày" },
-              { value: "05", label: "05 - Điều trị ngoại trú có khám và lĩnh thuốc" },
-              { value: "06", label: "06 - Điều trị lưu tại trạm y tế" },
-              { value: "07", label: "07 - Nhận thuốc theo hẹn" },
-              { value: "08", label: "08 - Ngoại trú có dịch vụ kỹ thuật" },
-              { value: "09", label: "09 - Điều trị nội trú dưới 4 giờ" },
-              { value: "10", label: "10 - Trường hợp khác" },
-            ]}
-          /> */}
-
-          <Select
-            aria-label="Nhóm hồ sơ"
-            value={treatmentGroup}
-            style={{ width: 205 }}
-            onChange={(value: string) => {
-              setTreatmentGroup(value);
-              setPage(1);
-            }}
-            options={[
-              { value: "ALL", label: "Tất cả nhóm hồ sơ KCB" },
-              { value: "GENERAL", label: "Khám bệnh Ngoại trú " },
-              { value: "YHCT", label: "Bệnh án Ngoại trú" },
-            ]}
-          />
-
-          <Select
-            value={
-              status
-            }
-
-            style={{
-              width:
-                170,
-            }}
-
-            onChange={(
-              value
-            ) => {
-
-              setStatus(
-                value
-              );
-
-
-              setPage(
-                1
-              );
-
-            }}
-
-            options={[
-              {
-                value:
-                  "ALL",
-
-                label:
-                  "Tất cả trạng thái",
-              },
-
-              {
-                value:
-                  "OK",
-
-                label:
-                  statusFilterLabel(
-                    "OK"
-                  ),
-              },
-
-              {
-                value:
-                  "ERROR",
-
-                label:
-                  statusFilterLabel(
-                    "ERROR"
-                  ),
-              },
-            ]}
-          />
-
-
-          <Select
-            value={
-              year
-            }
-
-            allowClear
-
-            placeholder="Năm"
-
-            style={{
-              width:
-                100,
-            }}
-
-            onChange={(
-              value
-            ) => {
-
-              setYear(
-                value
-              );
-
-
-              setPage(
-                1
-              );
-
-            }}
-
-            options={[
-              {
-                value:
-                  2026,
-
-                label:
-                  "2026",
-              },
-
-              {
-                value:
-                  2025,
-
-                label:
-                  "2025",
-              },
-
-              {
-                value:
-                  2024,
-
-                label:
-                  "2024",
-              },
-            ]}
-          />
-
-
-          <Select
-            value={
-              month
-            }
-
-            allowClear
-
-            placeholder="Tháng"
-
-            style={{
-              width:
-                110,
-            }}
-
-            onChange={(
-              value
-            ) => {
-
-              setMonth(
-                value
-              );
-
-
-              setPage(
-                1
-              );
-
-            }}
-
-            options={
-              Array.from(
-                {
-                  length:
-                    12,
-                },
-
-                (
-                  _,
-                  index
-                ) => ({
-                  value:
-                    index +
-                    1,
-
-                  label:
-                    `Tháng ${index + 1}`,
-                })
-              )
-            }
-          />
-
-
-          <div
-            style={{
-              position:
-                "relative",
-
-              width:
-                175,
-
-              transition:
-                "all 0.35s ease",
-
-              opacity:
-                clearingPaymentDate
-                  ? 0.55
-                  : 1,
-
-              transform:
-                clearingPaymentDate
-                  ? "scale(0.98)"
-                  : "scale(1)",
-            }}
-          >
-
-            <DatePicker
-              value={
-                paymentDate
-                  ? dayjs(
-                      paymentDate
-                    )
-                  : null
-              }
-
-              placeholder={
-                clearingPaymentDate
-                  ? "Đang bỏ lọc..."
-                  : "Ngày thanh toán"
-              }
-
-              format="DD/MM/YYYY"
-
-              allowClear
-
-              disabled={
-                clearingPaymentDate
-              }
-
-              style={{
-                width:
-                  "100%",
-              }}
-
-              onChange={(
-                date
-              ) => {
-
-                // ========================================
-                // CHỌN NGÀY
-                // ========================================
-
-                if (
-                  date
-                ) {
-
-                  if (
-                    clearPaymentTimer.current
-                  ) {
-
-                    clearTimeout(
-                      clearPaymentTimer.current
-                    );
-
-                  }
-
-
-                  setClearingPaymentDate(
-                    false
-                  );
-
-
-                  setPaymentDate(
-                    date.format(
-                      "YYYY-MM-DD"
-                    )
-                  );
-
-
-                  setPage(
-                    1
-                  );
-
-
-                  return;
-                }
-
-
-                // ========================================
-                // BẤM X
-                // ========================================
-
-                if (
-                  !paymentDate
-                ) {
-                  return;
-                }
-
-
-                setClearingPaymentDate(
-                  true
-                );
-
-
-                if (
-                  clearPaymentTimer.current
-                ) {
-
-                  clearTimeout(
-                    clearPaymentTimer.current
-                  );
-
-                }
-
-
-                clearPaymentTimer.current =
-                  setTimeout(
-                    () => {
-
-                      setPaymentDate(
-                        undefined
-                      );
-
-
-                      setClearingPaymentDate(
-                        false
-                      );
-
-
-                      setPage(
-                        1
-                      );
-
-
-                      clearPaymentTimer.current =
-                        null;
-
-                    },
-                    1200
-                  );
-
-              }}
-            />
-
-          </div>
-
-
-          <Button
-            icon={
-              <ReloadOutlined
-                className={
-                  refreshing
-                    ? "medguard-refresh-spin"
-                    : ""
-                }
-              />
-            }
-
-            disabled={
-              refreshing
-            }
-
-            onClick={
-              handleReset
-            }
-
-            style={{
-              borderRadius:
-                8,
-
-              fontWeight:
-                600,
-
-              minWidth:
-                115,
-
-              transition:
-                "all 0.25s ease",
-
-              transform:
-                refreshing
-                  ? "scale(0.97)"
-                  : "scale(1)",
-
-              opacity:
-                refreshing
-                  ? 0.78
-                  : 1,
-            }}
-          >
-            {
-              refreshing
-                ? "Đang làm mới..."
-                : "Làm mới"
-            }
-          </Button>
-
-
-          <Button
-            type="primary"
-
-            icon={
-              checking
-                ? <LoadingOutlined />
-                : <SafetyCertificateOutlined />
-            }
-
-            loading={
-              checking
-            }
-
-            onClick={
-              handleRunChecks
-            }
-
-            style={{
-              borderRadius:
-                8,
-
-              fontWeight:
-                700,
-
-              paddingInline:
-                18,
-
-              boxShadow:
-                "0 4px 12px rgba(22,119,255,0.22)",
-            }}
-          >
-            {
-              checking
-                ? "Đang kiểm tra..."
-                : "Kiểm tra dữ liệu"
-            }
-          </Button>
-
-        </Space>
-
-      </Card>
 
 
       {/* ==================================================
@@ -2799,7 +2707,7 @@ export default function MedicalCases() {
 
               scroll={{
                 x:
-                  1500,
+                  1750,
 
                 y:
                   tableScrollY,
@@ -2912,6 +2820,27 @@ export default function MedicalCases() {
                 },
 
 
+                {
+                  title: "Bác sĩ công khám",
+                  key: "exam_doctor",
+                  width: 220,
+                  render: (_: unknown, record: MedicalCase) => {
+                    const doctors = examDoctorByMaLk.get(record.ma_lk || "") || [];
+                    return doctors.length ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        {doctors.map(d => (
+                          <Typography.Text key={d.code} style={{ fontSize: 12 }}>
+                            {d.name?.trim() || d.code}
+                          </Typography.Text>
+                        ))}
+                      </div>
+                    ) : (
+                      <Typography.Text type="secondary">—</Typography.Text>
+                    );
+                  },
+                },
+
+                // =========================================
                 // =========================================
                 // MÃ THẺ
                 // =========================================
@@ -3857,6 +3786,240 @@ export default function MedicalCases() {
             }
 
           }
+            
+/* ==================================================
+   MEDGUARD - MODERN FILTER UI
+================================================== */
+
+.medguard-filter-panel {
+  overflow: visible;
+}
+
+.medguard-filter-field {
+  min-width: 0;
+}
+
+.medguard-filter-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: #52647d;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.medguard-filter-panel .ant-input-affix-wrapper,
+.medguard-filter-panel .ant-select-selector,
+.medguard-filter-panel .ant-picker {
+  border-color: #e1e8f2 !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.medguard-filter-panel .ant-input-affix-wrapper:focus-within,
+.medguard-filter-panel .ant-picker-focused,
+.medguard-filter-panel .ant-select-focused .ant-select-selector {
+  border-color: #1677ff !important;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.09) !important;
+}
+
+.medguard-filter-actions-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f3f8;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.medguard-filter-date-fields {
+  display: grid;
+  grid-template-columns: 110px 145px 190px;
+  gap: 10px;
+}
+
+.medguard-filter-buttons {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 0;
+}
+
+.medguard-filter-active {
+  margin-top: 11px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: #f3f8ff;
+  border: 1px solid #e2edff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #334155;
+}
+
+@media (max-width: 1400px) {
+  .medguard-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .medguard-filter-actions-row {
+    flex-wrap: wrap;
+  }
+
+  .medguard-filter-buttons {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 780px) {
+  .medguard-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .medguard-filter-date-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .medguard-filter-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .medguard-filter-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .medguard-filter-date-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .medguard-filter-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .medguard-filter-buttons .ant-btn {
+    width: 100%;
+  }
+}
+  
+/* ============================================
+   MEDGUARD - COMPACT FILTER
+   Thu gọn bộ lọc, tăng chiều cao TABLE
+============================================ */
+
+.medguard-filter-panel .ant-card-body {
+  padding: 8px 12px !important;
+}
+
+/* Thu nhỏ các ô */
+.medguard-filter-panel .ant-input-affix-wrapper,
+.medguard-filter-panel .ant-select-single,
+.medguard-filter-panel .ant-select-selector,
+.medguard-filter-panel .ant-picker {
+  min-height: 30px !important;
+  height: 30px !important;
+  font-size: 12px !important;
+  border-radius: 7px !important;
+}
+
+.medguard-filter-panel .ant-select-single .ant-select-selector {
+  display: flex;
+  align-items: center;
+  padding-inline: 9px !important;
+}
+
+.medguard-filter-panel .ant-input {
+  font-size: 12px !important;
+}
+
+.medguard-filter-panel .ant-picker-input > input {
+  font-size: 12px !important;
+}
+
+/* Nhãn bộ lọc */
+.medguard-filter-label {
+  font-size: 10px !important;
+  margin-bottom: 3px !important;
+}
+
+/* Khoảng cách hai hàng */
+.medguard-filter-grid {
+  gap: 7px !important;
+}
+
+.medguard-filter-actions-row {
+  margin-top: 7px !important;
+  padding-top: 7px !important;
+  gap: 8px !important;
+}
+
+.medguard-filter-date-fields {
+  gap: 7px !important;
+}
+
+/* Thu nhỏ nút thao tác */
+.medguard-filter-buttons .ant-btn {
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 11px !important;
+  font-size: 12px !important;
+  border-radius: 7px !important;
+}
+
+/* Thu nhỏ thông báo lọc */
+.medguard-filter-active {
+  margin-top: 6px !important;
+  padding: 5px 9px !important;
+  font-size: 11px !important;
+}
+
+/* Thu gọn tiêu đề của bộ lọc */
+.medguard-filter-panel .ant-card-body > div:first-child {
+  margin-bottom: 6px !important;
+}
+
+/* Thanh tiêu đề bảng */
+.medguard-case-table-header {
+  padding: 7px 12px !important;
+}
+
+/* Hàng bảng gọn hơn để hiện thêm hồ sơ */
+.medguard-case-table-fixed .ant-table-tbody > tr > td {
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+}
+
+.medguard-case-table-fixed .ant-table-thead > tr > th {
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+}
+  
+@keyframes medguard-quote-fade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+
 
         `}
       </style>
@@ -4032,22 +4195,33 @@ export default function MedicalCases() {
               </div>
 
 
-              <div
-                className="medguard-checking-remaining"
-              >
+             
+<div
+  className="medguard-checking-remaining"
+  style={{
+    padding: "8px 14px",
+    minHeight: 54,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+  }}
+>
+  <span
+    key={quoteIndex}
+    style={{
+      color: "#475569",
+      fontSize: 12,
+      fontWeight: 600,
+      fontStyle: "italic",
+      lineHeight: 1.6,
+      animation: "medguard-quote-fade 0.5s ease",
+    }}
+  >
+    “{MEDGUARD_QUOTES[quoteIndex]}”
+  </span>
+</div>
 
-                Còn lại{" "}
-
-                <strong>
-                  {
-                    checkProgress
-                      .remainingCases
-                  }
-                </strong>
-
-                {" "}hồ sơ
-
-              </div>
 
 
               <div
@@ -4059,11 +4233,11 @@ export default function MedicalCases() {
               </div>
 
 
-              <div
+              {/* <div
                 className="medguard-checking-note"
               >
                 Vui lòng chờ trong giây lát
-              </div>
+              </div> */}
 
             </div>
 

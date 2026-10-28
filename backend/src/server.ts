@@ -41,7 +41,9 @@ import dashboardRoutes
 
 import reportsRoutes
   from "./modules/reports/reports.routes.js";
-
+import { createExamDoctorRouter }
+  from "./modules/medical-case/exam-doctors.routes.js";
+import { requireAuth } from "./modules/auth/auth.middleware.js";
 
 // ======================================================
 // APP
@@ -356,6 +358,15 @@ app.use(
 );
 
 
+ // ======================================================
+ // EXAM DOCTORS - BÁC SĨ CÔNG KHÁM
+ // ======================================================
+
+app.use(
+  "/api/medical-cases",
+  requireAuth,
+  createExamDoctorRouter(db)
+);
 // ======================================================
 // 404
 // ======================================================
