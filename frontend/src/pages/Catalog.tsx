@@ -6,6 +6,7 @@ import {
   ExperimentOutlined,
   FileImageOutlined,
   MedicineBoxOutlined,
+  FileProtectOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
   UserOutlined,
@@ -156,6 +157,14 @@ const ruleCards: RuleCard[] = [
     path: "/catalog/service-diagnosis",
     icon: <AppstoreOutlined />,
     color: "#2f54eb",
+  },
+  {
+    title: "DVKT - ICD",
+    description:
+      "Cấu hình đối chiếu mã dịch vụ kỹ thuật với ICD-10.",
+    path: "/catalog/service-icd",
+    icon: <FileProtectOutlined />,
+    color: "#08979c",
   },
   {
     title: "ICD Cảnh báo",

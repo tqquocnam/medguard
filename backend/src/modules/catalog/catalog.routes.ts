@@ -100,6 +100,11 @@ import serviceCalciumElectrolyteRoutes
 
 import serviceChestXrayRoutes
   from "./service-chest-xray.routes.js";
+
+
+
+import serviceIcdRoutes
+  from "./service-icd.routes.js";
 // ======================================================
 // ROUTER
 // ======================================================
@@ -178,6 +183,16 @@ router.use(
   requireAuth,
   requireAdmin
 );
+
+  // ======================================================
+  // DVKT - ICD
+  // ======================================================
+
+  router.use(
+    "/service-icd-rules",
+    serviceIcdRoutes
+  );
+
 
 router.use(
   "/service-chest-xray",
