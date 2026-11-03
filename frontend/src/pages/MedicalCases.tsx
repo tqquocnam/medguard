@@ -623,32 +623,32 @@ export default function MedicalCases() {
       false
     );
 
-const [quoteIndex, setQuoteIndex] = useState(() =>
-  Math.floor(Math.random() * MEDGUARD_QUOTES.length)
-);
+// const [quoteIndex, setQuoteIndex] = useState(() =>
+//   Math.floor(Math.random() * MEDGUARD_QUOTES.length)
+// );
 
-useEffect(() => {
-  if (!checking) return;
+// useEffect(() => {
+//   if (!checking) return;
 
-  // Chọn ngẫu nhiên một câu khi bắt đầu kiểm tra.
-  setQuoteIndex(
-    Math.floor(Math.random() * MEDGUARD_QUOTES.length)
-  );
+//   // Chọn ngẫu nhiên một câu khi bắt đầu kiểm tra.
+//   setQuoteIndex(
+//     Math.floor(Math.random() * MEDGUARD_QUOTES.length)
+//   );
 
-  const timer = window.setInterval(() => {
-    setQuoteIndex((previous) => {
-      const offset =
-        1 +
-        Math.floor(
-          Math.random() * (MEDGUARD_QUOTES.length - 1)
-        );
+//   const timer = window.setInterval(() => {
+//     setQuoteIndex((previous) => {
+//       const offset =
+//         1 +
+//         Math.floor(
+//           Math.random() * (MEDGUARD_QUOTES.length - 1)
+//         );
 
-      return (previous + offset) % MEDGUARD_QUOTES.length;
-    });
-  }, 5000);
+//       return (previous + offset) % MEDGUARD_QUOTES.length;
+//     });
+//   }, 5000);
 
-  return () => window.clearInterval(timer);
-}, [checking]);
+//   return () => window.clearInterval(timer);
+// }, [checking]);
 
 
   const [
