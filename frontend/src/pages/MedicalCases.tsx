@@ -327,100 +327,100 @@ const statusTagStyle:
 
   
  
-const MEDGUARD_QUOTES = [
-  // TÌNH YÊU - SÂU LẮNG
-  "Có những người đi ngang đời ta, nhưng để lại thương nhớ rất lâu.",
-  "Đúng người, những ngày bình thường cũng trở nên đặc biệt.",
-  "Yêu thương thật lòng không cần ồn ào, chỉ cần bền bỉ.",
-  "Đôi khi, im lặng là câu trả lời rõ ràng nhất.",
-  "Không phải ai ta nhớ cũng là người ta nên quay về.",
-  "Tình yêu đẹp không phải không có giông bão, mà là cùng nhau vượt qua.",
-  "Có những lời chưa kịp nói, đã trở thành điều tiếc nuối.",
-  "Người thương bạn thật lòng sẽ thương cả những ngày bạn không rực rỡ.",
-  "Hạnh phúc đôi khi chỉ là có một người để kể chuyện mỗi ngày.",
-  "Thương một người là muốn họ bình yên, dù có mình hay không.",
-  "Có những cuộc gặp gỡ không kéo dài, nhưng đủ làm ta thay đổi.",
-  "Đừng vì cô đơn mà nắm nhầm một bàn tay.",
-  "Người ở lại lúc khó khăn mới hiểu hết hai chữ chân tình.",
-  "Tình yêu cần hai người vun đắp, không phải một người cố gắng.",
-  "Đôi khi, buông tay là cách cuối cùng để giữ lại sự bình yên.",
+// const MEDGUARD_QUOTES = [
+//   // TÌNH YÊU - SÂU LẮNG
+//   "Có những người đi ngang đời ta, nhưng để lại thương nhớ rất lâu.",
+//   "Đúng người, những ngày bình thường cũng trở nên đặc biệt.",
+//   "Yêu thương thật lòng không cần ồn ào, chỉ cần bền bỉ.",
+//   "Đôi khi, im lặng là câu trả lời rõ ràng nhất.",
+//   "Không phải ai ta nhớ cũng là người ta nên quay về.",
+//   "Tình yêu đẹp không phải không có giông bão, mà là cùng nhau vượt qua.",
+//   "Có những lời chưa kịp nói, đã trở thành điều tiếc nuối.",
+//   "Người thương bạn thật lòng sẽ thương cả những ngày bạn không rực rỡ.",
+//   "Hạnh phúc đôi khi chỉ là có một người để kể chuyện mỗi ngày.",
+//   "Thương một người là muốn họ bình yên, dù có mình hay không.",
+//   "Có những cuộc gặp gỡ không kéo dài, nhưng đủ làm ta thay đổi.",
+//   "Đừng vì cô đơn mà nắm nhầm một bàn tay.",
+//   "Người ở lại lúc khó khăn mới hiểu hết hai chữ chân tình.",
+//   "Tình yêu cần hai người vun đắp, không phải một người cố gắng.",
+//   "Đôi khi, buông tay là cách cuối cùng để giữ lại sự bình yên.",
 
-  // CUỘC SỐNG - NHÂN SINH
-  "Cuộc đời không lấy đi tất cả, đôi khi chỉ đang dạy ta cách bắt đầu lại.",
-  "Trưởng thành là khi bình yên quý hơn những lời hơn thua.",
-  "Có những ngày không cần chiến thắng, chỉ cần không bỏ cuộc.",
-  "Đừng so sánh chương đầu của mình với chương cuối của người khác.",
-  "Không phải con đường nào khó đi cũng dẫn đến nơi sai.",
-  "Cuộc sống không cần hoàn hảo, chỉ cần mỗi ngày tốt hơn một chút.",
-  "Đi chậm không đáng sợ, đáng sợ là không còn muốn bước tiếp.",
-  "Người mạnh mẽ không phải người chưa từng khóc.",
-  "Bình yên là khi lòng mình không còn phải chứng minh điều gì.",
-  "Thời gian không chữa lành tất cả, nhưng dạy ta cách sống cùng những vết thương.",
-  "Một ngày bình thường cũng là món quà đáng quý.",
-  "Có những mất mát giúp ta nhận ra điều gì thật sự quan trọng.",
-  "Đừng đánh đổi sức khỏe và bình yên để chạy theo ánh nhìn người khác.",
-  "Không ai có thể quay lại bắt đầu, nhưng ai cũng có thể bắt đầu từ hôm nay.",
-  "Đời người ngắn lắm, hãy dành thời gian cho những điều xứng đáng.",
+//   // CUỘC SỐNG - NHÂN SINH
+//   "Cuộc đời không lấy đi tất cả, đôi khi chỉ đang dạy ta cách bắt đầu lại.",
+//   "Trưởng thành là khi bình yên quý hơn những lời hơn thua.",
+//   "Có những ngày không cần chiến thắng, chỉ cần không bỏ cuộc.",
+//   "Đừng so sánh chương đầu của mình với chương cuối của người khác.",
+//   "Không phải con đường nào khó đi cũng dẫn đến nơi sai.",
+//   "Cuộc sống không cần hoàn hảo, chỉ cần mỗi ngày tốt hơn một chút.",
+//   "Đi chậm không đáng sợ, đáng sợ là không còn muốn bước tiếp.",
+//   "Người mạnh mẽ không phải người chưa từng khóc.",
+//   "Bình yên là khi lòng mình không còn phải chứng minh điều gì.",
+//   "Thời gian không chữa lành tất cả, nhưng dạy ta cách sống cùng những vết thương.",
+//   "Một ngày bình thường cũng là món quà đáng quý.",
+//   "Có những mất mát giúp ta nhận ra điều gì thật sự quan trọng.",
+//   "Đừng đánh đổi sức khỏe và bình yên để chạy theo ánh nhìn người khác.",
+//   "Không ai có thể quay lại bắt đầu, nhưng ai cũng có thể bắt đầu từ hôm nay.",
+//   "Đời người ngắn lắm, hãy dành thời gian cho những điều xứng đáng.",
 
-  // BÀI HỌC - LÒNG NGƯỜI
-  "Lòng tốt cần có giới hạn, sự chân thành cần đặt đúng người.",
-  "Đừng đánh giá một người chỉ qua một khoảnh khắc.",
-  "Người hiểu bạn không cần quá nhiều lời giải thích.",
-  "Không phải ai mỉm cười với bạn cũng thật lòng với bạn.",
-  "Cách một người đối xử với người yếu thế nói lên nhiều điều về họ.",
-  "Đừng vì một người không tốt mà đánh mất lòng tin vào tất cả.",
-  "Có những bài học phải trả bằng nước mắt mới nhớ được.",
-  "Biết đủ là giàu, biết dừng là khôn.",
-  "Sống tử tế không bảo đảm mọi điều tốt đẹp, nhưng giúp lòng mình thanh thản.",
-  "Đừng hứa khi vui, đừng quyết định khi giận.",
-  "Một lời nói có thể sưởi ấm, cũng có thể làm tổn thương.",
-  "Sự tôn trọng không nằm ở lời nói, mà ở cách hành xử.",
-  "Người khôn ngoan biết khi nào nên nói và khi nào nên lắng nghe.",
-  "Đừng để một phút nóng giận phá hỏng nhiều năm vun đắp.",
-  "Nhân cách là điều còn lại khi không ai nhìn thấy.",
+//   // BÀI HỌC - LÒNG NGƯỜI
+//   "Lòng tốt cần có giới hạn, sự chân thành cần đặt đúng người.",
+//   "Đừng đánh giá một người chỉ qua một khoảnh khắc.",
+//   "Người hiểu bạn không cần quá nhiều lời giải thích.",
+//   "Không phải ai mỉm cười với bạn cũng thật lòng với bạn.",
+//   "Cách một người đối xử với người yếu thế nói lên nhiều điều về họ.",
+//   "Đừng vì một người không tốt mà đánh mất lòng tin vào tất cả.",
+//   "Có những bài học phải trả bằng nước mắt mới nhớ được.",
+//   "Biết đủ là giàu, biết dừng là khôn.",
+//   "Sống tử tế không bảo đảm mọi điều tốt đẹp, nhưng giúp lòng mình thanh thản.",
+//   "Đừng hứa khi vui, đừng quyết định khi giận.",
+//   "Một lời nói có thể sưởi ấm, cũng có thể làm tổn thương.",
+//   "Sự tôn trọng không nằm ở lời nói, mà ở cách hành xử.",
+//   "Người khôn ngoan biết khi nào nên nói và khi nào nên lắng nghe.",
+//   "Đừng để một phút nóng giận phá hỏng nhiều năm vun đắp.",
+//   "Nhân cách là điều còn lại khi không ai nhìn thấy.",
 
-  // NGHỊ LỰC - THÀNH CÔNG
-  "Có công mài sắt, có ngày nên kim.",
-  "Kiến tha lâu cũng đầy tổ.",
-  "Lửa thử vàng, gian nan thử sức.",
-  "Chớ thấy sóng cả mà ngã tay chèo.",
-  "Có chí thì nên.",
-  "Thất bại là mẹ thành công.",
-  "Đường dài mới biết ngựa hay.",
-  "Tích tiểu thành đại.",
-  "Năng nhặt chặt bị.",
-  "Thua keo này, bày keo khác.",
-  "Không ai thành công chỉ nhờ những ngày thuận lợi.",
-  "Mỗi bước nhỏ hôm nay là nền móng cho ngày mai.",
-  "Ngã xuống không đáng sợ, miễn là còn đủ can đảm đứng lên.",
-  "Đừng sợ bắt đầu lại, lần này bạn đã có kinh nghiệm.",
-  "Cây lớn cũng bắt đầu từ một hạt mầm.",
+//   // NGHỊ LỰC - THÀNH CÔNG
+//   "Có công mài sắt, có ngày nên kim.",
+//   "Kiến tha lâu cũng đầy tổ.",
+//   "Lửa thử vàng, gian nan thử sức.",
+//   "Chớ thấy sóng cả mà ngã tay chèo.",
+//   "Có chí thì nên.",
+//   "Thất bại là mẹ thành công.",
+//   "Đường dài mới biết ngựa hay.",
+//   "Tích tiểu thành đại.",
+//   "Năng nhặt chặt bị.",
+//   "Thua keo này, bày keo khác.",
+//   "Không ai thành công chỉ nhờ những ngày thuận lợi.",
+//   "Mỗi bước nhỏ hôm nay là nền móng cho ngày mai.",
+//   "Ngã xuống không đáng sợ, miễn là còn đủ can đảm đứng lên.",
+//   "Đừng sợ bắt đầu lại, lần này bạn đã có kinh nghiệm.",
+//   "Cây lớn cũng bắt đầu từ một hạt mầm.",
 
-  // CA DAO - TỤC NGỮ VIỆT NAM
-  "Uống nước nhớ nguồn.",
-  "Ăn quả nhớ kẻ trồng cây.",
-  "Lá lành đùm lá rách.",
-  "Thương người như thể thương thân.",
-  "Một cây làm chẳng nên non, ba cây chụm lại nên hòn núi cao.",
-  "Gần mực thì đen, gần đèn thì sáng.",
-  "Tốt gỗ hơn tốt nước sơn.",
-  "Đói cho sạch, rách cho thơm.",
-  "Đi một ngày đàng, học một sàng khôn.",
-  "Học thầy không tày học bạn.",
-  "Không thầy đố mày làm nên.",
-  "Một miếng khi đói bằng một gói khi no.",
-  "Ở hiền gặp lành.",
-  "Thuận vợ thuận chồng, tát Biển Đông cũng cạn.",
-  "Yêu nhau mấy núi cũng trèo, mấy sông cũng lội, mấy đèo cũng qua.",
+//   // CA DAO - TỤC NGỮ VIỆT NAM
+//   "Uống nước nhớ nguồn.",
+//   "Ăn quả nhớ kẻ trồng cây.",
+//   "Lá lành đùm lá rách.",
+//   "Thương người như thể thương thân.",
+//   "Một cây làm chẳng nên non, ba cây chụm lại nên hòn núi cao.",
+//   "Gần mực thì đen, gần đèn thì sáng.",
+//   "Tốt gỗ hơn tốt nước sơn.",
+//   "Đói cho sạch, rách cho thơm.",
+//   "Đi một ngày đàng, học một sàng khôn.",
+//   "Học thầy không tày học bạn.",
+//   "Không thầy đố mày làm nên.",
+//   "Một miếng khi đói bằng một gói khi no.",
+//   "Ở hiền gặp lành.",
+//   "Thuận vợ thuận chồng, tát Biển Đông cũng cạn.",
+//   "Yêu nhau mấy núi cũng trèo, mấy sông cũng lội, mấy đèo cũng qua.",
 
-  // CHÂM NGÔN NGẮN - ĐÁNG SUY NGẪM
-  "Ít kỳ vọng hơn, nhiều bình yên hơn.",
-  "Thứ quý giá nhất đôi khi là những điều ta đang có.",
-  "Không phải điều gì mất đi cũng là mất mát.",
-  "Trân trọng hiện tại, vì ngày hôm nay sẽ không trở lại.",
-  "Học cách tha thứ, nhưng đừng quên bài học.",
+//   // CHÂM NGÔN NGẮN - ĐÁNG SUY NGẪM
+//   "Ít kỳ vọng hơn, nhiều bình yên hơn.",
+//   "Thứ quý giá nhất đôi khi là những điều ta đang có.",
+//   "Không phải điều gì mất đi cũng là mất mát.",
+//   "Trân trọng hiện tại, vì ngày hôm nay sẽ không trở lại.",
+//   "Học cách tha thứ, nhưng đừng quên bài học.",
 
-];
+// ];
 
 
 
@@ -4196,7 +4196,7 @@ setMonth(dayjs().month() + 1);
 
 
              
-<div
+{/* <div
   className="medguard-checking-remaining"
   style={{
     padding: "8px 14px",
@@ -4220,7 +4220,7 @@ setMonth(dayjs().month() + 1);
   >
     “{MEDGUARD_QUOTES[quoteIndex]}”
   </span>
-</div>
+</div> */}
 
 
 
@@ -4233,11 +4233,11 @@ setMonth(dayjs().month() + 1);
               </div>
 
 
-              {/* <div
+              <div
                 className="medguard-checking-note"
               >
                 Vui lòng chờ trong giây lát
-              </div> */}
+              </div>
 
             </div>
 
