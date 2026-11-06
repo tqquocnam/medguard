@@ -214,6 +214,14 @@ import {
   machineTimeOverlapRule,
 } from "./rules/machine-time-overlap.rule.js";
 
+import {
+  internalExamUnder16Rule,
+} from "./rules/internal-exam-under-16.rule.js";
+
+import {
+  outpatientExamAdmissionTimeRule,
+} from "./rules/outpatient-exam-admission-time.rule.js";
+
 export const ruleRegistry:
   Record<
     string,
@@ -373,5 +381,11 @@ YHCT_EXAM_PAYMENT_RATE:
 
   MACHINE_TIME_OVERLAP:
   machineTimeOverlapRule,
+
+    INTERNAL_EXAM_UNDER_16:
+     internalExamUnder16Rule,
+
+     OUTPATIENT_EXAM_ORDER_EQUALS_ADMISSION:
+  outpatientExamAdmissionTimeRule,
 
 };
