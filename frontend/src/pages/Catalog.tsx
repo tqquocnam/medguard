@@ -200,6 +200,14 @@ const ruleCards: RuleCard[] = [
   icon: <FileImageOutlined />,
   color: "#1677ff",
 },
+{
+  title: "Tương tác thuốc - ICD",
+  description:
+    "Cấu hình cảnh báo hoạt chất theo chẩn đoán ICD.",
+  path: "/catalog/drug-icd-interactions",
+  icon: <ExperimentOutlined />,
+  color: "#cf1322",
+},
 
 ];
 

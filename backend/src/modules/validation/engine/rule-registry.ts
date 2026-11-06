@@ -222,6 +222,10 @@ import {
   outpatientExamAdmissionTimeRule,
 } from "./rules/outpatient-exam-admission-time.rule.js";
 
+import {
+  drugIcdInteractionsRule,
+} from "./rules/drug-icd-interactions.rule.js";
+
 export const ruleRegistry:
   Record<
     string,
@@ -387,5 +391,8 @@ YHCT_EXAM_PAYMENT_RATE:
 
      OUTPATIENT_EXAM_ORDER_EQUALS_ADMISSION:
   outpatientExamAdmissionTimeRule,
+
+  DRUG_ICD_INTERACTIONS:
+  drugIcdInteractionsRule,
 
 };

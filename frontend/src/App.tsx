@@ -27,6 +27,7 @@ import ServiceIcdRules from "./pages/CataLog/ServiceIcdRules";
 import MainLayout from "./layouts/MainLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminRoute from "./auth/AdminRoute";
+import DrugIcdInteractions from "./pages/CataLog/DrugIcdInteractions";
 
 export default function App() {
   return (
@@ -54,6 +55,10 @@ export default function App() {
             <Route path="/catalog/departments" element={<Departments />} />
             <Route path="/catalog/medical-staff" element={<MedicalStaff />} />
             <Route path="/catalog/drugs" element={<Drugs />} />
+            <Route
+  path="/catalog/drug-icd-interactions"
+  element={<DrugIcdInteractions />}
+/>
           </Route>
 
           {/* Giữ nguyên phạm vi quyền truy cập của các route cũ */}

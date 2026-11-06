@@ -119,7 +119,7 @@ export const outpatientExamAdmissionTimeRule: RuleValidator = {
     const base = {
       ruleId: rule.id,
       ruleCode: rule.code,
-      severity: "WARNING" as const,
+      severity: "ERROR" as const,
       issueCount: 0,
     };
 
@@ -201,14 +201,8 @@ export const outpatientExamAdmissionTimeRule: RuleValidator = {
         admissionTime,
         orderTime,
         message:
-          `Bệnh nhân ${patientName || "chưa rõ tên"}` +
-          `${patientCode ? ` (mã BN: ${patientCode})` : ""}. ` +
-          `${serviceName}` +
-          `${serviceCode ? ` [${serviceCode}]` : ""}` +
-          `${text(exam.STT) ? `, STT XML3: ${text(exam.STT)}` : ""}. ` +
-          `Thời gian vào viện: ${displayTime(admissionTime)}; ` +
-          `thời gian y lệnh công khám: ${displayTime(orderTime)}. ` +
-          "Hai thời điểm bằng nhau, cần rà soát.",
+  `Thời gian vào viện: ${displayTime(admissionTime)} ` +
+  `trùng thời gian y lệnh công khám: ${displayTime(orderTime)}`,
       });
     }
 
