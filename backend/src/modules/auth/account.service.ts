@@ -1,426 +1,261 @@
-import bcrypt
-  from "bcryptjs";
+import bcrypt from "bcryptjs";
 
-import {
-  db,
-} from "../../config/database.js";
+import { db } from "../../config/database.js";
 
+export class AccountError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400,
+  ) {
+    super(message);
+    this.name = "AccountError";
+  }
+}
 
-// ======================================================
-// LIST USERS
-// ======================================================
+const USER_COLUMNS = `
+  id,
+  username,
+  full_name,
+  role,
+  active,
+  branch_id,
+  last_login_at,
+  created_at,
+  updated_at
+`;
 
-export async function getUsers() {
+function checkBranch(branchId: string): void {
+  if (!branchId?.trim()) {
+    throw new AccountError("Chưa xác định chi nhánh.", 403);
+  }
+}
 
-  const result =
-    await db.query(
-      `
-      SELECT
-        id,
-        username,
-        full_name,
-        role,
-        active,
-        last_login_at,
-        created_at,
-        updated_at
+function checkUserId(userId: string): void {
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-      FROM auth.users
+  if (!uuidPattern.test(userId)) {
+    throw new AccountError("ID tài khoản không hợp lệ.");
+  }
+}
 
-      ORDER BY
-        created_at DESC
-      `
-    );
+function checkPassword(password: string): void {
+  if (password.length < 6) {
+    throw new AccountError("Mật khẩu phải có ít nhất 6 ký tự.");
+  }
+}
 
+function requireRow(rows: any[]) {
+  if (!rows[0]) {
+    throw new AccountError("Không tìm thấy tài khoản trong chi nhánh.", 404);
+  }
+
+  return rows[0];
+}
+
+export async function getUsers(branchId: string) {
+  checkBranch(branchId);
+
+  const result = await db.query(
+    `
+    SELECT ${USER_COLUMNS}
+    FROM auth.users
+    WHERE branch_id = $1
+    ORDER BY created_at DESC
+    `,
+    [branchId],
+  );
 
   return result.rows;
 }
 
-
-// ======================================================
-// CREATE USER
-// ======================================================
-
 export async function createUser(
+  branchId: string,
   data: {
     username: string;
     password: string;
     fullName?: string;
-    role?: string;
-  }
+  },
 ) {
+  checkBranch(branchId);
 
-  const username =
-    data.username
-      .trim();
+  const username = data.username.trim();
+  const fullName = String(data.fullName ?? "").trim();
 
-
-  const password =
-    data.password;
-
-
-  const fullName =
-    String(
-      data.fullName ??
-      ""
-    ).trim();
-
-
-  const role =
-    data.role === "ADMIN"
-      ? "ADMIN"
-      : "USER";
-
-
-  if (
-    username.length < 3
-  ) {
-
-    throw new Error(
-      "Tài khoản phải có ít nhất 3 ký tự."
-    );
+  if (username.length < 3 || username.length > 100) {
+    throw new AccountError("Tài khoản phải có từ 3 đến 100 ký tự.");
   }
 
-
-  if (
-    password.length < 6
-  ) {
-
-    throw new Error(
-      "Mật khẩu phải có ít nhất 6 ký tự."
-    );
+  if (fullName.length > 255) {
+    throw new AccountError("Họ tên tối đa 255 ký tự.");
   }
 
+  checkPassword(data.password);
 
-  const passwordHash =
-    await bcrypt.hash(
-      password,
-      12
-    );
-
+  const passwordHash = await bcrypt.hash(data.password, 12);
 
   try {
+    const result = await db.query(
+      `
+      INSERT INTO auth.users (
+        username,
+        password_hash,
+        full_name,
+        role,
+        active,
+        branch_id
+      )
+      SELECT
+        $1,
+        $2,
+        $3,
+        'ADMIN',
+        TRUE,
+        b.id
+      FROM auth.branches b
+      WHERE
+        b.id = $4
+        AND b.active = TRUE
+      RETURNING ${USER_COLUMNS}
+      `,
+      [username, passwordHash, fullName || null, branchId],
+    );
 
-    const result =
-      await db.query(
-        `
-        INSERT INTO auth.users
-        (
-          username,
-          password_hash,
-          full_name,
-          role,
-          active
-        )
-
-        VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          true
-        )
-
-        RETURNING
-          id,
-          username,
-          full_name,
-          role,
-          active,
-          created_at
-        `,
-        [
-          username,
-          passwordHash,
-          fullName || null,
-          role,
-        ]
-      );
-
-
-    return result.rows[0];
-
-  } catch (error: any) {
-
-    if (
-      error?.code ===
-      "23505"
-    ) {
-
-      throw new Error(
-        "Tên tài khoản đã tồn tại."
-      );
+    if (!result.rows[0]) {
+      throw new AccountError("Chi nhánh không tồn tại hoặc đã ngừng hoạt động.");
     }
 
+    return result.rows[0];
+  } catch (error) {
+    if ((error as { code?: string })?.code === "23505") {
+      throw new AccountError("Tên tài khoản đã tồn tại.", 409);
+    }
 
     throw error;
   }
 }
 
-
-// ======================================================
-// SET ACTIVE
-// ======================================================
-
-export async function setUserActive(
-  userId: string,
-  active: boolean
-) {
-
-  const result =
-    await db.query(
-      `
-      UPDATE auth.users
-
-      SET
-        active = $1,
-        updated_at = NOW()
-
-      WHERE
-        id = $2
-
-      RETURNING
-        id,
-        username,
-        full_name,
-        role,
-        active
-      `,
-      [
-        active,
-        userId,
-      ]
-    );
-
-
-  if (
-    result.rows.length ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy tài khoản."
-    );
-  }
-
-
-  return result.rows[0];
-}
-
-
-// ======================================================
-// CHANGE ROLE
-// ======================================================
-
-export async function setUserRole(
-  userId: string,
-  role: string
-) {
-
-  if (
-    role !== "ADMIN" &&
-    role !== "USER"
-  ) {
-
-    throw new Error(
-      "Quyền tài khoản không hợp lệ."
-    );
-  }
-
-
-  const result =
-    await db.query(
-      `
-      UPDATE auth.users
-
-      SET
-        role = $1,
-        updated_at = NOW()
-
-      WHERE
-        id = $2
-
-      RETURNING
-        id,
-        username,
-        full_name,
-        role,
-        active
-      `,
-      [
-        role,
-        userId,
-      ]
-    );
-
-
-  if (
-    result.rows.length ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy tài khoản."
-    );
-  }
-
-
-  return result.rows[0];
-}
-
-
-// ======================================================
-// RESET PASSWORD BY ADMIN
-// ======================================================
-
-export async function resetUserPassword(
-  userId: string,
-  password: string
-) {
-
-  if (
-    password.length < 6
-  ) {
-
-    throw new Error(
-      "Mật khẩu phải có ít nhất 6 ký tự."
-    );
-  }
-
-
-  const passwordHash =
-    await bcrypt.hash(
-      password,
-      12
-    );
-
-
-  const result =
-    await db.query(
-      `
-      UPDATE auth.users
-
-      SET
-        password_hash = $1,
-        updated_at = NOW()
-
-      WHERE
-        id = $2
-
-      RETURNING
-        id,
-        username
-      `,
-      [
-        passwordHash,
-        userId,
-      ]
-    );
-
-
-  if (
-    result.rows.length ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy tài khoản."
-    );
-  }
-
-
-  return result.rows[0];
-}
-
-
-// ======================================================
-// CHANGE OWN PASSWORD
-// ======================================================
-
-export async function changeOwnPassword(
-  userId: string,
-  oldPassword: string,
-  newPassword: string
-) {
-
-  if (
-    newPassword.length < 6
-  ) {
-
-    throw new Error(
-      "Mật khẩu mới phải có ít nhất 6 ký tự."
-    );
-  }
-
-
-  const result =
-    await db.query(
-      `
-      SELECT
-        password_hash
-
-      FROM auth.users
-
-      WHERE
-        id = $1
-        AND active = true
-
-      LIMIT 1
-      `,
-      [
-        userId,
-      ]
-    );
-
-
-  if (
-    result.rows.length ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy tài khoản."
-    );
-  }
-
-
-  const passwordOk =
-    await bcrypt.compare(
-      oldPassword,
-      result.rows[0]
-        .password_hash
-    );
-
-
-  if (!passwordOk) {
-
-    throw new Error(
-      "Mật khẩu hiện tại không đúng."
-    );
-  }
-
-
-  const passwordHash =
-    await bcrypt.hash(
-      newPassword,
-      12
-    );
-
-
-  await db.query(
+export async function setUserActive(branchId: string, userId: string, active: boolean) {
+  checkBranch(branchId);
+  checkUserId(userId);
+
+  const result = await db.query(
     `
     UPDATE auth.users
-
     SET
-      password_hash = $1,
+      active = $3,
       updated_at = NOW()
-
     WHERE
-      id = $2
+      id = $1
+      AND branch_id = $2
+    RETURNING ${USER_COLUMNS}
     `,
-    [
-      passwordHash,
-      userId,
-    ]
+    [userId, branchId, active],
   );
+
+  return requireRow(result.rows);
+}
+
+export async function setUserRole(branchId: string, userId: string, role: string) {
+  checkBranch(branchId);
+  checkUserId(userId);
+
+  if (role !== "ADMIN") {
+    throw new AccountError("Tất cả tài khoản đều sử dụng quyền ADMIN.");
+  }
+
+  const result = await db.query(
+    `
+    UPDATE auth.users
+    SET
+      role = 'ADMIN',
+      updated_at = NOW()
+    WHERE
+      id = $1
+      AND branch_id = $2
+    RETURNING ${USER_COLUMNS}
+    `,
+    [userId, branchId],
+  );
+
+  return requireRow(result.rows);
+}
+
+export async function resetUserPassword(branchId: string, userId: string, password: string) {
+  checkBranch(branchId);
+  checkUserId(userId);
+  checkPassword(password);
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const result = await db.query(
+    `
+    UPDATE auth.users
+    SET
+      password_hash = $3,
+      updated_at = NOW()
+    WHERE
+      id = $1
+      AND branch_id = $2
+    RETURNING
+      id,
+      username,
+      branch_id
+    `,
+    [userId, branchId, passwordHash],
+  );
+
+  return requireRow(result.rows);
+}
+
+export async function changeOwnPassword(
+  branchId: string,
+  userId: string,
+  oldPassword: string,
+  newPassword: string,
+) {
+  checkBranch(branchId);
+  checkUserId(userId);
+  checkPassword(newPassword);
+
+  const result = await db.query(
+    `
+    SELECT password_hash
+    FROM auth.users
+    WHERE
+      id = $1
+      AND branch_id = $2
+      AND active = TRUE
+    `,
+    [userId, branchId],
+  );
+
+  const account = requireRow(result.rows);
+
+  const passwordOk = await bcrypt.compare(oldPassword, account.password_hash);
+
+  if (!passwordOk) {
+    throw new AccountError("Mật khẩu hiện tại không đúng.");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  const updated = await db.query(
+    `
+    UPDATE auth.users
+    SET
+      password_hash = $3,
+      updated_at = NOW()
+    WHERE
+      id = $1
+      AND branch_id = $2
+      AND active = TRUE
+      AND password_hash = $4
+    RETURNING id
+    `,
+    [userId, branchId, passwordHash, account.password_hash],
+  );
+
+  if (!updated.rows[0]) {
+    throw new AccountError("Tài khoản vừa thay đổi. Vui lòng thử lại.", 409);
+  }
 }

@@ -1,12 +1,9 @@
-import type {
-  Response,
-} from "express";
+import type { Response } from "express";
 
-import type {
-  AuthRequest,
-} from "./auth.middleware.js";
+import type { AuthRequest, AuthUser } from "./auth.middleware.js";
 
 import {
+  AccountError,
   changeOwnPassword,
   createUser,
   getUsers,
@@ -15,407 +12,139 @@ import {
   setUserRole,
 } from "./account.service.js";
 
+type Result = {
+  data?: unknown;
+  message?: string;
+  status?: number;
+};
 
-// ======================================================
-// LIST
-// ======================================================
-
-export async function listUsers(
-  _req: AuthRequest,
-  res: Response
+async function handle(
+  req: AuthRequest,
+  res: Response,
+  action: (user: AuthUser) => Promise<Result>,
 ): Promise<void> {
+  res.setHeader("Cache-Control", "no-store");
 
-  try {
-
-    const users =
-      await getUsers();
-
-
-    res.json({
-      success: true,
-      data: users,
+  if (!req.user?.branchId) {
+    res.status(403).json({
+      success: false,
+      message: "Chưa xác định tài khoản và chi nhánh.",
     });
 
-  } catch (error) {
-
-    res
-      .status(500)
-      .json({
-        success: false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Không thể tải danh sách tài khoản.",
-      });
+    return;
   }
-}
-
-
-// ======================================================
-// CREATE
-// ======================================================
-
-export async function addUser(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
 
   try {
+    const { status = 200, ...result } = await action(req.user);
 
-    const username =
-      String(
-        req.body?.username ??
-        ""
-      ).trim();
-
-
-    const password =
-      String(
-        req.body?.password ??
-        ""
-      );
-
-
-    if (
-      !username ||
-      !password
-    ) {
-
-      res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Vui lòng nhập tài khoản và mật khẩu.",
-        });
+    res.status(status).json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    if (error instanceof AccountError) {
+      res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
 
       return;
     }
 
+    console.error("Account error:", error);
 
-    const user =
-      await createUser({
-        username,
-
-        password,
-
-        fullName:
-          req.body?.fullName,
-
-        role:
-          req.body?.role,
-      });
-
-
-    res
-      .status(201)
-      .json({
-        success: true,
-        message:
-          "Tạo tài khoản thành công.",
-        data: user,
-      });
-
-  } catch (error) {
-
-    res
-      .status(400)
-      .json({
-        success: false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Không thể tạo tài khoản.",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Không thể xử lý tài khoản. Vui lòng thử lại.",
+    });
   }
 }
 
+export async function listUsers(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => ({
+    data: await getUsers(user.branchId),
+  }));
+}
 
-// ======================================================
-// ACTIVE
-// ======================================================
+export async function addUser(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => ({
+    status: 201,
+    message: "Tạo tài khoản thành công.",
 
-export async function updateUserActive(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+    // Chi nhánh lấy từ người đang đăng nhập.
+    // Không nhận branchId hoặc role từ form.
+    data: await createUser(user.branchId, {
+      username: String(req.body?.username ?? ""),
 
-  try {
+      password: String(req.body?.password ?? ""),
 
-    const userId =
-      String(
-        req.params.userId ??
-        ""
-      );
+      fullName: String(req.body?.fullName ?? ""),
+    }),
+  }));
+}
 
+export async function updateUserActive(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => {
+    const userId = String(req.params.userId ?? "");
 
-    const active =
-      req.body?.active ===
-      true;
+    const active = req.body?.active;
 
-
-    // Không cho admin tự khóa chính mình.
-    if (
-      req.user?.id === userId &&
-      !active
-    ) {
-
-      res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Bạn không thể tự khóa tài khoản của mình.",
-        });
-
-      return;
+    if (typeof active !== "boolean") {
+      throw new AccountError("Trạng thái tài khoản không hợp lệ.");
     }
 
-
-    const user =
-      await setUserActive(
-        userId,
-        active
-      );
-
-
-    res.json({
-      success: true,
-
-      message:
-        active
-          ? "Đã mở tài khoản."
-          : "Đã khóa tài khoản.",
-
-      data: user,
-    });
-
-  } catch (error) {
-
-    res
-      .status(400)
-      .json({
-        success: false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Không thể cập nhật tài khoản.",
-      });
-  }
-}
-
-
-// ======================================================
-// ROLE
-// ======================================================
-
-export async function updateUserRole(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-
-  try {
-
-    const userId =
-      String(
-        req.params.userId ??
-        ""
-      );
-
-
-    const role =
-      String(
-        req.body?.role ??
-        ""
-      ).toUpperCase();
-
-
-    if (
-      req.user?.id ===
-        userId &&
-      role !== "ADMIN"
-    ) {
-
-      res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Bạn không thể tự bỏ quyền ADMIN của mình.",
-        });
-
-      return;
+    if (userId.toLowerCase() === user.id.toLowerCase() && !active) {
+      throw new AccountError("Bạn không thể tự khóa tài khoản của mình.");
     }
 
+    return {
+      message: active ? "Đã mở tài khoản." : "Đã khóa tài khoản.",
 
-    const user =
-      await setUserRole(
-        userId,
-        role
-      );
-
-
-    res.json({
-      success: true,
-      message:
-        "Cập nhật quyền thành công.",
-      data: user,
-    });
-
-  } catch (error) {
-
-    res
-      .status(400)
-      .json({
-        success: false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Không thể cập nhật quyền.",
-      });
-  }
+      data: await setUserActive(user.branchId, userId, active),
+    };
+  });
 }
 
+export async function updateUserRole(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => ({
+    message: "Tài khoản sử dụng quyền ADMIN.",
 
-// ======================================================
-// ADMIN RESET PASSWORD
-// ======================================================
+    data: await setUserRole(
+      user.branchId,
+      String(req.params.userId ?? ""),
+      String(req.body?.role ?? "").toUpperCase(),
+    ),
+  }));
+}
 
-export async function adminResetPassword(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-
-  try {
-
-    const userId =
-      String(
-        req.params.userId ??
-        ""
-      );
-
-
-    const password =
-      String(
-        req.body?.password ??
-        ""
-      );
-
-
+export async function adminResetPassword(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => {
     await resetUserPassword(
-      userId,
-      password
+      user.branchId,
+      String(req.params.userId ?? ""),
+      String(req.body?.password ?? ""),
     );
 
-
-    res.json({
-      success: true,
-      message:
-        "Đặt lại mật khẩu thành công.",
-    });
-
-  } catch (error) {
-
-    res
-      .status(400)
-      .json({
-        success: false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Không thể đặt lại mật khẩu.",
-      });
-  }
+    return {
+      message: "Đặt lại mật khẩu thành công.",
+    };
+  });
 }
 
+export async function changePassword(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => {
+    const oldPassword = String(req.body?.oldPassword ?? "");
 
-// ======================================================
-// CHANGE OWN PASSWORD
-// ======================================================
+    const newPassword = String(req.body?.newPassword ?? "");
 
-export async function changePassword(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-
-  try {
-
-    if (
-      !req.user?.id
-    ) {
-
-      res
-        .status(401)
-        .json({
-          success: false,
-          message:
-            "Bạn chưa đăng nhập.",
-        });
-
-      return;
+    if (!oldPassword || !newPassword) {
+      throw new AccountError("Vui lòng nhập đầy đủ mật khẩu.");
     }
 
+    await changeOwnPassword(user.branchId, user.id, oldPassword, newPassword);
 
-    const oldPassword =
-      String(
-        req.body?.oldPassword ??
-        ""
-      );
-
-
-    const newPassword =
-      String(
-        req.body?.newPassword ??
-        ""
-      );
-
-
-    if (
-      !oldPassword ||
-      !newPassword
-    ) {
-
-      res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Vui lòng nhập đầy đủ mật khẩu.",
-        });
-
-      return;
-    }
-
-
-    await changeOwnPassword(
-      req.user.id,
-      oldPassword,
-      newPassword
-    );
-
-
-    res.json({
-      success: true,
-      message:
-        "Đổi mật khẩu thành công.",
-    });
-
-  } catch (error) {
-
-    res
-      .status(400)
-      .json({
-        success: false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Đổi mật khẩu thất bại.",
-      });
-  }
+    return {
+      message: "Đổi mật khẩu thành công.",
+    };
+  });
 }

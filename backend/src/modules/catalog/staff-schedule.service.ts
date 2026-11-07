@@ -1,1346 +1,512 @@
-import dayjs from "dayjs";
+import { db } from "../../config/database.js";
 
-import {
-  db,
-} from "../../config/database.js";
-
-
-// ======================================================
-// TYPES
-// ======================================================
+export class ScheduleError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400,
+  ) {
+    super(message);
+  }
+}
 
 export interface StaffScheduleInput {
-
   staffId: string;
-
   workDate: string;
-
   startTime: string;
-
   endTime: string;
-
-  status?:
-    "ACTIVE" |
-    "OFF";
-
-  source?:
-    "MANUAL" |
-    "DEFAULT";
-
-  note?:
-    string |
-    null;
-
+  status?: "ACTIVE" | "OFF";
+  source?: "MANUAL" | "DEFAULT";
+  note?: string | null;
 }
-
 
 export interface GenerateDefaultScheduleInput {
-
-  staffId:
-    string;
-
-  year:
-    number;
-
-  month:
-    number;
-
+  staffId: string;
+  year: number;
+  month: number;
 }
 
-
-// ======================================================
-// HELPERS
-// ======================================================
-
-function normalizeText(
-  value:
-    unknown
-): string {
-
-  return String(
-    value ??
-    ""
-  ).trim();
-
+function branch(value: string): void {
+  if (!value) {
+    throw new ScheduleError("Chưa xác định chi nhánh.", 403);
+  }
 }
 
+function uuid(value: string): void {
+  const pattern = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
-function parseDailyTime(
-  value:
-    unknown
-) {
-
-  const text =
-    normalizeText(
-      value
-    )
-      .replace(
-        /\s+/g,
-        ""
-      );
-
-
-  const match =
-    text.match(
-      /^(\d{4})-(\d{4})$/
-    );
-
-
-  if (
-    !match
-  ) {
-
-    throw new Error(
-      `Thời gian ngày không hợp lệ: ${text || "(trống)"}.`
-    );
-
+  if (!pattern.test(value)) {
+    throw new ScheduleError("ID không hợp lệ.");
   }
-
-
-  const startRaw =
-    match[1];
-
-  const endRaw =
-    match[2];
-
-
-  const startHour =
-    Number(
-      startRaw.slice(
-        0,
-        2
-      )
-    );
-
-  const startMinute =
-    Number(
-      startRaw.slice(
-        2,
-        4
-      )
-    );
-
-
-  const endHour =
-    Number(
-      endRaw.slice(
-        0,
-        2
-      )
-    );
-
-  const endMinute =
-    Number(
-      endRaw.slice(
-        2,
-        4
-      )
-    );
-
-
-  if (
-    startHour >
-      23 ||
-    endHour >
-      23 ||
-    startMinute >
-      59 ||
-    endMinute >
-      59
-  ) {
-
-    throw new Error(
-      `Thời gian ngày không hợp lệ: ${text}.`
-    );
-
-  }
-
-
-  const startTime =
-    `${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}`;
-
-
-  const endTime =
-    `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
-
-
-  return {
-    startTime,
-    endTime,
-  };
-
 }
 
+function checkInput(input: StaffScheduleInput): void {
+  uuid(String(input.staffId ?? ""));
 
-// ======================================================
-// PARSE WEEKLY TIME
-//
-// CNT2T3T4T5T6T7
-//
-// JavaScript:
-// 0 = CN
-// 1 = T2
-// 2 = T3
-// 3 = T4
-// 4 = T5
-// 5 = T6
-// 6 = T7
-// ======================================================
-
-function parseWeeklyTime(
-  value:
-    unknown
-): number[] {
-
-  const text =
-    normalizeText(
-      value
-    )
-      .toUpperCase()
-      .replace(
-        /\s+/g,
-        ""
-      );
-
+  const timePattern = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
   if (
-    !text
+    !/^\d{4}-\d{2}-\d{2}$/.test(input.workDate ?? "") ||
+    !timePattern.test(input.startTime ?? "") ||
+    !timePattern.test(input.endTime ?? "") ||
+    !["ACTIVE", "OFF"].includes(input.status ?? "ACTIVE") ||
+    !["MANUAL", "DEFAULT"].includes(input.source ?? "MANUAL")
   ) {
-
-    throw new Error(
-      "Nhân viên chưa có cấu hình Thời gian tuần."
-    );
-
+    throw new ScheduleError("Thông tin lịch làm việc không hợp lệ.");
   }
-
-
-  const weekdays =
-    new Set<
-      number
-    >();
-
-
-  if (
-    text.includes(
-      "CN"
-    )
-  ) {
-
-    weekdays.add(
-      0
-    );
-
-  }
-
-
-  if (
-    text.includes(
-      "T2"
-    )
-  ) {
-
-    weekdays.add(
-      1
-    );
-
-  }
-
-
-  if (
-    text.includes(
-      "T3"
-    )
-  ) {
-
-    weekdays.add(
-      2
-    );
-
-  }
-
-
-  if (
-    text.includes(
-      "T4"
-    )
-  ) {
-
-    weekdays.add(
-      3
-    );
-
-  }
-
-
-  if (
-    text.includes(
-      "T5"
-    )
-  ) {
-
-    weekdays.add(
-      4
-    );
-
-  }
-
-
-  if (
-    text.includes(
-      "T6"
-    )
-  ) {
-
-    weekdays.add(
-      5
-    );
-
-  }
-
-
-  if (
-    text.includes(
-      "T7"
-    )
-  ) {
-
-    weekdays.add(
-      6
-    );
-
-  }
-
-
-  if (
-    weekdays.size ===
-    0
-  ) {
-
-    throw new Error(
-      `Không đọc được Thời gian tuần: ${text}.`
-    );
-
-  }
-
-
-  return [
-    ...weekdays,
-  ];
-
 }
 
-
-// ======================================================
-// LIST
-// ======================================================
-
-export async function listStaffSchedules(
-  params: {
-
-    staffId?:
-      string;
-
-    year?:
-      number;
-
-    month?:
-      number;
-
-    status?:
-      string;
-
-    limit?:
-      number;
-
-    offset?:
-      number;
-
-  }
-) {
-
-  const {
-
-    staffId,
-    year,
-    month,
-    status,
-
-    limit =
-      50,
-
-    offset =
-      0,
-
-  } =
-    params;
-
-
-  const conditions:
-    string[] =
-    [];
-
-
-  const values:
-    unknown[] =
-    [];
-
-
-  if (
-    staffId
-  ) {
-
-    values.push(
-      staffId
-    );
-
-    conditions.push(
-      `s.staff_id = $${values.length}::uuid`
-    );
-
+function requireRow(rows: any[]) {
+  if (!rows[0]) {
+    throw new ScheduleError("Không tìm thấy lịch hoặc nhân viên trong chi nhánh.", 404);
   }
 
+  return rows[0];
+}
 
-  if (
-    year
-  ) {
+export async function listStaffSchedules(params: {
+  branchId: string;
+  staffId?: string;
+  year?: number;
+  month?: number;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  branch(params.branchId);
 
-    values.push(
-      year
-    );
-
-    conditions.push(
-      `EXTRACT(YEAR FROM s.work_date)::int = $${values.length}`
-    );
-
+  if (params.staffId) {
+    uuid(params.staffId);
   }
 
-
-  if (
-    month
-  ) {
-
-    values.push(
-      month
-    );
-
-    conditions.push(
-      `EXTRACT(MONTH FROM s.work_date)::int = $${values.length}`
-    );
-
-  }
-
-
-  if (
-    status
-  ) {
-
-    values.push(
-      status
-    );
-
-    conditions.push(
-      `s.status = $${values.length}`
-    );
-
-  }
-
-
-  const whereSql =
-    conditions.length >
-    0
-
-      ? `WHERE ${conditions.join(" AND ")}`
-
-      : "";
-
-
-  values.push(
-    limit
-  );
-
-  const limitIndex =
-    values.length;
-
-
-  values.push(
-    offset
-  );
-
-  const offsetIndex =
-    values.length;
-
-
-  const result =
-    await db.query(
-      `
+  const result = await db.query(
+    `
+    WITH filtered AS (
       SELECT
+        s.id::text AS id,
+        s.staff_id::text AS "staffId",
+        ms.full_name AS "fullName",
 
-        s.id,
+        NULLIF(
+          ms.social_insurance_code, ''
+        ) AS "socialInsuranceCode",
 
-        s.staff_id,
+        NULLIF(
+          ms.license_number, ''
+        ) AS "licenseNumber",
 
-        ms.full_name,
+        TO_CHAR(
+          s.work_date, 'YYYY-MM-DD'
+        ) AS "workDate",
 
-        ms.social_insurance_code,
+        TO_CHAR(
+          s.start_time, 'HH24:MI'
+        ) AS "startTime",
 
-        ms.license_number,
-
-        s.work_date,
-
-        s.start_time,
-
-        s.end_time,
+        TO_CHAR(
+          s.end_time, 'HH24:MI'
+        ) AS "endTime",
 
         s.status,
-
         s.source,
+        s.note
 
-        s.note,
+      FROM catalog.medical_staff_schedules s
 
-        s.created_at,
+      JOIN catalog.medical_staff ms
+        ON ms.id = s.staff_id
+        AND ms.branch_id = $1
 
-        s.updated_at
+      WHERE
+        s.branch_id = $1
 
-      FROM
-        catalog.medical_staff_schedules s
+        AND (
+          $2::uuid IS NULL
+          OR s.staff_id = $2::uuid
+        )
 
-      INNER JOIN
-        catalog.medical_staff ms
+        AND (
+          $3::integer IS NULL
+          OR EXTRACT(YEAR FROM s.work_date)::integer = $3
+        )
 
-        ON
-          ms.id =
-          s.staff_id
+        AND (
+          $4::integer IS NULL
+          OR EXTRACT(MONTH FROM s.work_date)::integer = $4
+        )
 
-      ${whereSql}
+        AND (
+          $5::text IS NULL
+          OR s.status = $5
+        )
+    )
 
-      ORDER BY
+    SELECT
+      (
+        SELECT COUNT(*)::integer
+        FROM filtered
+      ) AS total,
 
-        s.work_date ASC,
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            p ORDER BY
+              p."workDate",
+              p."fullName",
+              p."startTime",
+              p.id
+          )
 
-        ms.full_name ASC,
+          FROM (
+            SELECT *
+            FROM filtered
 
-        s.start_time ASC
+            ORDER BY
+              "workDate",
+              "fullName",
+              "startTime",
+              id
 
-      LIMIT
-        $${limitIndex}
-
-      OFFSET
-        $${offsetIndex}
-      `,
-      values
-    );
-
-
-  const countValues =
-    values.slice(
-      0,
-      values.length -
-      2
-    );
-
-
-  const countResult =
-    await db.query(
-      `
-      SELECT
-        COUNT(*)::int
-          AS total
-
-      FROM
-        catalog.medical_staff_schedules s
-
-      ${whereSql}
-      `,
-      countValues
-    );
-
+            LIMIT $6
+            OFFSET $7
+          ) p
+        ),
+        '[]'::jsonb
+      ) AS items
+    `,
+    [
+      params.branchId,
+      params.staffId || null,
+      params.year ?? null,
+      params.month ?? null,
+      params.status || null,
+      params.limit ?? 50,
+      params.offset ?? 0,
+    ],
+  );
 
   return {
-
-    items:
-      result.rows.map(
-        (
-          row
-        ) => ({
-
-          id:
-            String(
-              row.id
-            ),
-
-          staffId:
-            String(
-              row.staff_id
-            ),
-
-          fullName:
-            String(
-              row.full_name
-            ),
-
-          socialInsuranceCode:
-            row.social_insurance_code
-              ? String(
-                  row.social_insurance_code
-                )
-              : null,
-
-          licenseNumber:
-            row.license_number
-              ? String(
-                  row.license_number
-                )
-              : null,
-
-          workDate:
-            dayjs(
-              row.work_date
-            ).format(
-              "YYYY-MM-DD"
-            ),
-
-          startTime:
-            String(
-              row.start_time
-            ).slice(
-              0,
-              5
-            ),
-
-          endTime:
-            String(
-              row.end_time
-            ).slice(
-              0,
-              5
-            ),
-
-          status:
-            String(
-              row.status
-            ),
-
-          source:
-            String(
-              row.source
-            ),
-
-          note:
-            row.note
-              ? String(
-                  row.note
-                )
-              : null,
-
-        })
-      ),
-
-    total:
-      Number(
-        countResult
-          .rows[0]
-          ?.total ??
-        0
-      ),
-
+    items: result.rows[0].items,
+    total: Number(result.rows[0].total),
   };
-
 }
 
+export async function createStaffSchedule(branchId: string, input: StaffScheduleInput) {
+  branch(branchId);
+  checkInput(input);
 
-// ======================================================
-// CREATE MANUAL
-// ======================================================
+  const result = await db.query(
+    `
+    INSERT INTO catalog.medical_staff_schedules (
+      branch_id,
+      staff_id,
+      work_date,
+      start_time,
+      end_time,
+      status,
+      source,
+      note
+    )
+    SELECT
+      $1,
+      ms.id,
+      $3::date,
+      $4::time,
+      $5::time,
+      $6,
+      $7,
+      $8
+    FROM catalog.medical_staff ms
+    WHERE
+      ms.id = $2::uuid
+      AND ms.branch_id = $1
+    RETURNING *
+    `,
+    [
+      branchId,
+      input.staffId,
+      input.workDate,
+      input.startTime,
+      input.endTime,
+      input.status ?? "ACTIVE",
+      input.source ?? "MANUAL",
+      input.note ?? null,
+    ],
+  );
 
-export async function createStaffSchedule(
-  input:
-    StaffScheduleInput
-) {
-
-  const staffId =
-    normalizeText(
-      input.staffId
-    );
-
-
-  const workDate =
-    normalizeText(
-      input.workDate
-    );
-
-
-  const startTime =
-    normalizeText(
-      input.startTime
-    );
-
-
-  const endTime =
-    normalizeText(
-      input.endTime
-    );
-
-
-  if (
-    !staffId ||
-    !workDate ||
-    !startTime ||
-    !endTime
-  ) {
-
-    throw new Error(
-      "Thiếu thông tin lịch làm việc."
-    );
-
-  }
-
-
-  const result =
-    await db.query(
-      `
-      INSERT INTO
-        catalog.medical_staff_schedules
-      (
-        staff_id,
-
-        work_date,
-
-        start_time,
-
-        end_time,
-
-        status,
-
-        source,
-
-        note,
-
-        created_at,
-
-        updated_at
-      )
-
-      VALUES
-      (
-        $1::uuid,
-
-        $2::date,
-
-        $3::time,
-
-        $4::time,
-
-        $5,
-
-        $6,
-
-        $7,
-
-        NOW(),
-
-        NOW()
-      )
-
-      RETURNING
-        *
-      `,
-      [
-
-        staffId,
-
-        workDate,
-
-        startTime,
-
-        endTime,
-
-        input.status ??
-          "ACTIVE",
-
-        input.source ??
-          "MANUAL",
-
-        input.note ??
-          null,
-
-      ]
-    );
-
-
-  return result.rows[0];
-
+  return requireRow(result.rows);
 }
 
+export async function updateStaffSchedule(branchId: string, id: string, input: StaffScheduleInput) {
+  branch(branchId);
+  uuid(id);
+  checkInput(input);
 
-// ======================================================
-// UPDATE
-// ======================================================
+  const result = await db.query(
+    `
+    UPDATE catalog.medical_staff_schedules s
 
-export async function updateStaffSchedule(
-  id:
-    string,
+    SET
+      staff_id = ms.id,
+      work_date = $4::date,
+      start_time = $5::time,
+      end_time = $6::time,
+      status = $7,
+      source = $8,
+      note = $9,
+      updated_at = NOW()
 
-  input:
-    StaffScheduleInput
-) {
+    FROM catalog.medical_staff ms
 
-  const result =
-    await db.query(
-      `
-      UPDATE
-        catalog.medical_staff_schedules
+    WHERE
+      s.id = $2::uuid
+      AND s.branch_id = $1
+      AND ms.id = $3::uuid
+      AND ms.branch_id = $1
 
-      SET
+    RETURNING s.*
+    `,
+    [
+      branchId,
+      id,
+      input.staffId,
+      input.workDate,
+      input.startTime,
+      input.endTime,
+      input.status ?? "ACTIVE",
+      input.source ?? "MANUAL",
+      input.note ?? null,
+    ],
+  );
 
-        staff_id =
-          $2::uuid,
-
-        work_date =
-          $3::date,
-
-        start_time =
-          $4::time,
-
-        end_time =
-          $5::time,
-
-        status =
-          $6,
-
-        source =
-          $7,
-
-        note =
-          $8,
-
-        updated_at =
-          NOW()
-
-      WHERE
-        id =
-        $1::uuid
-
-      RETURNING
-        *
-      `,
-      [
-
-        id,
-
-        input.staffId,
-
-        input.workDate,
-
-        input.startTime,
-
-        input.endTime,
-
-        input.status ??
-          "ACTIVE",
-
-        input.source ??
-          "MANUAL",
-
-        input.note ??
-          null,
-
-      ]
-    );
-
-
-  if (
-    result.rowCount ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy lịch làm việc."
-    );
-
-  }
-
-
-  return result.rows[0];
-
+  return requireRow(result.rows);
 }
 
+export async function deleteStaffSchedule(branchId: string, id: string) {
+  branch(branchId);
+  uuid(id);
 
-// ======================================================
-// DELETE
-// ======================================================
+  const result = await db.query(
+    `
+    DELETE FROM catalog.medical_staff_schedules
+    WHERE
+      id = $2::uuid
+      AND branch_id = $1
+    RETURNING id
+    `,
+    [branchId, id],
+  );
 
-export async function deleteStaffSchedule(
-  id:
-    string
-) {
-
-  const result =
-    await db.query(
-      `
-      DELETE FROM
-        catalog.medical_staff_schedules
-
-      WHERE
-        id =
-        $1::uuid
-
-      RETURNING
-        id
-      `,
-      [
-        id,
-      ]
-    );
-
-
-  if (
-    result.rowCount ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy lịch làm việc."
-    );
-
-  }
-
+  requireRow(result.rows);
 
   return true;
-
 }
 
-
-// ======================================================
-// GENERATE DEFAULT
-//
-// Đọc:
-// medical_staff.daily_time
-// medical_staff.weekly_time
-//
-// Ví dụ:
-//
-// daily_time:
-// 0700-1900
-//
-// weekly_time:
-// CNT2T3T4T5T6T7
-//
-// ======================================================
-
 export async function generateDefaultSchedule(
-  input:
-    GenerateDefaultScheduleInput
+  branchId: string,
+  input: GenerateDefaultScheduleInput,
 ) {
+  branch(branchId);
+  uuid(input.staffId);
 
-  const {
-
-    staffId,
-    year,
-    month,
-
-  } =
-    input;
-
+  const { staffId, year, month } = input;
 
   if (
-    !staffId
+    !Number.isInteger(year) ||
+    year < 2000 ||
+    year > 2100 ||
+    !Number.isInteger(month) ||
+    month < 1 ||
+    month > 12
   ) {
-
-    throw new Error(
-      "Vui lòng chọn nhân viên."
-    );
-
+    throw new ScheduleError("Năm hoặc tháng không hợp lệ.");
   }
 
-
-  if (
-    !year ||
-    year <
-      2000 ||
-    year >
-      2100
-  ) {
-
-    throw new Error(
-      "Năm không hợp lệ."
-    );
-
-  }
-
-
-  if (
-    !month ||
-    month <
-      1 ||
-    month >
-      12
-  ) {
-
-    throw new Error(
-      "Tháng không hợp lệ."
-    );
-
-  }
-
-
-  // ==================================================
-  // LOAD STAFF
-  // ==================================================
-
-  const staffResult =
-    await db.query(
-      `
-      SELECT
-
-        id,
-
-        full_name,
-
-        social_insurance_code,
-
-        license_number,
-
-        daily_time,
-
-        weekly_time
-
-      FROM
-        catalog.medical_staff
-
-      WHERE
-        id =
-        $1::uuid
-
-        AND active =
-        true
-
-      LIMIT
-        1
-      `,
-      [
-        staffId,
-      ]
-    );
-
-
-  if (
-    staffResult.rowCount ===
-    0
-  ) {
-
-    throw new Error(
-      "Không tìm thấy nhân viên đang hoạt động."
-    );
-
-  }
-
-
-  const staff =
-    staffResult.rows[0];
-
-
-  const {
-    startTime,
-    endTime,
-  } =
-    parseDailyTime(
-      staff.daily_time
-    );
-
-
-  const weekdays =
-    parseWeeklyTime(
-      staff.weekly_time
-    );
-
-
-  // ==================================================
-  // LOOP ALL DAYS OF MONTH
-  // ==================================================
-
-  const firstDay =
-    dayjs(
-      `${year}-${String(month).padStart(2, "0")}-01`
-    );
-
-
-  const daysInMonth =
-    firstDay.daysInMonth();
-
-
-  let inserted =
-    0;
-
-
-  let skipped =
-    0;
-
-
-  const createdDates:
-    string[] =
-    [];
-
-
-  const skippedDates:
-    string[] =
-    [];
-
-
-  const client =
-    await db.connect();
-
+  const client = await db.connect();
 
   try {
+    await client.query("BEGIN");
 
     await client.query(
-      "BEGIN"
+      `
+      SELECT pg_advisory_xact_lock(
+        hashtextextended($1, 0)
+      )
+      `,
+      [`schedule:${branchId}:${staffId}:${year}:${month}`],
     );
 
+    const staffResult = await client.query(
+      `
+      SELECT *
+      FROM catalog.medical_staff
+      WHERE
+        id = $2::uuid
+        AND branch_id = $1
+        AND active = TRUE
+      FOR SHARE
+      `,
+      [branchId, staffId],
+    );
 
-    for (
-      let day =
-        1;
-      day <=
-        daysInMonth;
-      day++
+    const staff = requireRow(staffResult.rows);
+
+    const dailyTime = String(staff.daily_time ?? "");
+
+    const weeklyTime = String(staff.weekly_time ?? "");
+
+    const daily = dailyTime.replace(/\s/g, "").match(/^(\d{2})(\d{2})-(\d{2})(\d{2})$/);
+
+    if (
+      !daily ||
+      Number(daily[1]) > 23 ||
+      Number(daily[3]) > 23 ||
+      Number(daily[2]) > 59 ||
+      Number(daily[4]) > 59
     ) {
-
-      const currentDate =
-        firstDay.date(
-          day
-        );
-
-
-      const jsWeekday =
-        currentDate.day();
-
-
-      if (
-        !weekdays.includes(
-          jsWeekday
-        )
-      ) {
-
-        continue;
-
-      }
-
-
-      const workDate =
-        currentDate.format(
-          "YYYY-MM-DD"
-        );
-
-
-      // ==================================================
-      // KIỂM TRA ĐÃ CÓ LỊCH NGÀY ĐÓ CHƯA
-      //
-      // Nếu có bất kỳ lịch nào:
-      // không ghi đè
-      // ==================================================
-
-      const existingResult =
-        await client.query(
-          `
-          SELECT
-
-            id,
-
-            start_time,
-
-            end_time,
-
-            source
-
-          FROM
-            catalog.medical_staff_schedules
-
-          WHERE
-            staff_id =
-            $1::uuid
-
-            AND work_date =
-            $2::date
-
-          LIMIT
-            1
-          `,
-          [
-            staffId,
-            workDate,
-          ]
-        );
-
-
-      if (
-        existingResult.rowCount &&
-        existingResult.rowCount >
-        0
-      ) {
-
-        skipped++;
-
-        skippedDates.push(
-          workDate
-        );
-
-        continue;
-
-      }
-
-
-      await client.query(
-        `
-        INSERT INTO
-          catalog.medical_staff_schedules
-        (
-          staff_id,
-
-          work_date,
-
-          start_time,
-
-          end_time,
-
-          status,
-
-          source,
-
-          note,
-
-          created_at,
-
-          updated_at
-        )
-
-        VALUES
-        (
-          $1::uuid,
-
-          $2::date,
-
-          $3::time,
-
-          $4::time,
-
-          'ACTIVE',
-
-          'DEFAULT',
-
-          NULL,
-
-          NOW(),
-
-          NOW()
-        )
-
-        ON CONFLICT
-        DO NOTHING
-        `,
-        [
-
-          staffId,
-
-          workDate,
-
-          startTime,
-
-          endTime,
-
-        ]
-      );
-
-
-      inserted++;
-
-
-      createdDates.push(
-        workDate
-      );
-
+      throw new ScheduleError("Thời gian ngày của nhân viên không hợp lệ.");
     }
 
+    const startTime = `${daily[1]}:${daily[2]}`;
 
-    await client.query(
-      "COMMIT"
+    const endTime = `${daily[3]}:${daily[4]}`;
+
+    const tokens =
+      weeklyTime
+        .toUpperCase()
+        .replace(/\s/g, "")
+        .match(/CN|T[2-7]/g) ?? [];
+
+    const weekdays = [
+      ...new Set(tokens.map((token) => (token === "CN" ? 0 : Number(token[1]) - 1))),
+    ];
+
+    if (!weekdays.length) {
+      throw new ScheduleError("Nhân viên chưa có Thời gian tuần hợp lệ.");
+    }
+
+    const firstDate = `${year}-${String(month).padStart(2, "0")}-01`;
+
+    const result = await client.query(
+      `
+      WITH eligible AS (
+        SELECT d::date AS work_date
+
+        FROM generate_series(
+          $3::date::timestamp,
+
+          (
+            $3::date
+            + INTERVAL '1 month - 1 day'
+          )::timestamp,
+
+          INTERVAL '1 day'
+        ) d
+
+        WHERE
+          EXTRACT(DOW FROM d)::integer
+          = ANY($6::integer[])
+      ),
+
+      inserted AS (
+        INSERT INTO catalog.medical_staff_schedules (
+          branch_id,
+          staff_id,
+          work_date,
+          start_time,
+          end_time,
+          status,
+          source
+        )
+        SELECT
+          $1,
+          $2::uuid,
+          e.work_date,
+          $4::time,
+          $5::time,
+          'ACTIVE',
+          'DEFAULT'
+
+        FROM eligible e
+
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM catalog.medical_staff_schedules s
+          WHERE
+            s.branch_id = $1
+            AND s.staff_id = $2::uuid
+            AND s.work_date = e.work_date
+        )
+
+        ON CONFLICT DO NOTHING
+        RETURNING work_date
+      )
+
+      SELECT
+        COALESCE(
+          array_agg(
+            TO_CHAR(
+              e.work_date, 'YYYY-MM-DD'
+            )
+            ORDER BY e.work_date
+          ) FILTER (
+            WHERE i.work_date IS NOT NULL
+          ),
+          ARRAY[]::text[]
+        ) AS created_dates,
+
+        COALESCE(
+          array_agg(
+            TO_CHAR(
+              e.work_date, 'YYYY-MM-DD'
+            )
+            ORDER BY e.work_date
+          ) FILTER (
+            WHERE i.work_date IS NULL
+          ),
+          ARRAY[]::text[]
+        ) AS skipped_dates
+
+      FROM eligible e
+
+      LEFT JOIN inserted i
+        ON i.work_date = e.work_date
+      `,
+      [branchId, staffId, firstDate, startTime, endTime, weekdays],
     );
 
+    const createdDates: string[] = result.rows[0].created_dates;
+
+    const skippedDates: string[] = result.rows[0].skipped_dates;
+
+    await client.query("COMMIT");
 
     return {
-
       staff: {
+        id: String(staff.id),
+        fullName: staff.full_name,
 
-        id:
-          String(
-            staff.id
-          ),
+        socialInsuranceCode: staff.social_insurance_code || null,
 
-        fullName:
-          String(
-            staff.full_name
-          ),
-
-        socialInsuranceCode:
-          staff.social_insurance_code
-            ? String(
-                staff.social_insurance_code
-              )
-            : null,
-
-        licenseNumber:
-          staff.license_number
-            ? String(
-                staff.license_number
-              )
-            : null,
-
+        licenseNumber: staff.license_number || null,
       },
 
       year,
-
       month,
-
-      dailyTime:
-        String(
-          staff.daily_time
-        ),
-
-      weeklyTime:
-        String(
-          staff.weekly_time
-        ),
-
+      dailyTime,
+      weeklyTime,
       startTime,
-
       endTime,
-
       weekdays,
 
-      inserted,
-
-      skipped,
-
+      inserted: createdDates.length,
+      skipped: skippedDates.length,
       createdDates,
-
       skippedDates,
-
     };
-
-  } catch (
-    error
-  ) {
-
-    await client.query(
-      "ROLLBACK"
-    );
-
-
+  } catch (error) {
+    await client.query("ROLLBACK");
     throw error;
-
   } finally {
-
     client.release();
-
   }
-
 }

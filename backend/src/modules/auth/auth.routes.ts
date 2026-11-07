@@ -1,20 +1,8 @@
-import {
-  Router,
-} from "express";
+import { Router } from "express";
 
-import {
-  login,
-  logout,
-  me,
-} from "./auth.controller.js";
+import { login, logout, me } from "./auth.controller.js";
 
-import {
-  requireAuth,
-} from "./auth.middleware.js";
-
-import {
-  requireAdmin,
-} from "./admin.middleware.js";
+import { requireAuth } from "./auth.middleware.js";
 
 import {
   addUser,
@@ -25,88 +13,24 @@ import {
   updateUserRole,
 } from "./account.controller.js";
 
+const router = Router();
 
-const router =
-  Router();
+router.post("/login", login);
 
+router.get("/me", requireAuth, me);
 
-// ======================================================
-// LOGIN
-// ======================================================
+router.post("/logout", requireAuth, logout);
 
-router.post(
-  "/login",
-  login
-);
+router.post("/change-password", requireAuth, changePassword);
 
+router.get("/users", requireAuth, listUsers);
 
-// ======================================================
-// CURRENT USER
-// ======================================================
+router.post("/users", requireAuth, addUser);
 
-router.get(
-  "/me",
-  requireAuth,
-  me
-);
+router.patch("/users/:userId/active", requireAuth, updateUserActive);
 
+router.patch("/users/:userId/role", requireAuth, updateUserRole);
 
-router.post(
-  "/logout",
-  requireAuth,
-  logout
-);
-
-
-router.post(
-  "/change-password",
-  requireAuth,
-  changePassword
-);
-
-
-// ======================================================
-// ADMIN
-// ======================================================
-
-router.get(
-  "/users",
-  requireAuth,
-  requireAdmin,
-  listUsers
-);
-
-
-router.post(
-  "/users",
-  requireAuth,
-  requireAdmin,
-  addUser
-);
-
-
-router.patch(
-  "/users/:userId/active",
-  requireAuth,
-  requireAdmin,
-  updateUserActive
-);
-
-
-router.patch(
-  "/users/:userId/role",
-  requireAuth,
-  requireAdmin,
-  updateUserRole
-);
-
-
-router.post(
-  "/users/:userId/reset-password",
-  requireAuth,
-  requireAdmin,
-  adminResetPassword
-);
-
+router.post("/users/:userId/reset-password", requireAuth, adminResetPassword);
 
 export default router;

@@ -1,229 +1,89 @@
-import type {
-  Request,
-  Response,
-} from "express";
+import type { Request, Response } from "express";
 
-import {
-  loginUser,
-} from "./auth.service.js";
+import { AuthError, loginUser } from "./auth.service.js";
 
-import type {
-  AuthRequest,
-} from "./auth.middleware.js";
+import type { AuthRequest } from "./auth.middleware.js";
 
+import { AUTH_COOKIE_NAME, getAuthCookieOptions } from "./auth.cookies.js";
 
-// ======================================================
-// COOKIE CONFIG
-// ======================================================
+export async function login(req: Request, res: Response): Promise<void> {
+  const username = String(req.body?.username ?? "").trim();
 
-function getCookieOptions() {
-  const isProduction =
-    process.env.NODE_ENV ===
-    "production";
+  const password = String(req.body?.password ?? "");
 
-
-  return {
-    httpOnly:
-      true,
-
-    secure:
-      isProduction,
-
-    sameSite:
-      (
-        isProduction
-          ? "none"
-          : "lax"
-      ) as
-        | "none"
-        | "lax",
-
-    maxAge:
-      8 *
-      60 *
-      60 *
-      1000,
-
-    path:
-      "/",
-  };
-}
-
-
-// ======================================================
-// LOGIN
-// ======================================================
-
-export async function login(
-  req: Request,
-  res: Response
-): Promise<void> {
-  try {
-    const username =
-      String(
-        req.body?.username ??
-        ""
-      ).trim();
-
-
-    const password =
-      String(
-        req.body?.password ??
-        ""
-      );
-
-
-    if (
-      !username ||
-      !password
-    ) {
-      res
-        .status(
-          400
-        )
-        .json({
-          success:
-            false,
-
-          message:
-            "Vui lòng nhập tài khoản và mật khẩu.",
-        });
-
-      return;
-    }
-
-
-    const result =
-      await loginUser(
-        username,
-        password
-      );
-
-
-    if (
-      !result
-    ) {
-      res
-        .status(
-          401
-        )
-        .json({
-          success:
-            false,
-
-          message:
-            "Sai tài khoản hoặc mật khẩu.",
-        });
-
-      return;
-    }
-
-
-    res.cookie(
-      "medguard_token",
-      result.token,
-      getCookieOptions()
-    );
-
-
-    res.json({
-      success:
-        true,
-
-      message:
-        "Đăng nhập thành công.",
-
-      user:
-        result.user,
+  if (!username || !password) {
+    res.status(400).json({
+      success: false,
+      message: "Vui lòng nhập tài khoản và mật khẩu.",
     });
 
-  } catch (
-    error
-  ) {
-    console.error(
-      "Login error:",
-      error
-    );
+    return;
+  }
 
+  try {
+    const result = await loginUser(username, password);
 
-    res
-      .status(
-        500
-      )
-      .json({
-        success:
-          false,
-
-        message:
-          error instanceof Error
-            ? error.message
-            : "Đăng nhập thất bại.",
+    if (!result) {
+      res.status(401).json({
+        success: false,
+        message: "Sai tài khoản hoặc mật khẩu.",
       });
+
+      return;
+    }
+
+    res.cookie(AUTH_COOKIE_NAME, result.token, {
+      ...getAuthCookieOptions(),
+      maxAge: 8 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      success: true,
+      message: "Đăng nhập thành công.",
+      user: result.user,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+
+      return;
+    }
+
+    console.error("Login error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Không thể đăng nhập. Vui lòng thử lại.",
+    });
   }
 }
 
+export async function me(req: AuthRequest, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      message: "Bạn chưa đăng nhập.",
+    });
 
-// ======================================================
-// ME
-// ======================================================
+    return;
+  }
 
-export async function me(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  res.setHeader("Cache-Control", "no-store");
+
   res.json({
-    success:
-      true,
-
-    user: {
-      id:
-        req.user?.id,
-
-      username:
-        req.user?.username,
-
-      role:
-        req.user?.role,
-    },
+    success: true,
+    user: req.user,
   });
 }
 
-
-// ======================================================
-// LOGOUT
-// ======================================================
-
-export async function logout(
-  _req: Request,
-  res: Response
-): Promise<void> {
-  const cookieOptions =
-    getCookieOptions();
-
-
-  res.clearCookie(
-    "medguard_token",
-    {
-      httpOnly:
-        cookieOptions.httpOnly,
-
-      secure:
-        cookieOptions.secure,
-
-      sameSite:
-        cookieOptions.sameSite,
-
-      path:
-        cookieOptions.path,
-    }
-  );
-
+export async function logout(_req: Request, res: Response): Promise<void> {
+  res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
 
   res.json({
-    success:
-      true,
-
-    message:
-      "Đã đăng xuất.",
+    success: true,
+    message: "Đã đăng xuất.",
   });
 }

@@ -1,9 +1,7 @@
-import {
-  db,
-} from "../../config/database.js";
-
+import { db } from "../../config/database.js";
 
 export interface DoctorVisitParams {
+  branchId: string;
   staffId?: string;
   year?: number;
   month?: number;
@@ -12,634 +10,182 @@ export interface DoctorVisitParams {
   pageSize: number;
 }
 
-
-function normalizeText(
-  value:
-    unknown
-): string {
-
-  return String(
-    value ??
-    ""
-  ).trim();
-}
-
-
-export async function listDoctorVisits(
-  params:
-    DoctorVisitParams
-) {
-
-  const {
-    staffId,
-    year,
-    month,
-    paymentDate,
-    page,
-    pageSize,
-  } =
-    params;
-
-
-  const values:
-    unknown[] =
-    [];
-
-
-  const conditions:
-    string[] =
-    [];
-
-
-  if (
-    staffId
-  ) {
-
-    values.push(
-      staffId
-    );
-
-    conditions.push(
-      `ms.id = $${values.length}::uuid`
-    );
-
+export async function listDoctorVisits(params: DoctorVisitParams) {
+  if (!params.branchId) {
+    throw new Error("Chưa xác định chi nhánh.");
   }
 
-
-  if (
-    year
-  ) {
-
-    values.push(
-      year
-    );
-
- conditions.push(
-  `EXTRACT(YEAR FROM ee.exam_date)::integer = $${values.length}`
-);
-
-  }
-
-
-  if (
-    month
-  ) {
-
-    values.push(
-      month
-    );
-
-   conditions.push(
-  `EXTRACT(MONTH FROM ee.exam_date)::integer = $${values.length}`
-);
-
-  }
-
-
-  if (
-    paymentDate
-  ) {
-
-    values.push(
-      paymentDate
-    );
-
-    conditions.push(
-      `mc.ngay_ttoan::date = $${values.length}::date`
-    );
-
-  }
-
-
-  const whereSql =
-    conditions.length >
-    0
-
-      ? `AND ${conditions.join(
-          " AND "
-        )}`
-
-      : "";
-
-
-  const offset =
-    (
-      page -
-      1
-    ) *
-    pageSize;
-
-
-  const limitIndex =
-    values.length +
-    1;
-
-
-  const offsetIndex =
-    values.length +
-    2;
-
-
-  const result =
-    await db.query(
-      `
-      WITH exam_events AS (
-
-        SELECT DISTINCT
-
-          e.medical_case_id,
-
-          e.doctor_code,
-
-          e.start_time::date
-            AS exam_date
-
-        FROM
-          core.medical_events e
-
-        INNER JOIN
-          core.medical_cases mc
-
-          ON
-            mc.id =
-            e.medical_case_id
-
-        WHERE
-
-          e.start_time
-          IS NOT NULL
-
-          AND
-
-          NULLIF(
-            BTRIM(
-              e.doctor_code
-            ),
-            ''
-          )
-          IS NOT NULL
-
-          AND
-          (
-            UPPER(
-              COALESCE(
-                e.event_type,
-                ''
-              )
-            )
-            =
-            'EXAM'
-
-            OR
-
-            LOWER(
-              COALESCE(
-                e.item_name,
-                ''
-              )
-            )
-            LIKE
-            'khám%'
-          )
-
-      ),
-
-      matched AS (
-
-        SELECT
-
-          ms.id
-            AS staff_id,
-
-          ms.full_name,
-
-          ms.social_insurance_code,
-
-          ms.license_number,
-
-          ee.exam_date,
-
-          ee.medical_case_id
-
-        FROM
-          exam_events ee
-
-        INNER JOIN
-          catalog.medical_staff ms
-
-          ON
-          (
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  COALESCE(
-                    ms.license_number,
-                    ''
-                  )
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-
-            =
-
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  ee.doctor_code
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-
-            OR
-
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  COALESCE(
-                    ms.social_insurance_code,
-                    ''
-                  )
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-
-            =
-
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  ee.doctor_code
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-          )
-
-        INNER JOIN
-          core.medical_cases mc
-
-          ON
-            mc.id =
-            ee.medical_case_id
-
-        WHERE
-          ms.active =
-          true
-
-          ${whereSql}
-
-      ),
-
-      grouped AS (
-
-        SELECT
-
-          staff_id,
-
-          full_name,
-
-          social_insurance_code,
-
-          license_number,
-
-          exam_date,
-
-          COUNT(
-            DISTINCT
-            medical_case_id
-          )::integer
-            AS visit_count
-
-        FROM
-          matched
-
-        GROUP BY
-
-          staff_id,
-
-          full_name,
-
-          social_insurance_code,
-
-          license_number,
-
-          exam_date
-
-      )
-
+  const result = await db.query(
+    `
+    WITH exam_events AS (
+      SELECT DISTINCT
+        e.medical_case_id,
+        e.doctor_code,
+        e.start_time::date AS exam_date
+
+      FROM core.medical_events e
+
+      JOIN core.medical_cases mc
+        ON mc.id = e.medical_case_id
+
+      WHERE
+        e.branch_id = $1
+        AND mc.branch_id = $1
+        AND e.start_time IS NOT NULL
+        AND NULLIF(BTRIM(e.doctor_code), '') IS NOT NULL
+
+        AND (
+          UPPER(COALESCE(e.event_type, '')) = 'EXAM'
+          OR LOWER(COALESCE(e.item_name, '')) LIKE 'khám%'
+        )
+    ),
+
+    grouped AS (
       SELECT
+        ms.id AS staff_id,
+        ms.full_name,
+        ms.social_insurance_code,
+        ms.license_number,
+        ee.exam_date,
 
-        staff_id,
+        COUNT(
+          DISTINCT ee.medical_case_id
+        )::integer AS visit_count
 
-        full_name,
+      FROM exam_events ee
 
-        social_insurance_code,
-
-        license_number,
-
-        EXTRACT(
-          MONTH
-          FROM exam_date
-        )::integer
-          AS month,
-
-        EXTRACT(
-          YEAR
-          FROM exam_date
-        )::integer
-          AS year,
-
-        exam_date,
-
-        visit_count
-
-      FROM
-        grouped
-
-      ORDER BY
-
-        exam_date ASC,
-
-        full_name ASC
-
-      LIMIT
-        $${limitIndex}
-
-      OFFSET
-        $${offsetIndex}
-      `,
-      [
-        ...values,
-        pageSize,
-        offset,
-      ]
-    );
-
-
-  const countResult =
-    await db.query(
-      `
-      WITH exam_events AS (
-
-        SELECT DISTINCT
-
-          e.medical_case_id,
-
-          e.doctor_code,
-
-          e.start_time::date
-            AS exam_date
-
-        FROM
-          core.medical_events e
-
-        INNER JOIN
-          core.medical_cases mc
-
-          ON
-            mc.id =
-            e.medical_case_id
-
-        WHERE
-
-          e.start_time
-          IS NOT NULL
-
-          AND
-
-          NULLIF(
-            BTRIM(
-              e.doctor_code
-            ),
-            ''
-          )
-          IS NOT NULL
-
-          AND
-          (
-            UPPER(
-              COALESCE(
-                e.event_type,
-                ''
-              )
+      JOIN catalog.medical_staff ms
+        ON ms.branch_id = $1
+        AND (
+          LOWER(
+            REGEXP_REPLACE(
+              BTRIM(COALESCE(ms.license_number, '')),
+              '\\s+', '', 'g'
             )
-            =
-            'EXAM'
-
-            OR
-
-            LOWER(
-              COALESCE(
-                e.item_name,
-                ''
-              )
-            )
-            LIKE
-            'khám%'
-          )
-
-      ),
-
-      matched AS (
-
-        SELECT
-
-          ms.id
-            AS staff_id,
-
-          ms.full_name,
-
-          ee.exam_date,
-
-          ee.medical_case_id
-
-        FROM
-          exam_events ee
-
-        INNER JOIN
-          catalog.medical_staff ms
-
-          ON
-          (
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  COALESCE(
-                    ms.license_number,
-                    ''
-                  )
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-
-            =
-
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  ee.doctor_code
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-
-            OR
-
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  COALESCE(
-                    ms.social_insurance_code,
-                    ''
-                  )
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
-            )
-
-            =
-
-            LOWER(
-              REGEXP_REPLACE(
-                BTRIM(
-                  ee.doctor_code
-                ),
-                '\\s+',
-                '',
-                'g'
-              )
+          ) = LOWER(
+            REGEXP_REPLACE(
+              BTRIM(ee.doctor_code),
+              '\\s+', '', 'g'
             )
           )
 
-        INNER JOIN
-          core.medical_cases mc
+          OR LOWER(
+            REGEXP_REPLACE(
+              BTRIM(COALESCE(ms.social_insurance_code, '')),
+              '\\s+', '', 'g'
+            )
+          ) = LOWER(
+            REGEXP_REPLACE(
+              BTRIM(ee.doctor_code),
+              '\\s+', '', 'g'
+            )
+          )
+        )
 
-          ON
-            mc.id =
-            ee.medical_case_id
+      JOIN core.medical_cases mc
+        ON mc.id = ee.medical_case_id
+        AND mc.branch_id = $1
 
-        WHERE
-          ms.active =
-          true
+      WHERE
+        ms.active = TRUE
 
-          ${whereSql}
+        AND (
+          $2::uuid IS NULL
+          OR ms.id = $2::uuid
+        )
 
-      ),
+        AND (
+          $3::integer IS NULL
+          OR EXTRACT(YEAR FROM ee.exam_date)::integer = $3
+        )
 
-      grouped AS (
+        AND (
+          $4::integer IS NULL
+          OR EXTRACT(MONTH FROM ee.exam_date)::integer = $4
+        )
 
-        SELECT
+        AND (
+          $5::date IS NULL
+          OR mc.ngay_ttoan::date = $5::date
+        )
 
-          staff_id,
+      GROUP BY
+        ms.id,
+        ms.full_name,
+        ms.social_insurance_code,
+        ms.license_number,
+        ee.exam_date
+    )
 
-          exam_date
+    SELECT
+      (
+        SELECT COUNT(*)::integer
+        FROM grouped
+      ) AS total,
 
-        FROM
-          matched
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            p ORDER BY
+              p."examDate",
+              p."fullName",
+              p."staffId"
+          )
 
-        GROUP BY
+          FROM (
+            SELECT
+              staff_id::text AS "staffId",
+              full_name AS "fullName",
 
-          staff_id,
+              NULLIF(
+                social_insurance_code, ''
+              ) AS "socialInsuranceCode",
 
-          exam_date
+              NULLIF(
+                license_number, ''
+              ) AS "licenseNumber",
 
-      )
+              EXTRACT(
+                MONTH FROM exam_date
+              )::integer AS month,
 
-      SELECT
-        COUNT(*)::integer
-          AS total
+              EXTRACT(
+                YEAR FROM exam_date
+              )::integer AS year,
 
-      FROM
-        grouped
-      `,
-      values
-    );
+              TO_CHAR(
+                exam_date, 'YYYY-MM-DD'
+              ) AS "examDate",
 
+              visit_count AS "visitCount"
+
+            FROM grouped
+
+            ORDER BY
+              exam_date,
+              full_name,
+              staff_id
+
+            LIMIT $6
+            OFFSET $7
+          ) p
+        ),
+        '[]'::jsonb
+      ) AS items
+    `,
+    [
+      params.branchId,
+      params.staffId || null,
+      params.year ?? null,
+      params.month ?? null,
+      params.paymentDate || null,
+      params.pageSize,
+      (params.page - 1) * params.pageSize,
+    ],
+  );
 
   return {
-
-    items:
-      result.rows.map(
-        (
-          row
-        ) => ({
-
-          staffId:
-            String(
-              row.staff_id
-            ),
-
-          fullName:
-            String(
-              row.full_name
-            ),
-
-          socialInsuranceCode:
-            row.social_insurance_code
-              ? String(
-                  row.social_insurance_code
-                )
-              : null,
-
-          licenseNumber:
-            row.license_number
-              ? String(
-                  row.license_number
-                )
-              : null,
-
-          month:
-            Number(
-              row.month
-            ),
-
-          year:
-            Number(
-              row.year
-            ),
-
-          examDate:
-            String(
-              row.exam_date
-            ).slice(
-              0,
-              10
-            ),
-
-          visitCount:
-            Number(
-              row.visit_count
-            ),
-
-        })
-      ),
-
-    total:
-      Number(
-        countResult
-          .rows[0]
-          ?.total ??
-        0
-      ),
-
+    items: result.rows[0].items,
+    total: Number(result.rows[0].total),
   };
-
 }

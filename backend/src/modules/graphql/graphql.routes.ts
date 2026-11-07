@@ -1,442 +1,120 @@
-import {
-  Router,
-  type Response,
-} from "express";
+import { Router, type Response } from "express";
 
-import {
-  Kind,
-  parse,
-} from "graphql";
+import { requireAuth, type AuthRequest } from "../auth/auth.middleware.js";
 
-import {
-  requireAuth,
-  type AuthRequest,
-} from "../auth/auth.middleware.js";
+const router = Router();
 
+router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
+  res.setHeader("Cache-Control", "no-store");
 
-const router =
-  Router();
+  if (!req.user?.branchId) {
+    res.status(403).json({
+      errors: [
+        {
+          message: "Tài khoản chưa được xác định chi nhánh.",
+        },
+      ],
+    });
 
+    return;
+  }
 
-// ======================================================
-// KIỂM TRA GRAPHQL QUERY CỦA USER
-// ======================================================
-//
-// ADMIN:
-// - query
-// - mutation
-//
-// USER:
-// - chỉ query
-// - không mutation
-// - không subscription
-// - không introspection
-//
-// ======================================================
+  const query = req.body?.query;
+  const variables = req.body?.variables;
+  const operationName = req.body?.operationName;
 
-function checkUserGraphql(
-  query: string
-): {
-  allowed: boolean;
-  message?: string;
-} {
+  if (typeof query !== "string" || !query.trim()) {
+    res.status(400).json({
+      errors: [
+        {
+          message: "Thiếu GraphQL query hợp lệ.",
+        },
+      ],
+    });
+
+    return;
+  }
+
+  if (
+    (variables != null && (typeof variables !== "object" || Array.isArray(variables))) ||
+    (operationName != null && typeof operationName !== "string")
+  ) {
+    res.status(400).json({
+      errors: [
+        {
+          message: "GraphQL variables hoặc operationName không hợp lệ.",
+        },
+      ],
+    });
+
+    return;
+  }
+
+  const hasuraUrl = process.env.HASURA_GRAPHQL_URL || "http://localhost:8080/v1/graphql";
+
+  const adminSecret = process.env.HASURA_ADMIN_SECRET;
+
+  if (!adminSecret) {
+    console.error("HASURA_ADMIN_SECRET chưa được cấu hình.");
+
+    res.status(500).json({
+      errors: [
+        {
+          message: "Hệ thống chưa cấu hình kết nối Hasura.",
+        },
+      ],
+    });
+
+    return;
+  }
 
   try {
+    // Mọi tài khoản đều dùng cùng quyền Hasura.
+    // Chi nhánh lấy từ tài khoản đã xác thực.
+    // Không chuyển tiếp role hoặc chi nhánh
+    // do trình duyệt tự gửi lên.
+    const response = await fetch(hasuraUrl, {
+      method: "POST",
 
-    const document =
-      parse(query);
+      headers: {
+        "Content-Type": "application/json",
 
+        "x-hasura-admin-secret": adminSecret,
 
-    for (
-      const definition
-      of document.definitions
-    ) {
+        "x-hasura-role": "branch_admin",
 
-      if (
-        definition.kind !==
-        Kind.OPERATION_DEFINITION
-      ) {
+        "x-hasura-user-id": req.user.id,
 
-        continue;
-      }
+        "x-hasura-branch-id": req.user.branchId,
+      },
 
+      body: JSON.stringify({
+        query,
+        variables,
+        operationName,
+      }),
 
-      // ==================================================
-      // USER CHỈ ĐƯỢC QUERY
-      // ==================================================
+      signal: AbortSignal.timeout(30_000),
+    });
 
-      if (
-        definition.operation !==
-        "query"
-      ) {
+    const body = await response.text();
 
-        return {
-          allowed: false,
+    res.status(response.status);
 
-          message:
-            "Tài khoản USER chỉ được phép đọc dữ liệu.",
-        };
-      }
+    res.setHeader("Content-Type", response.headers.get("content-type") || "application/json");
 
+    res.send(body);
+  } catch (error) {
+    console.error("GraphQL proxy error:", error);
 
-      // ==================================================
-      // KHÔNG CHO USER DÙNG INTROSPECTION
-      // ==================================================
-
-      for (
-        const selection
-        of definition.selectionSet.selections
-      ) {
-
-        if (
-          selection.kind !==
-          Kind.FIELD
-        ) {
-
-          continue;
-        }
-
-
-        const fieldName =
-          selection.name.value;
-
-
-        if (
-          fieldName.startsWith(
-            "__"
-          )
-        ) {
-
-          return {
-            allowed: false,
-
-            message:
-              "Tài khoản USER không được phép truy vấn cấu trúc GraphQL.",
-          };
-        }
-      }
-    }
-
-
-    return {
-      allowed: true,
-    };
-
-  } catch {
-
-    return {
-      allowed: false,
-
-      message:
-        "GraphQL query không hợp lệ.",
-    };
+    res.status(502).json({
+      errors: [
+        {
+          message: "Không thể kết nối Hasura. Vui lòng thử lại.",
+        },
+      ],
+    });
   }
-}
-
-
-// ======================================================
-// GRAPHQL PROXY
-// ======================================================
-//
-// Browser
-//    │
-//    │ medguard_token
-//    ▼
-//
-// Backend MedGuard
-//    │
-//    │ requireAuth
-//    │ kiểm tra ADMIN / USER
-//    ▼
-//
-// Hasura
-//    │
-//    │ ADMIN:
-//    │ x-hasura-admin-secret
-//    │
-//    │ USER:
-//    │ x-hasura-admin-secret
-//    │ x-hasura-role: user
-//    │ x-hasura-user-id: UUID
-//    ▼
-//
-// PostgreSQL
-//
-// ======================================================
-
-router.post(
-  "/",
-  requireAuth,
-
-  async (
-    req: AuthRequest,
-    res: Response
-  ) => {
-
-    try {
-
-      // ==================================================
-      // 1. KIỂM TRA ĐĂNG NHẬP
-      // ==================================================
-
-      if (
-        !req.user
-      ) {
-
-        res
-          .status(401)
-          .json({
-            errors: [
-              {
-                message:
-                  "Bạn chưa đăng nhập.",
-              },
-            ],
-          });
-
-        return;
-      }
-
-
-      // ==================================================
-      // 2. LẤY GRAPHQL QUERY
-      // ==================================================
-
-      const query =
-        String(
-          req.body?.query ??
-          ""
-        );
-
-
-      if (!query) {
-
-        res
-          .status(400)
-          .json({
-            errors: [
-              {
-                message:
-                  "Thiếu GraphQL query.",
-              },
-            ],
-          });
-
-        return;
-      }
-
-
-      // ==================================================
-      // 3. KIỂM TRA ROLE
-      // ==================================================
-
-      const isAdmin =
-        req.user.role ===
-        "ADMIN";
-
-
-      // ==================================================
-      // 4. USER CHỈ ĐƯỢC QUERY
-      // ==================================================
-
-      if (!isAdmin) {
-
-        const check =
-          checkUserGraphql(
-            query
-          );
-
-
-        if (
-          !check.allowed
-        ) {
-
-          res
-            .status(403)
-            .json({
-              errors: [
-                {
-                  message:
-                    check.message ||
-                    "Bạn không có quyền thực hiện thao tác này.",
-                },
-              ],
-            });
-
-          return;
-        }
-      }
-
-
-      // ==================================================
-      // 5. HASURA CONFIG
-      // ==================================================
-
-      const hasuraUrl =
-        process.env
-          .HASURA_GRAPHQL_URL ||
-        "http://localhost:8080/v1/graphql";
-
-
-      const adminSecret =
-        process.env
-          .HASURA_ADMIN_SECRET;
-
-
-      if (
-        !adminSecret
-      ) {
-
-        console.error(
-          "HASURA_ADMIN_SECRET chưa được cấu hình."
-        );
-
-
-        res
-          .status(500)
-          .json({
-            errors: [
-              {
-                message:
-                  "Backend chưa cấu hình HASURA_ADMIN_SECRET.",
-              },
-            ],
-          });
-
-        return;
-      }
-
-
-      // ==================================================
-      // 6. TẠO HEADER GỬI SANG HASURA
-      // ==================================================
-
-      const hasuraHeaders:
-        Record<
-          string,
-          string
-        > = {
-
-          "Content-Type":
-            "application/json",
-
-          "x-hasura-admin-secret":
-            adminSecret,
-        };
-
-
-      // ==================================================
-      // 7. USER -> ÉP HASURA CHẠY ROLE user
-      // ==================================================
-      //
-      // Mặc dù backend biết admin secret,
-      // USER vẫn phải chạy theo Hasura Permission.
-      //
-      // ==================================================
-
-      if (!isAdmin) {
-
-        hasuraHeaders[
-          "x-hasura-role"
-        ] =
-          "user";
-
-
-        hasuraHeaders[
-          "x-hasura-user-id"
-        ] =
-          String(
-            req.user.id
-          );
-      }
-
-
-      // ==================================================
-      // 8. GỬI REQUEST SANG HASURA
-      // ==================================================
-
-      const response =
-        await fetch(
-          hasuraUrl,
-          {
-            method:
-              "POST",
-
-            headers:
-              hasuraHeaders,
-
-            body:
-              JSON.stringify({
-                query:
-                  req.body.query,
-
-                variables:
-                  req.body.variables ??
-                  undefined,
-
-                operationName:
-                  req.body.operationName ??
-                  undefined,
-              }),
-          }
-        );
-
-
-      // ==================================================
-      // 9. NHẬN RESPONSE TỪ HASURA
-      // ==================================================
-
-      const responseText =
-        await response.text();
-
-
-      // ==================================================
-      // 10. TRẢ RESPONSE VỀ FRONTEND
-      // ==================================================
-
-      res.status(
-        response.status
-      );
-
-
-      res.setHeader(
-        "Content-Type",
-        response.headers.get(
-          "content-type"
-        ) ||
-        "application/json"
-      );
-
-
-      res.send(
-        responseText
-      );
-
-    } catch (
-      error
-    ) {
-
-      console.error(
-        "GraphQL proxy error:",
-        error
-      );
-
-
-      res
-        .status(500)
-        .json({
-          errors: [
-            {
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Không thể kết nối Hasura.",
-            },
-          ],
-        });
-    }
-  }
-);
-
+});
 
 export default router;

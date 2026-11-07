@@ -1578,13 +1578,23 @@ async function replaceMedicalStaffDepartments(
 // ======================================================
 // MEDICAL STAFF CRUD
 // ======================================================
-
-export async function listMedicalStaff(params: ListMedicalStaffParams) {
+export async function listMedicalStaff(
+  params: ListMedicalStaffParams & {
+    branchId: string;
+  },
+) {
   const { fullName, socialInsuranceCode, licenseNumber, departmentCode, active, limit, offset } =
     params;
 
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+  const branchId = normalizeText(params.branchId);
+
+  if (!branchId) {
+    throw new Error("Chưa xác định chi nhánh.");
+  }
+
+  const conditions: string[] = ["s.branch_id = $1"];
+
+  const values: unknown[] = [branchId];
 
   if (fullName) {
     values.push(`%${normalizeText(fullName)}%`);
@@ -1612,8 +1622,9 @@ export async function listMedicalStaff(params: ListMedicalStaffParams) {
         SELECT 1
         FROM catalog.medical_staff_departments sd
         WHERE sd.staff_id = s.id
+          AND sd.branch_id = s.branch_id
           AND sd.department_code = $${values.length}
-          AND sd.active = true
+          AND sd.active = TRUE
       )
     `);
   }
@@ -1624,7 +1635,7 @@ export async function listMedicalStaff(params: ListMedicalStaffParams) {
     conditions.push(`s.active = $${values.length}`);
   }
 
-  const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const whereSql = `WHERE ${conditions.join(" AND ")}`;
 
   const limitIndex = values.length + 1;
   const offsetIndex = values.length + 2;
@@ -1649,6 +1660,7 @@ export async function listMedicalStaff(params: ListMedicalStaffParams) {
       s.active,
       s.created_at,
       s.updated_at,
+
       COALESCE(
         (
           SELECT json_agg(
@@ -1661,14 +1673,22 @@ export async function listMedicalStaff(params: ListMedicalStaffParams) {
           FROM catalog.medical_staff_departments sd
           INNER JOIN catalog.departments d
             ON d.code = sd.department_code
+            AND d.branch_id = s.branch_id
           WHERE sd.staff_id = s.id
-            AND sd.active = true
+            AND sd.branch_id = s.branch_id
+            AND sd.active = TRUE
         ),
         '[]'::json
       ) AS departments
+
     FROM catalog.medical_staff s
+
     ${whereSql}
-    ORDER BY s.full_name ASC, s.id ASC
+
+    ORDER BY
+      s.full_name ASC,
+      s.id ASC
+
     LIMIT $${limitIndex}
     OFFSET $${offsetIndex}
     `,
@@ -1687,6 +1707,7 @@ export async function listMedicalStaff(params: ListMedicalStaffParams) {
   return {
     items: result.rows.map((row) => ({
       id: String(row.id),
+
       fullName: String(row.full_name),
 
       socialInsuranceCode: row.social_insurance_code ? String(row.social_insurance_code) : null,
@@ -1720,6 +1741,7 @@ export async function listMedicalStaff(params: ListMedicalStaffParams) {
       departmentCount: Array.isArray(row.departments) ? row.departments.length : 0,
 
       createdAt: row.created_at,
+
       updatedAt: row.updated_at,
     })),
 
