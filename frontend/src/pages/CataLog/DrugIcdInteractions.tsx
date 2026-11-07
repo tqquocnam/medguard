@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -73,40 +68,26 @@ interface ApiResponse<T> {
 // API
 // ======================================================
 
-async function request<T>(
-  path = "",
-  init?: RequestInit
-): Promise<T | undefined> {
-  const response = await apiFetch(
-    `${API}${path}`,
-    {
-      ...init,
+async function request<T>(path = "", init?: RequestInit): Promise<T | undefined> {
+  const response = await apiFetch(`${API}${path}`, {
+    ...init,
 
-      headers: {
-        "Content-Type": "application/json",
-        ...init?.headers,
-      },
-    }
-  );
+    headers: {
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
 
-  const contentType =
-    response.headers.get("content-type") ?? "";
+  const contentType = response.headers.get("content-type") ?? "";
 
   if (!contentType.includes("application/json")) {
-    throw new Error(
-      `API không trả về JSON (HTTP ${response.status}).`
-    );
+    throw new Error(`API không trả về JSON (HTTP ${response.status}).`);
   }
 
-  const json =
-    (await response.json()) as ApiResponse<T>;
+  const json = (await response.json()) as ApiResponse<T>;
 
   if (!response.ok || json.success !== true) {
-    throw new Error(
-      json.message ||
-      json.error ||
-      `Lỗi HTTP ${response.status}`
-    );
+    throw new Error(json.message || json.error || `Lỗi HTTP ${response.status}`);
   }
 
   return json.data;
@@ -119,8 +100,7 @@ async function request<T>(
 export default function DrugIcdInteractions() {
   const navigate = useNavigate();
 
-  const [messageApi, contextHolder] =
-    message.useMessage();
+  const [messageApi, contextHolder] = message.useMessage();
 
   const [form] = Form.useForm<FormValues>();
 
@@ -128,20 +108,17 @@ export default function DrugIcdInteractions() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [deletingId, setDeletingId] =
-    useState<string | number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [editing, setEditing] =
-    useState<RuleRow | null>(null);
+  const [editing, setEditing] = useState<RuleRow | null>(null);
 
   const [ingredient, setIngredient] = useState("");
   const [icd, setIcd] = useState("");
 
-  const [status, setStatus] =
-    useState<string | undefined>();
+  const [status, setStatus] = useState<string | undefined>();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -160,18 +137,12 @@ export default function DrugIcdInteractions() {
       const data = await request<RuleRow[]>();
 
       if (!Array.isArray(data)) {
-        throw new Error(
-          "Danh sách cấu hình không hợp lệ."
-        );
+        throw new Error("Danh sách cấu hình không hợp lệ.");
       }
 
       setRows(data);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Không thể tải danh mục."
-      );
+      setError(err instanceof Error ? err.message : "Không thể tải danh mục.");
     } finally {
       setLoading(false);
     }
@@ -188,23 +159,16 @@ export default function DrugIcdInteractions() {
   const filteredRows = useMemo(
     () =>
       rows.filter(
-        row =>
+        (row) =>
           row.active_ingredient
             .toLocaleLowerCase()
-            .includes(
-              ingredient.trim().toLocaleLowerCase()
-            ) &&
+            .includes(ingredient.trim().toLocaleLowerCase()) &&
           `${row.icd_code} ${row.icd_name ?? ""}`
             .toLocaleLowerCase()
-            .includes(
-              icd.trim().toLocaleLowerCase()
-            ) &&
-          (
-            status === undefined ||
-            row.active === (status === "active")
-          )
+            .includes(icd.trim().toLocaleLowerCase()) &&
+          (status === undefined || row.active === (status === "active")),
       ),
-    [rows, ingredient, icd, status]
+    [rows, ingredient, icd, status],
   );
 
   // ====================================================
@@ -223,7 +187,7 @@ export default function DrugIcdInteractions() {
         match_type: "EXACT",
         note: "",
         active: true,
-      }
+      },
     );
 
     setModalOpen(true);
@@ -241,17 +205,13 @@ export default function DrugIcdInteractions() {
   // SAVE
   // ====================================================
 
-  async function handleSave(
-    values: FormValues
-  ) {
+  async function handleSave(values: FormValues) {
     if (saving) return;
 
     setSaving(true);
 
     try {
-      const path = editing
-        ? `/${encodeURIComponent(String(editing.id))}`
-        : "";
+      const path = editing ? `/${encodeURIComponent(String(editing.id))}` : "";
 
       await request(path, {
         method: editing ? "PUT" : "POST",
@@ -259,24 +219,17 @@ export default function DrugIcdInteractions() {
         body: JSON.stringify({
           ...values,
 
-          active_ingredient:
-            values.active_ingredient.trim(),
+          active_ingredient: values.active_ingredient.trim(),
 
-          icd_code:
-            values.icd_code.trim().toUpperCase(),
+          icd_code: values.icd_code.trim().toUpperCase(),
 
-          icd_name:
-            values.icd_name?.trim() || null,
+          icd_name: values.icd_name?.trim() || null,
 
           note: values.note.trim(),
         }),
       });
 
-      messageApi.success(
-        editing
-          ? "Đã cập nhật cấu hình."
-          : "Đã thêm cấu hình."
-      );
+      messageApi.success(editing ? "Đã cập nhật cấu hình." : "Đã thêm cấu hình.");
 
       setModalOpen(false);
       setEditing(null);
@@ -285,11 +238,7 @@ export default function DrugIcdInteractions() {
 
       await loadData();
     } catch (err) {
-      messageApi.error(
-        err instanceof Error
-          ? err.message
-          : "Không thể lưu cấu hình."
-      );
+      messageApi.error(err instanceof Error ? err.message : "Không thể lưu cấu hình.");
     } finally {
       setSaving(false);
     }
@@ -299,30 +248,19 @@ export default function DrugIcdInteractions() {
   // DELETE
   // ====================================================
 
-  async function handleDelete(
-    record: RuleRow
-  ) {
+  async function handleDelete(record: RuleRow) {
     setDeletingId(record.id);
 
     try {
-      await request(
-        `/${encodeURIComponent(String(record.id))}`,
-        { method: "DELETE" }
-      );
+      await request(`/${encodeURIComponent(String(record.id))}`, { method: "DELETE" });
 
-      messageApi.success(
-        "Đã xóa cấu hình."
-      );
+      messageApi.success("Đã xóa cấu hình.");
 
       setPage(1);
 
       await loadData();
     } catch (err) {
-      messageApi.error(
-        err instanceof Error
-          ? err.message
-          : "Không thể xóa cấu hình."
-      );
+      messageApi.error(err instanceof Error ? err.message : "Không thể xóa cấu hình.");
     } finally {
       setDeletingId(null);
     }
@@ -348,8 +286,7 @@ export default function DrugIcdInteractions() {
       width: 60,
       align: "center",
 
-      render: (_, __, index) =>
-        (page - 1) * pageSize + index + 1,
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
 
     {
@@ -363,7 +300,7 @@ export default function DrugIcdInteractions() {
       dataIndex: "icd_code",
       width: 100,
 
-      render: value => (
+      render: (value) => (
         <Text
           strong
           style={{
@@ -380,7 +317,7 @@ export default function DrugIcdInteractions() {
       title: "Tên ICD",
       dataIndex: "icd_name",
       width: 240,
-      render: value => value || "—",
+      render: (value) => value || "—",
     },
 
     {
@@ -389,16 +326,8 @@ export default function DrugIcdInteractions() {
       width: 145,
 
       render: (value: MatchType) => (
-        <Tag
-          color={
-            value === "EXACT"
-              ? "blue"
-              : "purple"
-          }
-        >
-          {value === "EXACT"
-            ? "Chính xác"
-            : "Theo nhóm ICD"}
+        <Tag color={value === "EXACT" ? "blue" : "purple"}>
+          {value === "EXACT" ? "Chính xác" : "Theo nhóm ICD"}
         </Tag>
       ),
     },
@@ -416,13 +345,7 @@ export default function DrugIcdInteractions() {
       align: "center",
 
       render: (value: boolean) => (
-        <Tag
-          color={
-            value ? "success" : "default"
-          }
-        >
-          {value ? "Đang bật" : "Đã tắt"}
-        </Tag>
+        <Tag color={value ? "success" : "default"}>{value ? "Đang bật" : "Đã tắt"}</Tag>
       ),
     },
 
@@ -449,16 +372,12 @@ export default function DrugIcdInteractions() {
 
           <Popconfirm
             title="Xóa cấu hình tương tác?"
-            description={
-              `${record.active_ingredient} — ${record.icd_code}`
-            }
+            description={`${record.active_ingredient} — ${record.icd_code}`}
             okText="Xóa"
             cancelText="Hủy"
             okButtonProps={{ danger: true }}
             disabled={busy || loading}
-            onConfirm={() =>
-              handleDelete(record)
-            }
+            onConfirm={() => handleDelete(record)}
           >
             <Button
               danger
@@ -467,9 +386,7 @@ export default function DrugIcdInteractions() {
               aria-label="Xóa cấu hình"
               icon={<DeleteOutlined />}
               disabled={busy || loading}
-              loading={
-                deletingId === record.id
-              }
+              loading={deletingId === record.id}
             />
           </Popconfirm>
         </Space>
@@ -489,10 +406,7 @@ export default function DrugIcdInteractions() {
         items={[
           {
             title: (
-              <a
-                onClick={() => navigate("/")}
-                aria-label="Trang chủ"
-              >
+              <a onClick={() => navigate("/")} aria-label="Trang chủ">
                 <HomeOutlined />
               </a>
             ),
@@ -501,10 +415,7 @@ export default function DrugIcdInteractions() {
             title: (
               <a
                 onClick={() => {
-                  sessionStorage.setItem(
-                    "catalog-active-tab",
-                    "rules"
-                  );
+                  sessionStorage.setItem("catalog-active-tab", "rules");
 
                   navigate("/catalog");
                 }}
@@ -536,29 +447,15 @@ export default function DrugIcdInteractions() {
                 color: "#1677ff",
               }}
             />
-
             Tương tác thuốc - ICD
           </Title>
 
-          <Text
-            type="secondary"
-            className="drug-icd-subtitle"
-          >
-            Quản lý cấu hình cảnh báo hoạt chất
-            theo chẩn đoán ICD
+          <Text type="secondary" className="drug-icd-subtitle">
+            Quản lý cấu hình cảnh báo hoạt chất theo chẩn đoán ICD
           </Text>
         </div>
 
         <Space size={8} wrap>
-          <Button
-            icon={<ReloadOutlined />}
-            loading={loading}
-            disabled={busy}
-            onClick={() => void loadData()}
-          >
-            Làm mới
-          </Button>
-
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -577,11 +474,7 @@ export default function DrugIcdInteractions() {
           message="Không thể tải danh mục tương tác thuốc - ICD"
           description={error}
           action={
-            <Button
-              size="small"
-              disabled={busy || loading}
-              onClick={() => void loadData()}
-            >
+            <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>
               Thử lại
             </Button>
           }
@@ -591,15 +484,12 @@ export default function DrugIcdInteractions() {
       <div className="drug-icd-filters">
         <label>
           Hoạt chất
-
           <Input
             allowClear
             value={ingredient}
             placeholder="Nhập tên hoạt chất"
-            onChange={event => {
-              setIngredient(
-                event.target.value
-              );
+            onChange={(event) => {
+              setIngredient(event.target.value);
 
               setPage(1);
             }}
@@ -608,12 +498,11 @@ export default function DrugIcdInteractions() {
 
         <label>
           Mã ICD / Tên ICD
-
           <Input
             allowClear
             value={icd}
             placeholder="Nhập mã hoặc tên ICD"
-            onChange={event => {
+            onChange={(event) => {
               setIcd(event.target.value);
               setPage(1);
             }}
@@ -622,7 +511,6 @@ export default function DrugIcdInteractions() {
 
         <label>
           Trạng thái
-
           <Select
             allowClear
             value={status}
@@ -637,7 +525,7 @@ export default function DrugIcdInteractions() {
                 label: "Đã tắt",
               },
             ]}
-            onChange={value => {
+            onChange={(value) => {
               setStatus(value);
               setPage(1);
             }}
@@ -668,27 +556,17 @@ export default function DrugIcdInteractions() {
           size="middle"
           scroll={{ x: 1275 }}
           locale={{
-            emptyText: error
-              ? "Chưa tải được dữ liệu."
-              : "Chưa có cấu hình tương tác thuốc - ICD.",
+            emptyText: error ? "Chưa tải được dữ liệu." : "Chưa có cấu hình tương tác thuốc - ICD.",
           }}
           pagination={{
             current: page,
             pageSize,
             showSizeChanger: true,
-            pageSizeOptions: [
-              "10",
-              "20",
-              "50",
-            ],
+            pageSizeOptions: ["10", "20", "50"],
 
-            showTotal: total =>
-              `Tổng số: ${total}`,
+            showTotal: (total) => `Tổng số: ${total}`,
 
-            onChange: (
-              nextPage,
-              nextSize
-            ) => {
+            onChange: (nextPage, nextSize) => {
               setPage(nextPage);
               setPageSize(nextSize);
             },
@@ -696,12 +574,8 @@ export default function DrugIcdInteractions() {
         />
       </Card>
 
-      <Text
-        type="secondary"
-        className="drug-icd-legend"
-      >
-        Cấu hình đang bật được áp dụng khi
-        chạy lại kiểm tra hồ sơ.
+      <Text type="secondary" className="drug-icd-legend">
+        Cấu hình đang bật được áp dụng khi chạy lại kiểm tra hồ sơ.
       </Text>
 
       <Modal
@@ -718,21 +592,14 @@ export default function DrugIcdInteractions() {
 
             <div>
               <div className="drug-icd-modal-title">
-                {editing
-                  ? "Cập nhật tương tác thuốc - ICD"
-                  : "Thêm tương tác thuốc - ICD"}
+                {editing ? "Cập nhật tương tác thuốc - ICD" : "Thêm tương tác thuốc - ICD"}
               </div>
 
-              <div className="drug-icd-subtitle">
-                Thiết lập hoạt chất và mã ICD
-                cần cảnh báo
-              </div>
+              <div className="drug-icd-subtitle">Thiết lập hoạt chất và mã ICD cần cảnh báo</div>
             </div>
           </div>
         }
-        okText={
-          editing ? "Cập nhật" : "Thêm mới"
-        }
+        okText={editing ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
         confirmLoading={saving}
         cancelButtonProps={{
@@ -759,15 +626,12 @@ export default function DrugIcdInteractions() {
               {
                 required: true,
                 whitespace: true,
-                message:
-                  "Vui lòng nhập hoạt chất.",
+                message: "Vui lòng nhập hoạt chất.",
               },
             ]}
             extra="Nhập đúng tên hoạt chất hoặc tổ hợp hoạt chất trong Danh mục Thuốc."
           >
-            <Input
-              placeholder="VD: Calci carbonat + vitamin D3"
-            />
+            <Input placeholder="VD: Calci carbonat + vitamin D3" />
           </Form.Item>
 
           <div className="drug-icd-form-grid">
@@ -778,24 +642,15 @@ export default function DrugIcdInteractions() {
                 {
                   required: true,
                   whitespace: true,
-                  message:
-                    "Vui lòng nhập mã ICD.",
+                  message: "Vui lòng nhập mã ICD.",
                 },
               ]}
             >
-              <Input
-                placeholder="VD: N20 hoặc K29.9"
-                maxLength={100}
-              />
+              <Input placeholder="VD: N20 hoặc K29.9" maxLength={100} />
             </Form.Item>
 
-            <Form.Item
-              name="icd_name"
-              label="Tên ICD"
-            >
-              <Input
-                placeholder="Nhập tên chẩn đoán"
-              />
+            <Form.Item name="icd_name" label="Tên ICD">
+              <Input placeholder="Nhập tên chẩn đoán" />
             </Form.Item>
           </div>
 
@@ -805,8 +660,7 @@ export default function DrugIcdInteractions() {
             rules={[
               {
                 required: true,
-                message:
-                  "Vui lòng chọn cách khớp ICD.",
+                message: "Vui lòng chọn cách khớp ICD.",
               },
             ]}
           >
@@ -818,8 +672,7 @@ export default function DrugIcdInteractions() {
                 },
                 {
                   value: "PREFIX",
-                  label:
-                    "Theo nhóm ICD (Ví dụ N20 gồm N20.0, N20.1...)",
+                  label: "Theo nhóm ICD (Ví dụ N20 gồm N20.0, N20.1...)",
                 },
               ]}
             />
@@ -832,8 +685,7 @@ export default function DrugIcdInteractions() {
               {
                 required: true,
                 whitespace: true,
-                message:
-                  "Vui lòng nhập nội dung cảnh báo.",
+                message: "Vui lòng nhập nội dung cảnh báo.",
               },
             ]}
           >
@@ -845,28 +697,15 @@ export default function DrugIcdInteractions() {
 
           <div className="drug-icd-active">
             <div>
-              <Text strong>
-                Kích hoạt quy tắc
-              </Text>
+              <Text strong>Kích hoạt quy tắc</Text>
 
-              <Text
-                type="secondary"
-                className="drug-icd-subtitle"
-              >
-                Áp dụng trong lần kiểm tra
-                hồ sơ tiếp theo
+              <Text type="secondary" className="drug-icd-subtitle">
+                Áp dụng trong lần kiểm tra hồ sơ tiếp theo
               </Text>
             </div>
 
-            <Form.Item
-              name="active"
-              valuePropName="checked"
-              noStyle
-            >
-              <Switch
-                checkedChildren="Bật"
-                unCheckedChildren="Tắt"
-              />
+            <Form.Item name="active" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
             </Form.Item>
           </div>
         </Form>

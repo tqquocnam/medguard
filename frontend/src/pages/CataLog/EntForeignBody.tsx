@@ -55,17 +55,33 @@ type ApiResponse = {
 
 const DEFAULT_ENDOSCOPY = ["20.0013.0933", "20.0013.2048"];
 const DEFAULT_FOREIGN_BODY = [
-  "15.0143.0907", "15.0143.0906", "15.0212.0900", "03.2117.0903",
-  "15.0054.0903", "03.2117.0902", "03.2117.0901", "15.0054.0902",
+  "15.0143.0907",
+  "15.0143.0906",
+  "15.0212.0900",
+  "03.2117.0903",
+  "15.0054.0903",
+  "03.2117.0902",
+  "03.2117.0901",
+  "15.0054.0902",
 ];
 
 function parseCodes(input: string): string[] {
-  return Array.from(new Set(input.split(/[\s,;|]+/).map((v) => v.trim().toUpperCase()).filter(Boolean)));
+  return Array.from(
+    new Set(
+      input
+        .split(/[\s,;|]+/)
+        .map((v) => v.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  );
 }
-function codesText(codes: string[]): string { return codes.join("\n"); }
+function codesText(codes: string[]): string {
+  return codes.join("\n");
+}
 function validateCodes(a: string[], b: string[]): string | null {
   if (!a.length || !b.length) return "Mỗi nhóm phải có ít nhất một mã DVKT.";
-  if ([...a, ...b].some((code) => code.length > 100)) return "Mã DVKT không được vượt quá 100 ký tự.";
+  if ([...a, ...b].some((code) => code.length > 100))
+    return "Mã DVKT không được vượt quá 100 ký tự.";
   const duplicates = b.filter((code) => new Set(a).has(code));
   if (duplicates.length) return `Mã DVKT trùng giữa hai nhóm: ${duplicates.join(", ")}`;
   return null;
@@ -80,16 +96,28 @@ type CodeEditorProps = {
   disabled: boolean;
   onChange: (v: string) => void;
 };
-function CodeEditor({ title, description, tone, value, codes, disabled, onChange }: CodeEditorProps) {
+function CodeEditor({
+  title,
+  description,
+  tone,
+  value,
+  codes,
+  disabled,
+  onChange,
+}: CodeEditorProps) {
   const removeCode = (code: string) => onChange(codes.filter((v) => v !== code).join("\n"));
   return (
     <Card className={`ent-compact-group ent-compact-${tone}`} bordered={false}>
       <div className="ent-compact-group-title">
         <div className="ent-compact-group-label">
           <Text strong>{title}</Text>
-          <Text type="secondary" className="ent-compact-muted">{description}</Text>
+          <Text type="secondary" className="ent-compact-muted">
+            {description}
+          </Text>
         </div>
-        <Tag color={tone === "blue" ? "blue" : "orange"} style={{ margin: 0 }}>{codes.length} mã</Tag>
+        <Tag color={tone === "blue" ? "blue" : "orange"} style={{ margin: 0 }}>
+          {codes.length} mã
+        </Tag>
       </div>
       <Input.TextArea
         value={value}
@@ -106,7 +134,10 @@ function CodeEditor({ title, description, tone, value, codes, disabled, onChange
             key={code}
             color={tone === "blue" ? "blue" : "orange"}
             closable={!disabled}
-            onClose={(event) => { event.preventDefault(); removeCode(code); }}
+            onClose={(event) => {
+              event.preventDefault();
+              removeCode(code);
+            }}
           >
             {code}
           </Tag>
@@ -129,7 +160,10 @@ export default function EntForeignBody() {
 
   const endoscopyCodes = useMemo(() => parseCodes(endoscopyText), [endoscopyText]);
   const foreignBodyCodes = useMemo(() => parseCodes(foreignBodyText), [foreignBodyText]);
-  const error = useMemo(() => validateCodes(endoscopyCodes, foreignBodyCodes), [endoscopyCodes, foreignBodyCodes]);
+  const error = useMemo(
+    () => validateCodes(endoscopyCodes, foreignBodyCodes),
+    [endoscopyCodes, foreignBodyCodes],
+  );
 
   const applyRule = useCallback((data: RuleData) => {
     setOriginal(data);
@@ -144,7 +178,8 @@ export default function EntForeignBody() {
     try {
       const response = await apiFetch("/catalog/ent-foreign-body", { method: "GET" });
       const json = (await response.json()) as ApiResponse;
-      if (!response.ok || !json.success || !json.data) throw new Error(json.message || "Không thể tải cấu hình.");
+      if (!response.ok || !json.success || !json.data)
+        throw new Error(json.message || "Không thể tải cấu hình.");
       applyRule(json.data);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Không thể tải cấu hình.");
@@ -152,14 +187,19 @@ export default function EntForeignBody() {
       setLoading(false);
     }
   }, [applyRule]);
-  useEffect(() => { void loadRule(); }, [loadRule]);
+  useEffect(() => {
+    void loadRule();
+  }, [loadRule]);
 
   const dirty = useMemo(() => {
     if (!original) return false;
     const canonical = (codes: string[]) => [...codes].sort().join("|");
-    return original.enabled !== enabled || original.severity !== severity ||
+    return (
+      original.enabled !== enabled ||
+      original.severity !== severity ||
       canonical(original.config.endoscopyCodes) !== canonical(endoscopyCodes) ||
-      canonical(original.config.foreignBodyCodes) !== canonical(foreignBodyCodes);
+      canonical(original.config.foreignBodyCodes) !== canonical(foreignBodyCodes)
+    );
   }, [original, enabled, severity, endoscopyCodes, foreignBodyCodes]);
 
   async function saveRule() {
@@ -173,7 +213,8 @@ export default function EntForeignBody() {
         body: JSON.stringify({ enabled, severity, endoscopyCodes, foreignBodyCodes }),
       });
       const json = (await response.json()) as ApiResponse;
-      if (!response.ok || !json.success || !json.data) throw new Error(json.message || "Lưu cấu hình thất bại.");
+      if (!response.ok || !json.success || !json.data)
+        throw new Error(json.message || "Lưu cấu hình thất bại.");
       applyRule(json.data);
       message.success(json.message || "Đã lưu cấu hình.");
     } catch (e) {
@@ -189,27 +230,58 @@ export default function EntForeignBody() {
     <div className="ent-compact-page">
       <div className="ent-compact-top">
         <div className="ent-compact-heading">
-          <Breadcrumb items={[
-            { title: <a onClick={() => navigate("/")}><HomeOutlined /></a> },
-            { title: <a onClick={() => navigate("/catalog")}>Danh mục</a> },
-            { title: "Nội soi TMH - Lấy dị vật" },
-          ]} />
+          <Breadcrumb
+            items={[
+              {
+                title: (
+                  <a onClick={() => navigate("/")}>
+                    <HomeOutlined />
+                  </a>
+                ),
+              },
+              { title: <a onClick={() => navigate("/catalog")}>Danh mục</a> },
+              { title: "Nội soi TMH - Lấy dị vật" },
+            ]}
+          />
           <div className="ent-compact-title-row">
-            <span className="ent-compact-icon"><MedicineBoxOutlined /></span>
+            <span className="ent-compact-icon">
+              <MedicineBoxOutlined />
+            </span>
             <div>
-              <Title level={4} style={{ margin: 0 }}>Nội soi TMH và Lấy dị vật</Title>
-              <Text type="secondary" className="ent-compact-muted">Cấu hình thanh toán đồng thời DVKT</Text>
+              <Title level={4} style={{ margin: 0 }}>
+                Nội soi TMH và Lấy dị vật
+              </Title>
+              <Text type="secondary" className="ent-compact-muted">
+                Cấu hình thanh toán đồng thời DVKT
+              </Text>
             </div>
           </div>
         </div>
         <Space size={8} wrap>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/catalog")}>Quay lại</Button>
-          <Button icon={<ReloadOutlined />} disabled={saving} onClick={() => void loadRule()}>Làm mới</Button>
-          <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={cannotSave} onClick={() => void saveRule()}>Lưu cấu hình</Button>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            loading={saving}
+            disabled={cannotSave}
+            onClick={() => void saveRule()}
+          >
+            Lưu cấu hình
+          </Button>
         </Space>
       </div>
 
-      {loadError && <Alert type="error" showIcon message={loadError} action={<Button size="small" onClick={() => void loadRule()}>Thử lại</Button>} />}
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message={loadError}
+          action={
+            <Button size="small" onClick={() => void loadRule()}>
+              Thử lại
+            </Button>
+          }
+        />
+      )}
 
       <Spin spinning={loading}>
         <div className="ent-compact-body">
@@ -217,27 +289,55 @@ export default function EntForeignBody() {
             <div className="ent-compact-identifiers">
               <Text strong>Chuyên đề TINH.DV.107</Text>
               <Space size={4} wrap>
-                <Tag color="blue">S.005.655</Tag><Tag>GENERAL</Tag><Tag>XML3</Tag>
+                <Tag color="blue">S.005.655</Tag>
+                <Tag>GENERAL</Tag>
+                <Tag>XML3</Tag>
               </Space>
             </div>
             <div className="ent-compact-control">
               <Text className="ent-compact-control-label">Trạng thái</Text>
-              <Switch checked={enabled} disabled={unavailable} checkedChildren="Đang bật" unCheckedChildren="Đã tắt" onChange={setEnabled} />
+              <Switch
+                checked={enabled}
+                disabled={unavailable}
+                checkedChildren="Đang bật"
+                unCheckedChildren="Đã tắt"
+                onChange={setEnabled}
+              />
             </div>
             <div className="ent-compact-control">
               <Text className="ent-compact-control-label">Mức cảnh báo</Text>
-              <Select<Severity> value={severity} disabled={unavailable} onChange={setSeverity}
+              <Select<Severity>
+                value={severity}
+                disabled={unavailable}
+                onChange={setSeverity}
                 style={{ width: 175 }}
-                options={[{ value: "WARNING", label: "WARNING" }, { value: "ERROR", label: "ERROR" }]}
+                options={[
+                  { value: "WARNING", label: "WARNING" },
+                  { value: "ERROR", label: "ERROR" },
+                ]}
               />
             </div>
           </Card>
 
           <div className="ent-compact-groups">
-            <CodeEditor title="Nhóm 1 · Nội soi TMH" description="Các mã nội soi tai mũi họng" tone="blue"
-              value={endoscopyText} codes={endoscopyCodes} disabled={unavailable} onChange={setEndoscopyText} />
-            <CodeEditor title="Nhóm 2 · Lấy dị vật" description="Các mã lấy dị vật tai, mũi, họng" tone="orange"
-              value={foreignBodyText} codes={foreignBodyCodes} disabled={unavailable} onChange={setForeignBodyText} />
+            <CodeEditor
+              title="Nhóm 1 · Nội soi TMH"
+              description="Các mã nội soi tai mũi họng"
+              tone="blue"
+              value={endoscopyText}
+              codes={endoscopyCodes}
+              disabled={unavailable}
+              onChange={setEndoscopyText}
+            />
+            <CodeEditor
+              title="Nhóm 2 · Lấy dị vật"
+              description="Các mã lấy dị vật tai, mũi, họng"
+              tone="orange"
+              value={foreignBodyText}
+              codes={foreignBodyCodes}
+              disabled={unavailable}
+              onChange={setForeignBodyText}
+            />
           </div>
 
           {error && <Alert showIcon type="error" message={error} />}
@@ -245,8 +345,13 @@ export default function EntForeignBody() {
           <div className="ent-compact-rule-note">
             <WarningOutlined style={{ color: "#d48806", fontSize: 17 }} />
             <div className="ent-compact-note-text">
-              <Text strong>Nguyên tắc: Có cả nội soi TMH và lấy dị vật trong cùng hồ sơ → Cảnh báo rà soát.</Text>
-              <Text type="secondary" className="ent-compact-muted">Không kiểm tra trùng thời gian · Công khám TMH không tính là nội soi · {endoscopyCodes.length * foreignBodyCodes.length} cặp mã có thể đối chiếu.</Text>
+              <Text strong>
+                Nguyên tắc: Có cả nội soi TMH và lấy dị vật trong cùng hồ sơ → Cảnh báo rà soát.
+              </Text>
+              <Text type="secondary" className="ent-compact-muted">
+                Không kiểm tra trùng thời gian · Công khám TMH không tính là nội soi ·{" "}
+                {endoscopyCodes.length * foreignBodyCodes.length} cặp mã có thể đối chiếu.
+              </Text>
             </div>
           </div>
 
@@ -258,14 +363,33 @@ export default function EntForeignBody() {
               </span>
             </Space>
             <Space size={8} wrap>
-              <Button icon={<UndoOutlined />} disabled={!original || !dirty || saving} onClick={() => {
-                if (original) applyRule(original);
-              }}>Hủy thay đổi</Button>
-              <Button disabled={unavailable} onClick={() => {
-                setEndoscopyText(codesText(DEFAULT_ENDOSCOPY));
-                setForeignBodyText(codesText(DEFAULT_FOREIGN_BODY));
-              }}>Mã mặc định</Button>
-              <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={cannotSave} onClick={() => void saveRule()}>Lưu cấu hình</Button>
+              <Button
+                icon={<UndoOutlined />}
+                disabled={!original || !dirty || saving}
+                onClick={() => {
+                  if (original) applyRule(original);
+                }}
+              >
+                Hủy thay đổi
+              </Button>
+              <Button
+                disabled={unavailable}
+                onClick={() => {
+                  setEndoscopyText(codesText(DEFAULT_ENDOSCOPY));
+                  setForeignBodyText(codesText(DEFAULT_FOREIGN_BODY));
+                }}
+              >
+                Mã mặc định
+              </Button>
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                loading={saving}
+                disabled={cannotSave}
+                onClick={() => void saveRule()}
+              >
+                Lưu cấu hình
+              </Button>
             </Space>
           </div>
         </div>

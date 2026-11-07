@@ -28,6 +28,7 @@ import MainLayout from "./layouts/MainLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminRoute from "./auth/AdminRoute";
 import DrugIcdInteractions from "./pages/CataLog/DrugIcdInteractions";
+import DrugInteraction from "./pages/CataLog/DrugInteraction";
 
 export default function App() {
   return (
@@ -58,6 +59,10 @@ export default function App() {
             <Route
   path="/catalog/drug-icd-interactions"
   element={<DrugIcdInteractions />}
+/>
+<Route
+  path="/catalog/drug-interaction"
+  element={<DrugInteraction />}
 />
           </Route>
 

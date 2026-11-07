@@ -107,14 +107,23 @@ const SPECS: Record<CatalogType, CatalogSpec> = {
 
   "drug-interaction": {
     table: "catalog.drug_interaction_rules",
+
     columns: [
+      "drug_name_a",
+      "drug_name_b",
       "ingredient_a",
       "ingredient_b",
-      "severity",
+      "description",
       "active",
+    ],
+
+    required: [
+      "drug_name_a",
+      "drug_name_b",
+      "ingredient_a",
+      "ingredient_b",
       "description",
     ],
-    required: ["ingredient_a", "ingredient_b"],
   },
 };
 

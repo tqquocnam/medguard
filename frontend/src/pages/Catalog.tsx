@@ -208,6 +208,14 @@ const ruleCards: RuleCard[] = [
   icon: <ExperimentOutlined />,
   color: "#cf1322",
 },
+{
+  title: "Tương tác thuốc - thuốc",
+  description:
+    "Cấu hình các cặp thuốc tương tác để hiển thị lỗi khi kiểm tra hồ sơ.",
+  path: "/catalog/drug-interaction",
+  icon: <ExperimentOutlined />,
+  color: "#cf1322",
+},
 
 ];
 

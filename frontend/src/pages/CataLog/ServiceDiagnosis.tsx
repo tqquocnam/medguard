@@ -1,5 +1,4 @@
 import {
-
   HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -21,1006 +20,479 @@ import {
   Typography,
 } from "antd";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type {
-  ColumnsType,
-} from "antd/es/table";
+import type { ColumnsType } from "antd/es/table";
 
-import {
-  useNavigate,
-} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-import {
-  apiFetch,
-} from "../../api/apiClient";
+import { apiFetch } from "../../api/apiClient";
 
-
-const {
-  Title,
-  Text,
-} = Typography;
-
+const { Title, Text } = Typography;
 
 interface ServiceDiagnosisRow {
-  id:
-    string;
+  id: string;
 
-  service_code:
-    string;
+  service_code: string;
 
-  diagnosis_pattern:
-    string;
+  diagnosis_pattern: string;
 
-  match_type:
-    string;
+  match_type: string;
 
-  active:
-    boolean;
+  active: boolean;
 
-  note?:
-    string |
-    null;
+  note?: string | null;
 }
-
 
 interface GroupedServiceDiagnosis {
-  serviceCode:
-    string;
+  serviceCode: string;
 
-  rows:
-    ServiceDiagnosisRow[];
+  rows: ServiceDiagnosisRow[];
 }
-
 
 interface FormValues {
-  service_code:
-    string;
+  service_code: string;
 
-  diagnosis_pattern:
-    string;
+  diagnosis_pattern: string;
 
-  match_type:
-    string;
+  match_type: string;
 
-  active:
-    boolean;
+  active: boolean;
 
-  note?:
-    string;
+  note?: string;
 }
-
 
 const MATCH_OPTIONS = [
   {
-    label:
-      "Có chứa",
+    label: "Có chứa",
 
-    value:
-      "CONTAINS",
+    value: "CONTAINS",
   },
 
   {
-    label:
-      "Chính xác",
+    label: "Chính xác",
 
-    value:
-      "EXACT",
+    value: "EXACT",
   },
 
   {
-    label:
-      "Bắt đầu bằng",
+    label: "Bắt đầu bằng",
 
-    value:
-      "STARTS_WITH",
+    value: "STARTS_WITH",
   },
 ];
 
-
-function getMatchLabel(
-  value:
-    string
-) {
-  return (
-    MATCH_OPTIONS.find(
-      (
-        item
-      ) =>
-        item.value ===
-        value
-    )?.label ??
-    value
-  );
+function getMatchLabel(value: string) {
+  return MATCH_OPTIONS.find((item) => item.value === value)?.label ?? value;
 }
 
-
 export default function ServiceDiagnosis() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
+  const [form] = Form.useForm<FormValues>();
 
-  const [
-    form,
-  ] =
-    Form.useForm<
-      FormValues
-    >();
+  const [rows, setRows] = useState<ServiceDiagnosisRow[]>([]);
 
+  const [loading, setLoading] = useState(false);
 
-  const [
-    rows,
-    setRows,
-  ] =
-    useState<
-      ServiceDiagnosisRow[]
-    >([]);
+  const [saving, setSaving] = useState(false);
 
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      false
-    );
+  const [editing, setEditing] = useState<ServiceDiagnosisRow | null>(null);
 
-
-  const [
-    saving,
-    setSaving,
-  ] =
-    useState(
-      false
-    );
-
-
-  const [
-    modalOpen,
-    setModalOpen,
-  ] =
-    useState(
-      false
-    );
-
-
-  const [
-    editing,
-    setEditing,
-  ] =
-    useState<
-      ServiceDiagnosisRow |
-      null
-    >(
-      null
-    );
-
-
-  const [
-    selectedServiceCode,
-    setSelectedServiceCode,
-  ] =
-    useState<
-      string |
-      undefined
-    >();
-
+  const [selectedServiceCode, setSelectedServiceCode] = useState<string | undefined>();
 
   async function loadData() {
     try {
-      setLoading(
-        true
-      );
+      setLoading(true);
 
+      const response = await apiFetch("/catalog/service-diagnosis", {
+        method: "GET",
+      });
 
-      const response =
-        await apiFetch(
-          "/catalog/service-diagnosis",
-          {
-            method:
-              "GET",
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
+      let json: any = null;
 
       try {
-        json =
-          await response.json();
+        json = await response.json();
       } catch {
-        json =
-          null;
+        json = null;
       }
 
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể tải dữ liệu."
-        );
+      if (!response.ok || json?.success !== true) {
+        throw new Error(json?.message || "Không thể tải dữ liệu.");
       }
 
+      const data = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json?.data?.items)
+          ? json.data.items
+          : [];
 
-      const data =
-        Array.isArray(
-          json?.data
-        )
-          ? json.data
-          : Array.isArray(
-              json?.data?.items
-            )
-            ? json.data.items
-            : [];
+      setRows(data);
+    } catch (error) {
+      console.error("Load service diagnosis error:", error);
 
-
-      setRows(
-        data
-      );
-
-    } catch (
-      error
-    ) {
-      console.error(
-        "Load service diagnosis error:",
-        error
-      );
-
-
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải dữ liệu."
-      );
-
+      message.error(error instanceof Error ? error.message : "Không thể tải dữ liệu.");
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
+  useEffect(() => {
+    void loadData();
+  }, []);
 
-  useEffect(
-    () => {
-      void loadData();
-    },
-    []
-  );
-
-
-  const serviceOptions =
-    useMemo(
-      () => {
-        const values =
-          Array.from(
-            new Set(
-              rows
-                .map(
-                  (
-                    item
-                  ) =>
-                    String(
-                      item.service_code ??
-                      ""
-                    ).trim()
-                )
-                .filter(
-                  Boolean
-                )
-            )
-          );
-
-
-        values.sort(
-          (
-            a,
-            b
-          ) =>
-            a.localeCompare(
-              b
-            )
-        );
-
-
-        return values.map(
-          (
-            value
-          ) => ({
-            value,
-
-            label:
-              value,
-          })
-        );
-      },
-      [
-        rows,
-      ]
+  const serviceOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(rows.map((item) => String(item.service_code ?? "").trim()).filter(Boolean)),
     );
 
+    values.sort((a, b) => a.localeCompare(b));
 
-  const filteredRows =
-    useMemo(
-      () => {
-        if (
-          !selectedServiceCode
-        ) {
-          return rows;
-        }
+    return values.map((value) => ({
+      value,
 
+      label: value,
+    }));
+  }, [rows]);
 
-        return rows.filter(
-          (
-            item
-          ) =>
-            item.service_code ===
-            selectedServiceCode
-        );
-      },
-      [
-        rows,
-        selectedServiceCode,
-      ]
-    );
+  const filteredRows = useMemo(() => {
+    if (!selectedServiceCode) {
+      return rows;
+    }
 
+    return rows.filter((item) => item.service_code === selectedServiceCode);
+  }, [rows, selectedServiceCode]);
 
-  const groupedRows:
-    GroupedServiceDiagnosis[] =
-    useMemo(
-      () => {
-        const map =
-          new Map<
-            string,
-            ServiceDiagnosisRow[]
-          >();
+  const groupedRows: GroupedServiceDiagnosis[] = useMemo(() => {
+    const map = new Map<string, ServiceDiagnosisRow[]>();
 
+    for (const item of filteredRows) {
+      const key = String(item.service_code ?? "").trim();
 
-        for (
-          const item
-          of filteredRows
-        ) {
-          const key =
-            String(
-              item.service_code ??
-              ""
-            ).trim();
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
 
+      map.get(key)!.push(item);
+    }
 
-          if (
-            !map.has(
-              key
-            )
-          ) {
-            map.set(
-              key,
-              []
-            );
-          }
+    return Array.from(map.entries()).map(([serviceCode, values]) => ({
+      serviceCode,
 
-
-          map
-            .get(
-              key
-            )!
-            .push(
-              item
-            );
-        }
-
-
-        return Array.from(
-          map.entries()
-        ).map(
-          (
-            [
-              serviceCode,
-              values,
-            ]
-          ) => ({
-            serviceCode,
-
-            rows:
-              values,
-          })
-        );
-      },
-      [
-        filteredRows,
-      ]
-    );
-
+      rows: values,
+    }));
+  }, [filteredRows]);
 
   function openCreate() {
-    setEditing(
-      null
-    );
-
+    setEditing(null);
 
     form.resetFields();
 
-
     form.setFieldsValue({
-      service_code:
-        selectedServiceCode ??
-        "",
+      service_code: selectedServiceCode ?? "",
 
-      diagnosis_pattern:
-        "",
+      diagnosis_pattern: "",
 
-      match_type:
-        "CONTAINS",
+      match_type: "CONTAINS",
 
-      active:
-        true,
+      active: true,
 
-      note:
-        "",
+      note: "",
     });
 
-
-    setModalOpen(
-      true
-    );
+    setModalOpen(true);
   }
 
-
-  function openEdit(
-    record:
-      ServiceDiagnosisRow
-  ) {
-    setEditing(
-      record
-    );
-
+  function openEdit(record: ServiceDiagnosisRow) {
+    setEditing(record);
 
     form.resetFields();
 
-
     form.setFieldsValue({
-      service_code:
-        record.service_code,
+      service_code: record.service_code,
 
-      diagnosis_pattern:
-        record.diagnosis_pattern,
+      diagnosis_pattern: record.diagnosis_pattern,
 
-      match_type:
-        record.match_type,
+      match_type: record.match_type,
 
-      active:
-        record.active,
+      active: record.active,
 
-      note:
-        record.note ??
-        "",
+      note: record.note ?? "",
     });
 
-
-    setModalOpen(
-      true
-    );
+    setModalOpen(true);
   }
-
 
   async function handleSave() {
     try {
-      const values =
-        await form
-          .validateFields();
+      const values = await form.validateFields();
 
+      setSaving(true);
 
-      setSaving(
-        true
-      );
+      const url = editing
+        ? `/catalog/service-diagnosis/${editing.id}`
+        : "/catalog/service-diagnosis";
 
+      const response = await apiFetch(url, {
+        method: editing ? "PUT" : "POST",
 
-      const url =
-        editing
-          ? `/catalog/service-diagnosis/${editing.id}`
-          : "/catalog/service-diagnosis";
+        headers: {
+          "Content-Type": "application/json",
+        },
 
+        body: JSON.stringify({
+          service_code: values.service_code.trim(),
 
-      const response =
-        await apiFetch(
-          url,
-          {
-            method:
-              editing
-                ? "PUT"
-                : "POST",
+          diagnosis_pattern: values.diagnosis_pattern.trim(),
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          match_type: values.match_type,
 
-            body:
-              JSON.stringify({
-                service_code:
-                  values.service_code.trim(),
+          active: values.active,
 
-                diagnosis_pattern:
-                  values.diagnosis_pattern.trim(),
+          note: values.note?.trim() || null,
+        }),
+      });
 
-                match_type:
-                  values.match_type,
-
-                active:
-                  values.active,
-
-                note:
-                  values.note?.trim() ||
-                  null,
-              }),
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
+      let json: any = null;
 
       try {
-        json =
-          await response.json();
+        json = await response.json();
       } catch {
-        json =
-          null;
+        json = null;
       }
 
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
+      if (!response.ok || json?.success !== true) {
         throw new Error(
-          json?.message ||
-          (
-            editing
-              ? "Không thể cập nhật cấu hình."
-              : "Không thể thêm cấu hình."
-          )
+          json?.message || (editing ? "Không thể cập nhật cấu hình." : "Không thể thêm cấu hình."),
         );
       }
 
+      message.success(editing ? "Cập nhật thành công." : "Thêm mới thành công.");
 
-      message.success(
-        editing
-          ? "Cập nhật thành công."
-          : "Thêm mới thành công."
-      );
+      setModalOpen(false);
 
-
-      setModalOpen(
-        false
-      );
-
-
-      setEditing(
-        null
-      );
-
+      setEditing(null);
 
       form.resetFields();
 
-
       await loadData();
-
-    } catch (
-      error
-    ) {
-      if (
-        error instanceof Error
-      ) {
-        message.error(
-          error.message
-        );
+    } catch (error) {
+      if (error instanceof Error) {
+        message.error(error.message);
       }
-
     } finally {
-      setSaving(
-        false
-      );
+      setSaving(false);
     }
   }
 
-
-  async function handleDelete(
-    id:
-      string
-  ) {
+  async function handleDelete(id: string) {
     try {
-      const response =
-        await apiFetch(
-          `/catalog/service-diagnosis/${id}`,
-          {
-            method:
-              "DELETE",
-          }
-        );
+      const response = await apiFetch(`/catalog/service-diagnosis/${id}`, {
+        method: "DELETE",
+      });
 
-
-      let json:
-        any =
-        null;
-
+      let json: any = null;
 
       try {
-        json =
-          await response.json();
+        json = await response.json();
       } catch {
-        json =
-          null;
+        json = null;
       }
 
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể xóa cấu hình."
-        );
+      if (!response.ok || json?.success !== true) {
+        throw new Error(json?.message || "Không thể xóa cấu hình.");
       }
 
-
-      message.success(
-        "Đã xóa cấu hình."
-      );
-
+      message.success("Đã xóa cấu hình.");
 
       await loadData();
-
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể xóa cấu hình."
-      );
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể xóa cấu hình.");
     }
   }
 
-
-const columns:
-  ColumnsType<
-    GroupedServiceDiagnosis
-  > = [
+  const columns: ColumnsType<GroupedServiceDiagnosis> = [
     {
-      title:
-        "DVKT",
+      title: "DVKT",
 
-      dataIndex:
-        "serviceCode",
+      dataIndex: "serviceCode",
 
-      key:
-        "serviceCode",
+      key: "serviceCode",
 
-      width:
-        280,
+      width: 280,
 
-      render:
-        (
-          value:
-            string
-        ) => (
-          <Text
-            strong
-
-            style={{
-              color:
-                "#172033",
-            }}
-          >
-            {value}
-          </Text>
-        ),
+      render: (value: string) => (
+        <Text
+          strong
+          style={{
+            color: "#172033",
+          }}
+        >
+          {value}
+        </Text>
+      ),
     },
 
- {
-  title:
-    "Chẩn đoán vào",
+    {
+      title: "Chẩn đoán vào",
 
-  key:
-    "diagnosis",
+      key: "diagnosis",
 
-  render:
-    (
-      _:
-        unknown,
+      render: (
+        _: unknown,
 
-      record:
-        GroupedServiceDiagnosis
-    ) => (
-      <div
-        className="service-diagnosis-tags"
-      >
-        {
-          record.rows.map(
-            (
-              item
-            ) => (
-              <Tag
-                key={
-                  item.id
-                }
+        record: GroupedServiceDiagnosis,
+      ) => (
+        <div className="service-diagnosis-tags">
+          {record.rows.map((item) => (
+            <Tag
+              key={item.id}
+              color={item.active ? "blue" : "default"}
+              className="service-diagnosis-tag"
+              closable
+              onClose={(event) => {
+                event.preventDefault();
 
-                color={
-                  item.active
-                    ? "blue"
-                    : "default"
-                }
+                event.stopPropagation();
 
-                className="service-diagnosis-tag"
+                Modal.confirm({
+                  title: "Xóa chẩn đoán này?",
 
-                closable
-
-                onClose={(
-                  event
-                ) => {
-                  event.preventDefault();
-
-                  event.stopPropagation();
-
-
-                  Modal.confirm({
-                    title:
-                      "Xóa chẩn đoán này?",
-
-                    content: (
+                  content: (
+                    <div
+                      style={{
+                        marginTop: 10,
+                      }}
+                    >
                       <div
                         style={{
-                          marginTop:
-                            10,
+                          marginBottom: 6,
+
+                          color: "#64748b",
                         }}
                       >
-                        <div
-                          style={{
-                            marginBottom:
-                              6,
-
-                            color:
-                              "#64748b",
-                          }}
-                        >
-                          Bạn có chắc muốn xóa:
-                        </div>
-
-                        <div
-                          style={{
-                            padding:
-                              "8px 10px",
-
-                            borderRadius:
-                              8,
-
-                            background:
-                              "#f5f7fa",
-
-                            color:
-                              "#1677ff",
-
-                            fontWeight:
-                              700,
-                          }}
-                        >
-                          {
-                            item
-                              .diagnosis_pattern
-                          }
-                        </div>
+                        Bạn có chắc muốn xóa:
                       </div>
-                    ),
 
-                    okText:
-                      "Xóa",
+                      <div
+                        style={{
+                          padding: "8px 10px",
 
-                    cancelText:
-                      "Hủy",
+                          borderRadius: 8,
 
-                    centered:
-                      true,
+                          background: "#f5f7fa",
 
-                    okButtonProps: {
-                      danger:
-                        true,
-                    },
+                          color: "#1677ff",
 
-                    onOk:
-                      async () => {
-                        await handleDelete(
-                          item.id
-                        );
-                      },
-                  });
+                          fontWeight: 700,
+                        }}
+                      >
+                        {item.diagnosis_pattern}
+                      </div>
+                    </div>
+                  ),
+
+                  okText: "Xóa",
+
+                  cancelText: "Hủy",
+
+                  centered: true,
+
+                  okButtonProps: {
+                    danger: true,
+                  },
+
+                  onOk: async () => {
+                    await handleDelete(item.id);
+                  },
+                });
+              }}
+            >
+              <span
+                onClick={(event) => {
+                  event.stopPropagation();
+
+                  openEdit(item);
+                }}
+                style={{
+                  cursor: "pointer",
                 }}
               >
-                <span
-                  onClick={(
-                    event
-                  ) => {
-                    event.stopPropagation();
-
-                    openEdit(
-                      item
-                    );
-                  }}
-
-                  style={{
-                    cursor:
-                      "pointer",
-                  }}
-                >
-                  {
-                    item
-                      .diagnosis_pattern
-                  }
-                </span>
-              </Tag>
-            )
-          )
-        }
-      </div>
-    ),
-},
-
-    {
-      title:
-        "Kiểu so khớp",
-
-      key:
-        "matchType",
-
-      width:
-        150,
-
-      render:
-        (
-          _:
-            unknown,
-
-          record:
-            GroupedServiceDiagnosis
-        ) => {
-          const values =
-            Array.from(
-              new Set(
-                record.rows.map(
-                  (
-                    item
-                  ) =>
-                    item.match_type
-                )
-              )
-            );
-
-
-          return (
-            <Space
-              wrap
-
-              size={[
-                4,
-                4,
-              ]}
-            >
-              {
-                values.map(
-                  (
-                    value
-                  ) => (
-                    <Tag
-                      key={
-                        value
-                      }
-
-                      className="service-match-tag"
-                    >
-                      {
-                        getMatchLabel(
-                          value
-                        )
-                      }
-                    </Tag>
-                  )
-                )
-              }
-            </Space>
-          );
-        },
+                {item.diagnosis_pattern}
+              </span>
+            </Tag>
+          ))}
+        </div>
+      ),
     },
 
     {
-      title:
-        "Hoạt động",
+      title: "Kiểu so khớp",
 
-      key:
-        "active",
+      key: "matchType",
 
-      width:
-        110,
+      width: 150,
 
-      align:
-        "center",
+      render: (
+        _: unknown,
 
-      render:
-        (
-          _:
-            unknown,
+        record: GroupedServiceDiagnosis,
+      ) => {
+        const values = Array.from(new Set(record.rows.map((item) => item.match_type)));
 
-          record:
-            GroupedServiceDiagnosis
-        ) => {
-          const activeCount =
-            record.rows.filter(
-              (
-                item
-              ) =>
-                item.active
-            ).length;
+        return (
+          <Space wrap size={[4, 4]}>
+            {values.map((value) => (
+              <Tag key={value} className="service-match-tag">
+                {getMatchLabel(value)}
+              </Tag>
+            ))}
+          </Space>
+        );
+      },
+    },
 
+    {
+      title: "Hoạt động",
 
-          return (
-            <Tag
-              color={
-                activeCount ===
-                record.rows.length
-                  ? "success"
-                  : "warning"
-              }
+      key: "active",
 
-              className="service-status-tag"
-            >
-              {
-                activeCount
-              }
-              /
-              {
-                record.rows.length
-              }
-            </Tag>
-          );
-        },
+      width: 110,
+
+      align: "center",
+
+      render: (
+        _: unknown,
+
+        record: GroupedServiceDiagnosis,
+      ) => {
+        const activeCount = record.rows.filter((item) => item.active).length;
+
+        return (
+          <Tag
+            color={activeCount === record.rows.length ? "success" : "warning"}
+            className="service-status-tag"
+          >
+            {activeCount}/{record.rows.length}
+          </Tag>
+        );
+      },
     },
   ];
 
-
   return (
-    <div
-      className="service-diagnosis-page"
-    >
-      <div
-        className="service-breadcrumb"
-      >
+    <div className="service-diagnosis-page">
+      <div className="service-breadcrumb">
         <Breadcrumb
           items={[
             {
               title: (
                 <HomeOutlined
-                  onClick={() =>
-                    navigate(
-                      "/"
-                    )
-                  }
+                  onClick={() => navigate("/")}
                   style={{
-                    cursor:
-                      "pointer",
+                    cursor: "pointer",
                   }}
                 />
               ),
@@ -1029,15 +501,9 @@ const columns:
             {
               title: (
                 <span
-                  onClick={() =>
-                    navigate(
-                      "/catalog"
-                    )
-                  }
-
+                  onClick={() => navigate("/catalog")}
                   style={{
-                    cursor:
-                      "pointer",
+                    cursor: "pointer",
                   }}
                 >
                   Danh mục
@@ -1046,97 +512,60 @@ const columns:
             },
 
             {
-              title:
-                "DVKT - Chẩn đoán vào",
+              title: "DVKT - Chẩn đoán vào",
             },
           ]}
         />
       </div>
 
-
-      <div
-        className="service-page-header"
-      >
+      <div className="service-page-header">
         <div>
           <Title
             level={3}
-
             style={{
-              margin:
-                0,
+              margin: 0,
 
-              color:
-                "#172033",
+              color: "#172033",
 
-              fontWeight:
-                800,
+              fontWeight: 800,
             }}
           >
             <SafetyCertificateOutlined
               style={{
-                marginRight:
-                  9,
+                marginRight: 9,
 
-                color:
-                  "#1677ff",
+                color: "#1677ff",
               }}
             />
-
             DVKT - Chẩn đoán vào
           </Title>
 
-
           <Text
             type="secondary"
-
             style={{
-              display:
-                "block",
+              display: "block",
 
-              marginTop:
-                4,
+              marginTop: 4,
             }}
           >
             Quản lý chẩn đoán phù hợp theo từng dịch vụ kỹ thuật
           </Text>
         </div>
 
-
-        <Space
-          size={
-            8
-          }
-        >
+        <Space size={8}>
           <Button
-            icon={
-              <ReloadOutlined />
-            }
-
-            loading={
-              loading
-            }
-
-            onClick={() =>
-              void loadData()
-            }
-
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => void loadData()}
             className="service-header-button"
           >
             Làm mới
           </Button>
 
-
           <Button
             type="primary"
-
-            icon={
-              <PlusOutlined />
-            }
-
-            onClick={
-              openCreate
-            }
-
+            icon={<PlusOutlined />}
+            onClick={openCreate}
             className="service-header-button service-add-button"
           >
             Thêm mới
@@ -1144,64 +573,29 @@ const columns:
         </Space>
       </div>
 
+      <div className="service-filter-block">
+        <div className="service-filter-label">DVKT</div>
 
-      <div
-        className="service-filter-block"
-      >
-        <div
-          className="service-filter-label"
-        >
-          DVKT
-        </div>
-
-
-        <div
-          className="service-filter-row"
-        >
+        <div className="service-filter-row">
           <Select
             showSearch
-
             allowClear
-
-            value={
-              selectedServiceCode
-            }
-
+            value={selectedServiceCode}
             placeholder="Chọn DVKT"
-
             optionFilterProp="label"
-
-            options={
-              serviceOptions
-            }
-
+            options={serviceOptions}
             className="service-filter-select"
-
-            onChange={(
-              value
-            ) =>
-              setSelectedServiceCode(
-                value
-              )
-            }
+            onChange={(value) => setSelectedServiceCode(value)}
           />
-
 
           <Button
             type="primary"
-
-            icon={
-              <ReloadOutlined />
-            }
-
+            icon={<ReloadOutlined />}
             onClick={() => {
-              setSelectedServiceCode(
-                undefined
-              );
+              setSelectedServiceCode(undefined);
 
               void loadData();
             }}
-
             className="service-filter-refresh"
           >
             Làm mới
@@ -1209,212 +603,113 @@ const columns:
         </div>
       </div>
 
-
       <Card
         className="service-table-card"
-
         styles={{
           body: {
-            padding:
-              0,
+            padding: 0,
           },
         }}
       >
-        <Table<
-          GroupedServiceDiagnosis
-        >
+        <Table<GroupedServiceDiagnosis>
           rowKey="serviceCode"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            groupedRows
-          }
-
-          columns={
-            columns
-          }
-
+          loading={loading}
+          dataSource={groupedRows}
+          columns={columns}
           size="middle"
-
           pagination={{
-            pageSize:
-              10,
+            pageSize: 10,
 
-            showSizeChanger:
-              true,
+            showSizeChanger: true,
 
-            pageSizeOptions: [
-              "10",
-              "20",
-              "50",
-            ],
+            pageSizeOptions: ["10", "20", "50"],
 
-            showTotal:
-              (
-                total
-              ) =>
-                `Tổng số: ${total}`,
+            showTotal: (total) => `Tổng số: ${total}`,
           }}
-
           locale={{
-            emptyText:
-              "Chưa có dữ liệu",
+            emptyText: "Chưa có dữ liệu",
           }}
         />
       </Card>
 
-
       <Modal
-        open={
-          modalOpen
-        }
-
+        open={modalOpen}
         className="service-diagnosis-modal"
-
         title={
           <div>
-            <div
-              className="service-modal-title"
-            >
-              {
-                editing
-                  ? "Cập nhật chẩn đoán vào"
-                  : "Thêm chẩn đoán vào"
-              }
+            <div className="service-modal-title">
+              {editing ? "Cập nhật chẩn đoán vào" : "Thêm chẩn đoán vào"}
             </div>
 
-            <div
-              className="service-modal-description"
-            >
-              Thiết lập điều kiện phù hợp cho DVKT
-            </div>
+            <div className="service-modal-description">Thiết lập điều kiện phù hợp cho DVKT</div>
           </div>
         }
-
-        width={
-          620
-        }
-
-        okText={
-          editing
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
+        width={620}
+        okText={editing ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
+        confirmLoading={saving}
+        onOk={() => void handleSave()}
         onCancel={() => {
-          if (
-            saving
-          ) {
+          if (saving) {
             return;
           }
 
+          setModalOpen(false);
 
-          setModalOpen(
-            false
-          );
-
-
-          setEditing(
-            null
-          );
-
+          setEditing(null);
 
           form.resetFields();
         }}
       >
         <Form
-          form={
-            form
-          }
-
+          form={form}
           layout="vertical"
-
-          requiredMark={
-            false
-          }
-
+          requiredMark={false}
           style={{
-            marginTop:
-              18,
+            marginTop: 18,
           }}
         >
           <Form.Item
             name="service_code"
-
             label="Mã DVKT"
-
             rules={[
               {
-                required:
-                  true,
+                required: true,
 
-                message:
-                  "Vui lòng nhập mã DVKT.",
+                message: "Vui lòng nhập mã DVKT.",
               },
             ]}
           >
-            <Input
-              placeholder="Ví dụ: 21.0014.1778"
-            />
+            <Input placeholder="Ví dụ: 21.0014.1778" />
           </Form.Item>
-
 
           <Form.Item
             name="diagnosis_pattern"
-
             label="Chẩn đoán vào"
-
             rules={[
               {
-                required:
-                  true,
+                required: true,
 
-                message:
-                  "Vui lòng nhập chẩn đoán vào.",
+                message: "Vui lòng nhập chẩn đoán vào.",
               },
             ]}
           >
-            <Input
-              placeholder="Ví dụ: đau ngực"
-            />
+            <Input placeholder="Ví dụ: đau ngực" />
           </Form.Item>
-
 
           <Form.Item
             name="match_type"
-
             label="Kiểu so khớp"
-
             rules={[
               {
-                required:
-                  true,
+                required: true,
 
-                message:
-                  "Vui lòng chọn kiểu so khớp.",
+                message: "Vui lòng chọn kiểu so khớp.",
               },
             ]}
           >
-            <Select
-              options={
-                MATCH_OPTIONS
-              }
-            />
+            <Select options={MATCH_OPTIONS} />
           </Form.Item>
-
 
           {/* <Form.Item
             name="active"
@@ -1430,23 +725,11 @@ const columns:
             />
           </Form.Item> */}
 
-
-          <Form.Item
-            name="note"
-
-            label="Ghi chú"
-          >
-            <Input.TextArea
-              rows={
-                3
-              }
-
-              placeholder="Ghi chú nếu có"
-            />
+          <Form.Item name="note" label="Ghi chú">
+            <Input.TextArea rows={3} placeholder="Ghi chú nếu có" />
           </Form.Item>
         </Form>
       </Modal>
-
 
       <style>
         {`
@@ -1710,10 +993,10 @@ const columns:
               11px;
           }
 
-         
-    
 
- 
+
+
+
 
           .service-table-card
           .ant-pagination {
