@@ -1,7 +1,6 @@
 import { Router } from "express";
 
 import { login, logout, me } from "./auth.controller.js";
-
 import { requireAuth } from "./auth.middleware.js";
 
 import {
@@ -9,6 +8,7 @@ import {
   adminResetPassword,
   changePassword,
   listUsers,
+  updateOwnProfile,
   updateUserActive,
   updateUserRole,
 } from "./account.controller.js";
@@ -20,6 +20,8 @@ router.post("/login", login);
 router.get("/me", requireAuth, me);
 
 router.post("/logout", requireAuth, logout);
+
+router.patch("/profile", requireAuth, updateOwnProfile);
 
 router.post("/change-password", requireAuth, changePassword);
 

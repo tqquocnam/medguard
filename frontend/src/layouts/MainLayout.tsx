@@ -14,7 +14,7 @@ import {
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Drawer, Grid, Layout, Menu, Space, Tag, Tooltip } from "antd";
+import { Avatar, Button, Drawer, Grid, Layout, Menu, Space, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -30,6 +30,7 @@ export default function MainLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const displayName = user?.fullName?.trim() || user?.username || "Tài khoản";
   const screens = Grid.useBreakpoint();
   const isMobile = screens.md === false;
   const [collapsed, setCollapsed] = useState<boolean | null>(null);
@@ -132,7 +133,8 @@ export default function MainLayout() {
             </div>
 
             <div className="mg-side-bottom">
-              <Tooltip title={sidebarCollapsed ? "Tài khoản" : ""} placement="right">
+              <Tooltip title={sidebarCollapsed ? displayName : ""} placement="right">
+                {" "}
                 <button
                   type="button"
                   className={`mg-account ${selectedKey === "/account" ? "mg-account-active" : ""}`}
@@ -145,7 +147,7 @@ export default function MainLayout() {
                   />
                   {!sidebarCollapsed && (
                     <span className="mg-account-info">
-                      <strong>{user?.username || "Tài khoản"}</strong>
+                      <strong>{displayName}</strong>{" "}
                       <small>Chi nhánh {user?.branchId || "—"}</small>
                     </span>
                   )}
@@ -211,7 +213,7 @@ export default function MainLayout() {
               style={{ background: "#eff6ff", color: "#1677ff" }}
             />
             <strong className="mg-header-username">{user?.username}</strong>
-            <Tooltip title={user?.branchName || "Chi nhánh hiện tại"}>
+            {/* <Tooltip title={user?.branchName || "Chi nhánh hiện tại"}>
               <Tag
                 color="blue"
                 style={{
@@ -223,7 +225,7 @@ export default function MainLayout() {
               >
                 Chi nhánh {user?.branchId || "—"}
               </Tag>
-            </Tooltip>
+            </Tooltip> */}
             <Button danger size="small" icon={<LogoutOutlined />} onClick={handleLogout}>
               <span className="mg-logout-label">Đăng xuất</span>
             </Button>
@@ -265,9 +267,29 @@ export default function MainLayout() {
         .mg-account, .mg-collapse-btn { border: 0; width: 100%; display: flex; align-items: center; text-align: left; cursor: pointer; border-radius: 10px; color: #52617a; background: transparent; transition: background .2s; }
         .mg-account { gap: 10px; padding: 9px 7px; min-height: 54px; }
         .mg-account:hover, .mg-account-active { background: #eef6ff; }
-        .mg-account-info { display: flex; flex-direction: column; overflow: hidden; white-space: nowrap; gap: 3px; }
-        .mg-account-info strong { font-size: 12px; color: #1d2a42; overflow: hidden; text-overflow: ellipsis; }
-        .mg-account-info small { font-size: 11px; color: #94a3b8; }
+       .mg-account-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  white-space: normal;
+}
+
+.mg-account-info strong {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #1d2a42;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.mg-account-info small {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #94a3b8;
+}
         .mg-collapse-btn { gap: 12px; min-height: 36px; padding: 8px 15px; font-size: 12px; font-weight: 600; }
         .mg-collapse-btn:hover { background: #f2f6fc; color: #1677ff; }
         .mg-sider.ant-layout-sider-collapsed .mg-account, .mg-sider.ant-layout-sider-collapsed .mg-collapse-btn { justify-content: center; padding: 8px 0; }

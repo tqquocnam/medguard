@@ -10,6 +10,7 @@ import {
   resetUserPassword,
   setUserActive,
   setUserRole,
+  updateUserFullName,
 } from "./account.service.js";
 
 type Result = {
@@ -71,22 +72,27 @@ export async function addUser(req: AuthRequest, res: Response): Promise<void> {
     status: 201,
     message: "Tạo tài khoản thành công.",
 
-    // Chi nhánh lấy từ người đang đăng nhập.
-    // Không nhận branchId hoặc role từ form.
+    // Chi nhánh và quyền được xác định ở backend.
     data: await createUser(user.branchId, {
       username: String(req.body?.username ?? ""),
-
       password: String(req.body?.password ?? ""),
-
       fullName: String(req.body?.fullName ?? ""),
     }),
+  }));
+}
+
+export async function updateOwnProfile(req: AuthRequest, res: Response): Promise<void> {
+  await handle(req, res, async (user) => ({
+    message: "Cập nhật tên hiển thị thành công.",
+
+    // Chỉ cập nhật tài khoản đang đăng nhập.
+    data: await updateUserFullName(user.branchId, user.id, req.body?.fullName),
   }));
 }
 
 export async function updateUserActive(req: AuthRequest, res: Response): Promise<void> {
   await handle(req, res, async (user) => {
     const userId = String(req.params.userId ?? "");
-
     const active = req.body?.active;
 
     if (typeof active !== "boolean") {
@@ -99,7 +105,6 @@ export async function updateUserActive(req: AuthRequest, res: Response): Promise
 
     return {
       message: active ? "Đã mở tài khoản." : "Đã khóa tài khoản.",
-
       data: await setUserActive(user.branchId, userId, active),
     };
   });
@@ -134,7 +139,6 @@ export async function adminResetPassword(req: AuthRequest, res: Response): Promi
 export async function changePassword(req: AuthRequest, res: Response): Promise<void> {
   await handle(req, res, async (user) => {
     const oldPassword = String(req.body?.oldPassword ?? "");
-
     const newPassword = String(req.body?.newPassword ?? "");
 
     if (!oldPassword || !newPassword) {

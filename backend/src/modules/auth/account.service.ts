@@ -44,12 +44,14 @@ function checkPassword(password: string): void {
   }
 }
 
-function requireRow(rows: any[]) {
-  if (!rows[0]) {
+function requireRow<T>(rows: T[]): T {
+  const row = rows[0];
+
+  if (!row) {
     throw new AccountError("Không tìm thấy tài khoản trong chi nhánh.", 404);
   }
 
-  return rows[0];
+  return row;
 }
 
 export async function getUsers(branchId: string) {
@@ -86,7 +88,7 @@ export async function createUser(
   }
 
   if (fullName.length > 255) {
-    throw new AccountError("Họ tên tối đa 255 ký tự.");
+    throw new AccountError("Tên hiển thị tối đa 255 ký tự.");
   }
 
   checkPassword(data.password);
@@ -132,6 +134,42 @@ export async function createUser(
 
     throw error;
   }
+}
+
+export async function updateUserFullName(branchId: string, userId: string, fullName: unknown) {
+  checkBranch(branchId);
+  checkUserId(userId);
+
+  if (typeof fullName !== "string") {
+    throw new AccountError("Tên hiển thị không hợp lệ.");
+  }
+
+  const name = fullName.trim();
+
+  if (!name) {
+    throw new AccountError("Vui lòng nhập tên hiển thị.");
+  }
+
+  if (name.length > 255) {
+    throw new AccountError("Tên hiển thị tối đa 255 ký tự.");
+  }
+
+  const result = await db.query(
+    `
+    UPDATE auth.users
+    SET
+      full_name = $3,
+      updated_at = NOW()
+    WHERE
+      id = $1
+      AND branch_id = $2
+      AND active = TRUE
+    RETURNING ${USER_COLUMNS}
+    `,
+    [userId, branchId, name],
+  );
+
+  return requireRow(result.rows);
 }
 
 export async function setUserActive(branchId: string, userId: string, active: boolean) {

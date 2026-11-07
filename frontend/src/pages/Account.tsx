@@ -1,5 +1,6 @@
 import {
   CheckCircleOutlined,
+  EditOutlined,
   LockOutlined,
   LogoutOutlined,
   PlusOutlined,
@@ -41,6 +42,10 @@ interface AccountUser {
   created_at?: string | null;
 }
 
+interface ProfileForm {
+  fullName: string;
+}
+
 interface CreateUserForm {
   username: string;
   fullName?: string;
@@ -70,7 +75,6 @@ async function request<T>(
   options?: RequestInit,
 ): Promise<ApiResponse<T>> {
   const response = await apiFetch(path, options);
-
   const json = (await response.json().catch(() => null)) as ApiResponse<T> | null;
 
   if (!response.ok || json?.success !== true) {
@@ -98,21 +102,24 @@ const jsonHeaders = {
 
 export default function Account() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [messageApi, contextHolder] = message.useMessage();
 
   const [users, setUsers] = useState<AccountUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [updatingAccountId, setUpdatingAccountId] = useState<string | null>(null);
 
+  const [profileOpen, setProfileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<AccountUser | null>(null);
 
+  const [profileForm] = Form.useForm<ProfileForm>();
   const [createForm] = Form.useForm<CreateUserForm>();
   const [changePasswordForm] = Form.useForm<ChangePasswordForm>();
   const [resetPasswordForm] = Form.useForm<ResetPasswordForm>();
@@ -161,6 +168,7 @@ export default function Account() {
     const controller = new AbortController();
 
     setUsers([]);
+    setProfileOpen(false);
     setCreateOpen(false);
     setChangePasswordOpen(false);
     setResetPasswordUser(null);
@@ -179,6 +187,37 @@ export default function Account() {
       locked: users.length - active,
     };
   }, [users]);
+
+  function openProfile(): void {
+    profileForm.setFieldsValue({
+      fullName: user?.fullName || "",
+    });
+    setProfileOpen(true);
+  }
+
+  async function handleUpdateProfile(values: ProfileForm): Promise<void> {
+    setSavingProfile(true);
+
+    try {
+      await request("/auth/profile", "Không thể cập nhật tên hiển thị.", {
+        method: "PATCH",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          fullName: values.fullName.trim(),
+        }),
+      });
+
+      setProfileOpen(false);
+
+      void messageApi.success("Cập nhật tên hiển thị thành công.");
+
+      await Promise.all([refreshUser(), loadUsers()]);
+    } catch (error) {
+      void messageApi.error(errorMessage(error, "Không thể cập nhật tên hiển thị."));
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   async function handleCreateUser(values: CreateUserForm): Promise<void> {
     if (!branchId) {
@@ -338,10 +377,12 @@ export default function Account() {
       ),
     },
     {
-      title: "Họ và tên",
+      title: "Tên hiển thị",
       dataIndex: "full_name",
-      width: 200,
-      render: (value?: string | null) => value || "—",
+      width: 260,
+      render: (value?: string | null) => (
+        <span className="account-display-name">{value || "—"}</span>
+      ),
     },
     {
       title: "Quyền",
@@ -380,9 +421,15 @@ export default function Account() {
       title: "Thao tác",
       key: "actions",
       fixed: "right",
-      width: 240,
+      width: 260,
       render: (_: unknown, record) => (
-        <Space size={6}>
+        <Space size={6} wrap>
+          {/* {record.id === user?.id && (
+            <Button size="small" icon={<EditOutlined />} onClick={openProfile}>
+              Đổi tên
+            </Button>
+          )} */}
+
           <Button
             size="small"
             icon={<LockOutlined />}
@@ -439,9 +486,9 @@ export default function Account() {
             </Typography.Text>
           </div>
 
-          <Tag color="blue" className="account-branch-tag">
+          {/* <Tag color="blue" className="account-branch-tag">
             Chi nhánh {branchId || "—"}
-          </Tag>
+          </Tag> */}
         </div>
 
         <Card className="account-profile-card">
@@ -470,6 +517,10 @@ export default function Account() {
             </div>
 
             <Space wrap className="account-profile-actions">
+              <Button type="primary" ghost icon={<EditOutlined />} onClick={openProfile}>
+                Đổi tên hiển thị
+              </Button>
+
               <Button
                 icon={<LockOutlined />}
                 onClick={() => {
@@ -562,16 +613,77 @@ export default function Account() {
             columns={columns}
             size="middle"
             rowClassName={(record) => (record.active ? "" : "account-row-locked")}
-            locale={{ emptyText: "Chưa có tài khoản trong chi nhánh" }}
+            locale={{
+              emptyText: "Chưa có tài khoản trong chi nhánh",
+            }}
             pagination={{
               defaultPageSize: 10,
               pageSizeOptions: ["10", "20", "50", "100"],
               showSizeChanger: true,
               showTotal: (total) => `Tổng số: ${total} tài khoản`,
             }}
-            scroll={{ x: 1310 }}
+            scroll={{ x: 1390 }}
           />
         </Card>
+
+        <Modal
+          title="Đổi tên hiển thị"
+          className="account-form-modal"
+          open={profileOpen}
+          footer={null}
+          closable={!savingProfile}
+          mask={{ closable: !savingProfile }}
+          keyboard={!savingProfile}
+          onCancel={() => {
+            if (!savingProfile) setProfileOpen(false);
+          }}
+        >
+          <Form<ProfileForm>
+            form={profileForm}
+            layout="vertical"
+            onFinish={handleUpdateProfile}
+            disabled={savingProfile}
+            className="account-form"
+          >
+            <Alert
+              type="info"
+              showIcon
+              title="Tên hiển thị của tài khoản"
+              description="Bạn có thể nhập tên phòng khám. Tên sau khi lưu sẽ hiển thị ở cuối sidebar."
+              className="account-form-note"
+            />
+
+            <Form.Item
+              label="Tên hiển thị"
+              name="fullName"
+              rules={[
+                {
+                  required: true,
+                  whitespace: true,
+                  message: "Vui lòng nhập tên hiển thị.",
+                },
+                {
+                  max: 255,
+                  message: "Tên hiển thị tối đa 255 ký tự.",
+                },
+              ]}
+            >
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="Phòng khám Đa khoa Sài Gòn Tâm Đức"
+                maxLength={255}
+              />
+            </Form.Item>
+
+            <div className="account-form-actions">
+              <Button onClick={() => setProfileOpen(false)}>Hủy</Button>
+
+              <Button type="primary" htmlType="submit" loading={savingProfile}>
+                Lưu thay đổi
+              </Button>
+            </div>
+          </Form>
+        </Modal>
 
         <Modal
           title="Tạo tài khoản"
@@ -614,8 +726,17 @@ export default function Account() {
               <Input prefix={<UserOutlined />} placeholder="Ví dụ: bacsi01" autoComplete="off" />
             </Form.Item>
 
-            <Form.Item label="Họ và tên" name="fullName">
-              <Input placeholder="Nguyễn Văn A" autoComplete="name" />
+            <Form.Item
+              label="Tên hiển thị"
+              name="fullName"
+              rules={[
+                {
+                  max: 255,
+                  message: "Tên hiển thị tối đa 255 ký tự.",
+                },
+              ]}
+            >
+              <Input placeholder="Tên người dùng hoặc tên phòng khám" maxLength={255} />
             </Form.Item>
 
             <Form.Item
@@ -892,6 +1013,10 @@ export default function Account() {
           border-radius: 6px;
         }
 
+        .account-profile-actions {
+          flex-shrink: 0;
+        }
+
         .account-stat-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -997,6 +1122,12 @@ export default function Account() {
           background: #f5f9ff !important;
         }
 
+        .account-display-name {
+          white-space: normal;
+          overflow-wrap: anywhere;
+          line-height: 1.6;
+        }
+
         .account-user-cell {
           display: flex;
           align-items: center;
@@ -1053,7 +1184,7 @@ export default function Account() {
           gap: 8px;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1100px) {
           .account-profile-main {
             flex-wrap: wrap;
           }
@@ -1061,7 +1192,9 @@ export default function Account() {
           .account-profile-actions {
             width: 100%;
           }
+        }
 
+        @media (max-width: 900px) {
           .account-table-header {
             align-items: flex-start;
             flex-direction: column;
