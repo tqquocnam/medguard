@@ -14,7 +14,7 @@ import {
   UploadOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Layout, Menu, Space, Tag, Tooltip } from "antd";
+import { Avatar, Button, Drawer, Grid, Layout, Menu, Space, Tag, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -30,7 +30,19 @@ export default function MainLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "ADMIN";
-  const [collapsed, setCollapsed] = useState(false);
+  const screens = Grid.useBreakpoint();
+  const isMobile = screens.md === false;
+  const [collapsed, setCollapsed] = useState<boolean | null>(null);
+  const sidebarCollapsed = collapsed ?? screens.xl === false;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const toggleMenu = () => {
+    if (isMobile) setMobileMenuOpen((open) => !open);
+    else setCollapsed(!sidebarCollapsed);
+  };
+  const navigateTo = (key: string) => {
+    navigate(key);
+    setMobileMenuOpen(false);
+  };
 
   const selectedKey =
     location.pathname === "/dashboard"
@@ -71,100 +83,123 @@ export default function MainLayout() {
   }
 
   return (
-    <Layout className="mg-shell">
-      <Sider
-        className="mg-sider"
-        theme="light"
-        width={SIDEBAR_WIDTH}
-        collapsedWidth={COLLAPSED_WIDTH}
-        collapsed={collapsed}
-        trigger={null}
-        breakpoint="lg"
-        onBreakpoint={(broken) => setCollapsed(broken)}
-        style={{
-          position: "fixed",
-          top: 0,
-          bottom: 0,
-          left: 0,
-          height: "100dvh",
-          overflow: "hidden",
-          zIndex: 30,
-          background: "#fff",
-          borderRight: "1px solid #e8eef6",
-          boxShadow: "3px 0 18px rgba(35, 59, 100, .035)",
-        }}
-      >
-        <div className="mg-side-inner">
-          <div className="mg-brand">
-            <div className="mg-brand-mark">
-              <SafetyCertificateOutlined />
-            </div>
-            {!collapsed && (
-              <div className="mg-brand-copy">
-                <strong>MedGuard</strong>
-                <small>BHYT MANAGEMENT</small>
+    <Layout
+      className={`mg-shell${location.pathname === "/medical-cases" ? " mg-shell-fixed" : ""}`}
+    >
+      {!isMobile && (
+        <Sider
+          className="mg-sider"
+          theme="light"
+          width={SIDEBAR_WIDTH}
+          collapsedWidth={COLLAPSED_WIDTH}
+          collapsed={sidebarCollapsed}
+          trigger={null}
+          style={{
+            position: "fixed",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            height: "100dvh",
+            overflow: "hidden",
+            zIndex: 30,
+            background: "#fff",
+            borderRight: "1px solid #e8eef6",
+            boxShadow: "3px 0 18px rgba(35, 59, 100, .035)",
+          }}
+        >
+          <div className="mg-side-inner">
+            <div className="mg-brand">
+              <div className="mg-brand-mark">
+                <SafetyCertificateOutlined />
               </div>
-            )}
-          </div>
+              {!sidebarCollapsed && (
+                <div className="mg-brand-copy">
+                  <strong>MedGuard</strong>
+                  <small>BHYT MANAGEMENT</small>
+                </div>
+              )}
+            </div>
 
-          <div className="mg-menu-scroll">
-            <Menu
-              className="mg-menu"
-              mode="inline"
-              inlineCollapsed={collapsed}
-              selectedKeys={[selectedKey]}
-              items={menuItems}
-              onClick={({ key }) => navigate(key)}
-            />
-          </div>
+            <div className="mg-menu-scroll">
+              <Menu
+                className="mg-menu"
+                mode="inline"
+                inlineCollapsed={sidebarCollapsed}
+                selectedKeys={[selectedKey]}
+                items={menuItems}
+                onClick={({ key }) => navigateTo(key)}
+              />
+            </div>
 
-          <div className="mg-side-bottom">
-            <Tooltip title={collapsed ? "Tài khoản" : ""} placement="right">
-              <button
-                type="button"
-                className={`mg-account ${selectedKey === "/account" ? "mg-account-active" : ""}`}
-                onClick={() => navigate("/account")}
-              >
-                <Avatar
-                  size={34}
-                  icon={<UserOutlined />}
-                  style={{ background: "#e8f2ff", color: "#1677ff", flexShrink: 0 }}
-                />
-                {!collapsed && (
-                  <span className="mg-account-info">
-                    <strong>{user?.username || "Tài khoản"}</strong>
-                    <small>Chi nhánh {user?.branchId || "—"}</small>
-                  </span>
-                )}
-              </button>
-            </Tooltip>
-            <Tooltip title={collapsed ? "Mở rộng menu" : ""} placement="right">
-              <button
-                type="button"
-                className="mg-collapse-btn"
-                onClick={() => setCollapsed((prev) => !prev)}
-                aria-label={collapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-              >
-                {collapsed ? <DoubleRightOutlined /> : <DoubleLeftOutlined />}
-                {!collapsed}
-              </button>
-            </Tooltip>
+            <div className="mg-side-bottom">
+              <Tooltip title={sidebarCollapsed ? "Tài khoản" : ""} placement="right">
+                <button
+                  type="button"
+                  className={`mg-account ${selectedKey === "/account" ? "mg-account-active" : ""}`}
+                  onClick={() => navigateTo("/account")}
+                >
+                  <Avatar
+                    size={34}
+                    icon={<UserOutlined />}
+                    style={{ background: "#e8f2ff", color: "#1677ff", flexShrink: 0 }}
+                  />
+                  {!sidebarCollapsed && (
+                    <span className="mg-account-info">
+                      <strong>{user?.username || "Tài khoản"}</strong>
+                      <small>Chi nhánh {user?.branchId || "—"}</small>
+                    </span>
+                  )}
+                </button>
+              </Tooltip>
+              <Tooltip title={sidebarCollapsed ? "Mở rộng menu" : ""} placement="right">
+                <button
+                  type="button"
+                  className="mg-collapse-btn"
+                  onClick={toggleMenu}
+                  aria-label={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+                >
+                  {sidebarCollapsed ? <DoubleRightOutlined /> : <DoubleLeftOutlined />}
+                  {!sidebarCollapsed}
+                </button>
+              </Tooltip>
+            </div>
           </div>
-        </div>
-      </Sider>
+        </Sider>
+      )}
+
+      <Drawer
+        title="MedGuard"
+        placement="left"
+        open={isMobile && mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        styles={{ wrapper: { width: "min(300px, 90vw)" }, body: { padding: 12 } }}
+      >
+        <Menu
+          mode="inline"
+          selectedKeys={[selectedKey]}
+          items={menuItems}
+          onClick={({ key }) => navigateTo(key)}
+        />
+        <Button block icon={<UserOutlined />} onClick={() => navigateTo("/account")}>
+          Tài khoản
+        </Button>
+      </Drawer>
 
       <Layout
         className="mg-main-layout"
-        style={{ marginLeft: collapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
+        style={{ marginLeft: isMobile ? 0 : sidebarCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
       >
         <Header className="mg-header">
           <div className="mg-header-left">
-            <Tooltip title={collapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}>
+            <Tooltip title={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}>
               <Button
                 type="text"
                 className="mg-header-toggle"
-                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setCollapsed((prev) => !prev)}
+                aria-label={
+                  isMobile ? "Mở menu" : sidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"
+                }
+                icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={toggleMenu}
               />
             </Tooltip>
             <span className="mg-header-title">Hệ thống kiểm tra hồ sơ BHYT</span>
@@ -236,18 +271,22 @@ export default function MainLayout() {
         .mg-collapse-btn { gap: 12px; min-height: 36px; padding: 8px 15px; font-size: 12px; font-weight: 600; }
         .mg-collapse-btn:hover { background: #f2f6fc; color: #1677ff; }
         .mg-sider.ant-layout-sider-collapsed .mg-account, .mg-sider.ant-layout-sider-collapsed .mg-collapse-btn { justify-content: center; padding: 8px 0; }
-        .mg-main-layout { min-width: 0; min-height: 100dvh; transition: margin-left .2s ease; background: #f5f7fb; }
+        .mg-main-layout { flex: 1; width: 0; min-width: 0; min-height: 100dvh; transition: margin-left .2s ease; background: #f5f7fb; }
         .mg-header { height: 64px; line-height: normal; padding: 0 24px; background: #fff; border-bottom: 1px solid #e8edf3; display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; z-index: 15; box-shadow: 0 2px 10px rgba(15,23,42,.02); }
         .mg-header-left { display: flex; align-items: center; min-width: 0; gap: 10px; }
         .mg-header-toggle { color: #64748b; font-size: 16px; }
         .mg-header-title { font-size: 14px; font-weight: 700; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .mg-header-actions { flex-shrink: 0; }
+        .mg-header-left { flex: 1; }
+        .mg-header-toggle { flex-shrink: 0; }
         .mg-header-username { font-size: 13px; color: #172033; }
         .mg-role-tag { margin: 0; border-radius: 6px; font-weight: 700; }
         .mg-content { padding: 22px; background: #f5f7fb; min-width: 0; min-height: calc(100dvh - 64px); }
-        .mg-content-surface { background: #fff; border-radius: 12px; padding: 22px; min-height: 500px; min-width: 0; box-shadow: 0 4px 18px rgba(15,23,42,.025); }
+        .mg-content-surface { container-type: inline-size; background: #fff; border-radius: 12px; padding: 22px; min-height: 500px; min-width: 0; box-shadow: 0 4px 18px rgba(15,23,42,.025); }
         @media (max-width: 900px) { .mg-header { padding: 0 14px; } .mg-content { padding: 12px; } .mg-content-surface { padding: 14px; } }
         @media (max-width: 640px) { .mg-header-username, .mg-logout-label { display: none; } .mg-header-title { font-size: 12px; } .mg-role-tag { display: none; } .mg-header-actions { gap: 5px !important; } }
+        @media (max-width: 1199px) { .mg-content { padding: 14px; } .mg-content-surface { padding: 16px; } }
+        @media (max-width: 767px) { .mg-header-title { display: none; } .mg-header { padding: 0 10px; } .mg-content { padding: 8px; } .mg-content-surface { padding: 10px; min-height: 0; } }
       `}</style>
     </Layout>
   );

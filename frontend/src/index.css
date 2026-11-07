@@ -22,3 +22,140 @@ body {
     sans-serif;
   background: #f5f7fa;
 }
+
+/* Keep wide data inside its own scroll area instead of widening the app. */
+.mg-content-surface > *,
+.mg-content-surface .ant-card,
+.mg-content-surface .ant-card-body,
+.mg-content-surface .ant-tabs,
+.mg-content-surface .ant-tabs-content,
+.mg-content-surface .ant-tabs-tabpane,
+.mg-content-surface .ant-table-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* .mg-content-surface .ant-table-container {
+  max-width: 100%;
+  overflow-x: auto;
+} */
+
+.mg-content-surface .ant-pagination {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.ant-modal .ant-modal-content {
+  min-width: 0;
+}
+
+.ant-modal .ant-modal-body {
+  overflow-wrap: anywhere;
+}
+
+/* Use available content width, including the space occupied by the sidebar. */
+@container (max-width: 1050px) {
+  .mg-content-surface .medguard-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .mg-content-surface .medguard-filter-actions-row {
+    flex-wrap: wrap;
+  }
+}
+
+@container (max-width: 700px) {
+  .mg-content-surface .medguard-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .mg-content-surface .medguard-filter-date-fields {
+    width: 100%;
+  }
+  .mg-content-surface .medguard-filter-buttons {
+    flex-wrap: wrap;
+  }
+}
+
+@container (max-width: 440px) {
+  .mg-content-surface .medguard-filter-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .mg-content-surface .medguard-filter-date-fields {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ant-modal {
+    max-width: calc(100vw - 16px);
+    margin-inline: auto;
+  }
+  .ant-modal .ant-modal-body {
+    max-height: 75dvh;
+    overflow-y: auto;
+  }
+  .ant-modal .ant-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+}
+
+/* Trang hồ sơ chiếm đúng chiều cao màn hình */
+.mg-shell.mg-shell-fixed {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mg-shell-fixed .mg-main-layout {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mg-shell-fixed .mg-header {
+  flex: 0 0 64px;
+}
+
+.mg-shell-fixed .mg-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mg-shell-fixed .mg-content-surface {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Gọn hơn khi màn hình laptop có chiều cao thấp */
+@media (max-height: 820px) {
+  .mg-shell-fixed .mg-content {
+    padding: 10px;
+  }
+
+  .mg-shell-fixed .mg-content-surface {
+    padding: 12px;
+  }
+
+  .mg-shell-fixed .medguard-stat-grid .ant-card-body {
+    padding: 6px 12px !important;
+  }
+
+  .mg-shell-fixed .medguard-filter-panel .ant-card-body {
+    padding: 10px 12px !important;
+  }
+
+  .mg-shell-fixed .medguard-case-table-header,
+  .mg-shell-fixed .medguard-case-pagination-footer {
+    padding: 6px 10px !important;
+  }
+
+  .mg-shell-fixed .medguard-case-table-fixed .ant-table-tbody > tr > td {
+    padding: 8px 10px;
+  }
+}

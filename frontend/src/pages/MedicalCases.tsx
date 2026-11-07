@@ -190,25 +190,10 @@ function renderGender(value?: string) {
 
 const pageStyle: CSSProperties = {
   display: "flex",
-
   flexDirection: "column",
-
-  // Gọn hơn bản cũ
-  gap: 10,
-
-  /*
-   * MainLayout:
-   *
-   * Header: 64px
-   * Content padding: 24 + 24
-   * Container padding: 24 + 24
-   *
-   * Tổng = 160px
-   */
-  height: "calc(100vh - 160px)",
-
+  gap: 8,
+  height: "100%",
   minHeight: 0,
-
   overflow: "hidden",
 };
 
@@ -360,25 +345,25 @@ export default function MedicalCases() {
   // KHÓA SCROLL BODY
   // ====================================================
 
-  useEffect(() => {
-    const html = document.documentElement;
+  // useEffect(() => {
+  //   const html = document.documentElement;
 
-    const body = document.body;
+  //   const body = document.body;
 
-    const oldHtmlOverflow = html.style.overflow;
+  //   const oldHtmlOverflow = html.style.overflow;
 
-    const oldBodyOverflow = body.style.overflow;
+  //   const oldBodyOverflow = body.style.overflow;
 
-    html.style.overflow = "hidden";
+  //   html.style.overflow = "hidden";
 
-    body.style.overflow = "hidden";
+  //   body.style.overflow = "hidden";
 
-    return () => {
-      html.style.overflow = oldHtmlOverflow;
+  //   return () => {
+  //     html.style.overflow = oldHtmlOverflow;
 
-      body.style.overflow = oldBodyOverflow;
-    };
-  }, []);
+  //     body.style.overflow = oldBodyOverflow;
+  //   };
+  // }, []);
 
   // ====================================================
   // MODAL KẾT QUẢ
@@ -1170,7 +1155,7 @@ export default function MedicalCases() {
         style={{
           display: "grid",
 
-          gridTemplateColumns: "repeat(4, minmax(170px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(170px, 100%), 1fr))",
 
           gap: 10,
 
@@ -1684,10 +1669,9 @@ export default function MedicalCases() {
       <div
         ref={tableAreaRef}
         style={{
-          flex: 1,
-
+          flex: "1 1 0",
           minHeight: 0,
-
+          minWidth: 0,
           overflow: "hidden",
         }}
       >
