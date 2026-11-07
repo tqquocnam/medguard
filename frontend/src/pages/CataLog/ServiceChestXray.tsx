@@ -1,4 +1,3 @@
-
 import {
   Alert,
   Breadcrumb,
@@ -26,12 +25,7 @@ import {
   FileImageOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../api/apiClient";
@@ -40,14 +34,9 @@ const { Title, Text } = Typography;
 
 const API_PATH = "/catalog/service-chest-xray";
 
-const DEFAULT_GROUP_A = [
-  "18.0119.0029",
-  "18.0119.0028",
-];
+const DEFAULT_GROUP_A = ["18.0119.0029", "18.0119.0028"];
 
-const DEFAULT_GROUP_B = [
-  "18.0120.0028",
-];
+const DEFAULT_GROUP_B = ["18.0120.0028"];
 
 type Severity = "WARNING" | "ERROR";
 
@@ -83,8 +72,8 @@ function parseCodes(text: string): string[] {
       text
         .split(/[\s,;|]+/)
         .map((item) => item.trim().toUpperCase())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
 }
 
@@ -92,17 +81,12 @@ function codeText(codes: string[]): string {
   return codes.join("\n");
 }
 
-function validateCodes(
-  groupA: string[],
-  groupB: string[]
-): string | null {
+function validateCodes(groupA: string[], groupB: string[]): string | null {
   if (!groupA.length || !groupB.length) {
     return "Mỗi nhóm phải có ít nhất một mã DVKT.";
   }
 
-  const invalid = [...groupA, ...groupB].find(
-    (code) => code.length > 100
-  );
+  const invalid = [...groupA, ...groupB].find((code) => code.length > 100);
 
   if (invalid) {
     return "Mã DVKT không được vượt quá 100 ký tự.";
@@ -110,28 +94,17 @@ function validateCodes(
 
   const groupASet = new Set(groupA);
 
-  const duplicates = groupB.filter((code) =>
-    groupASet.has(code)
-  );
+  const duplicates = groupB.filter((code) => groupASet.has(code));
 
   if (duplicates.length) {
-    return (
-      "Mã DVKT không được nằm ở cả hai nhóm: " +
-      duplicates.join(", ")
-    );
+    return "Mã DVKT không được nằm ở cả hai nhóm: " + duplicates.join(", ");
   }
 
   return null;
 }
 
-function sameCodes(
-  first: string[],
-  second: string[]
-): boolean {
-  return (
-    [...first].sort().join("|") ===
-    [...second].sort().join("|")
-  );
+function sameCodes(first: string[], second: string[]): boolean {
+  return [...first].sort().join("|") === [...second].sort().join("|");
 }
 
 export default function ServiceChestXray() {
@@ -141,33 +114,23 @@ export default function ServiceChestXray() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  const [original, setOriginal] =
-    useState<RuleData | null>(null);
+  const [original, setOriginal] = useState<RuleData | null>(null);
 
   const [enabled, setEnabled] = useState(true);
 
-  const [severity, setSeverity] =
-    useState<Severity>("WARNING");
+  const [severity, setSeverity] = useState<Severity>("WARNING");
 
-  const [groupAText, setGroupAText] =
-    useState("");
+  const [groupAText, setGroupAText] = useState("");
 
-  const [groupBText, setGroupBText] =
-    useState("");
+  const [groupBText, setGroupBText] = useState("");
 
-  const groupACodes = useMemo(
-    () => parseCodes(groupAText),
-    [groupAText]
-  );
+  const groupACodes = useMemo(() => parseCodes(groupAText), [groupAText]);
 
-  const groupBCodes = useMemo(
-    () => parseCodes(groupBText),
-    [groupBText]
-  );
+  const groupBCodes = useMemo(() => parseCodes(groupBText), [groupBText]);
 
   const validationError = useMemo(
     () => validateCodes(groupACodes, groupBCodes),
-    [groupACodes, groupBCodes]
+    [groupACodes, groupBCodes],
   );
 
   const applyRule = useCallback((rule: RuleData) => {
@@ -175,13 +138,9 @@ export default function ServiceChestXray() {
     setEnabled(rule.enabled);
     setSeverity(rule.severity);
 
-    setGroupAText(
-      codeText(rule.config.groupACodes)
-    );
+    setGroupAText(codeText(rule.config.groupACodes));
 
-    setGroupBText(
-      codeText(rule.config.groupBCodes)
-    );
+    setGroupBText(codeText(rule.config.groupBCodes));
   }, []);
 
   const loadRule = useCallback(async () => {
@@ -193,27 +152,15 @@ export default function ServiceChestXray() {
         method: "GET",
       });
 
-      const json =
-        (await response.json()) as ApiResponse;
+      const json = (await response.json()) as ApiResponse;
 
-      if (
-        !response.ok ||
-        !json.success ||
-        !json.data
-      ) {
-        throw new Error(
-          json.message ||
-          "Không tải được cấu hình X-quang ngực."
-        );
+      if (!response.ok || !json.success || !json.data) {
+        throw new Error(json.message || "Không tải được cấu hình X-quang ngực.");
       }
 
       applyRule(json.data);
     } catch (error) {
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải cấu hình."
-      );
+      setLoadError(error instanceof Error ? error.message : "Không thể tải cấu hình.");
     } finally {
       setLoading(false);
     }
@@ -229,22 +176,10 @@ export default function ServiceChestXray() {
     return (
       original.enabled !== enabled ||
       original.severity !== severity ||
-      !sameCodes(
-        original.config.groupACodes,
-        groupACodes
-      ) ||
-      !sameCodes(
-        original.config.groupBCodes,
-        groupBCodes
-      )
+      !sameCodes(original.config.groupACodes, groupACodes) ||
+      !sameCodes(original.config.groupBCodes, groupBCodes)
     );
-  }, [
-    original,
-    enabled,
-    severity,
-    groupACodes,
-    groupBCodes,
-  ]);
+  }, [original, enabled, severity, groupACodes, groupBCodes]);
 
   async function handleSave() {
     if (!original) {
@@ -273,30 +208,17 @@ export default function ServiceChestXray() {
         }),
       });
 
-      const json =
-        (await response.json()) as ApiResponse;
+      const json = (await response.json()) as ApiResponse;
 
-      if (
-        !response.ok ||
-        !json.success ||
-        !json.data
-      ) {
-        throw new Error(
-          json.message || "Không thể lưu cấu hình."
-        );
+      if (!response.ok || !json.success || !json.data) {
+        throw new Error(json.message || "Không thể lưu cấu hình.");
       }
 
       applyRule(json.data);
 
-      message.success(
-        json.message || "Đã lưu cấu hình."
-      );
+      message.success(json.message || "Đã lưu cấu hình.");
     } catch (error) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Lưu cấu hình thất bại."
-      );
+      message.error(error instanceof Error ? error.message : "Lưu cấu hình thất bại.");
     } finally {
       setSaving(false);
     }
@@ -314,12 +236,7 @@ export default function ServiceChestXray() {
     setGroupBText(codeText(DEFAULT_GROUP_B));
   }
 
-  const canSave =
-    Boolean(original) &&
-    !loading &&
-    !saving &&
-    isDirty &&
-    !validationError;
+  const canSave = Boolean(original) && !loading && !saving && isDirty && !validationError;
 
   return (
     <div className="chest-rule-page">
@@ -333,11 +250,7 @@ export default function ServiceChestXray() {
             ),
           },
           {
-            title: (
-              <a onClick={() => navigate("/catalog")}>
-                Danh mục
-              </a>
-            ),
+            title: <a onClick={() => navigate("/catalog")}>Danh mục</a>,
           },
           {
             title: "Tương tác DVKT - X-quang ngực",
@@ -356,21 +269,12 @@ export default function ServiceChestXray() {
               Tương tác DVKT - X-quang ngực
             </Title>
             <Text type="secondary">
-              Cấu hình cảnh báo thanh toán đồng thời
-              X-quang ngực thẳng và nghiêng/chếch
+              Cấu hình cảnh báo thanh toán đồng thời X-quang ngực thẳng và nghiêng/chếch
             </Text>
           </div>
         </div>
 
         <Space size={8} wrap>
-          <Button
-            icon={<ReloadOutlined />}
-            disabled={saving}
-            onClick={() => void loadRule()}
-          >
-            Làm mới
-          </Button>
-
           <Button
             type="primary"
             icon={<SaveOutlined />}
@@ -390,10 +294,7 @@ export default function ServiceChestXray() {
           message="Không thể tải cấu hình"
           description={loadError}
           action={
-            <Button
-              size="small"
-              onClick={() => void loadRule()}
-            >
+            <Button size="small" onClick={() => void loadRule()}>
               Thử lại
             </Button>
           }
@@ -406,21 +307,16 @@ export default function ServiceChestXray() {
             <Row gutter={[16, 14]} align="middle">
               <Col xs={24} lg={12}>
                 <div className="chest-rule-info">
-                  <Text strong>
-                    Quy luật không thanh toán đồng thời
-                  </Text>
+                  <Text strong>Quy luật không thanh toán đồng thời</Text>
 
                   <Space size={5} wrap>
                     <Tag color="blue">GENERAL</Tag>
                     <Tag>XML3</Tag>
-                    <Tag color="orange">
-                      Hai nhóm DVKT loại trừ
-                    </Tag>
+                    <Tag color="orange">Hai nhóm DVKT loại trừ</Tag>
                   </Space>
 
                   <Text type="secondary">
-                    Kiểm tra trong cùng hồ sơ,
-                    không phụ thuộc thời gian thực hiện.
+                    Kiểm tra trong cùng hồ sơ, không phụ thuộc thời gian thực hiện.
                   </Text>
                 </div>
               </Col>
@@ -469,40 +365,27 @@ export default function ServiceChestXray() {
               <Card className="chest-rule-card chest-code-card">
                 <div className="chest-code-heading">
                   <div>
-                    <Text strong>
-                      Nhóm A - X-quang ngực thẳng
-                    </Text>
-                    <Text
-                      type="secondary"
-                      className="chest-code-subtitle"
-                    >
+                    <Text strong>Nhóm A - X-quang ngực thẳng</Text>
+                    <Text type="secondary" className="chest-code-subtitle">
                       Các mã X-quang ngực thẳng
                     </Text>
                   </div>
 
-                  <Tag color="blue">
-                    {groupACodes.length} mã
-                  </Tag>
+                  <Tag color="blue">{groupACodes.length} mã</Tag>
                 </div>
 
                 <Input.TextArea
                   value={groupAText}
                   disabled={!original || loading}
-                  onChange={(event) =>
-                    setGroupAText(event.target.value)
-                  }
+                  onChange={(event) => setGroupAText(event.target.value)}
                   rows={4}
                   spellCheck={false}
                   placeholder="Mỗi dòng một mã DVKT"
                   className="chest-code-input"
                 />
 
-                <Text
-                  type="secondary"
-                  className="chest-code-hint"
-                >
-                  Mỗi dòng một mã. Có thể dán danh sách
-                  mã từ Excel.
+                <Text type="secondary" className="chest-code-hint">
+                  Mỗi dòng một mã. Có thể dán danh sách mã từ Excel.
                 </Text>
 
                 <div className="chest-code-tags">
@@ -519,40 +402,27 @@ export default function ServiceChestXray() {
               <Card className="chest-rule-card chest-code-card">
                 <div className="chest-code-heading">
                   <div>
-                    <Text strong>
-                      Nhóm B - X-quang ngực nghiêng/chếch
-                    </Text>
-                    <Text
-                      type="secondary"
-                      className="chest-code-subtitle"
-                    >
+                    <Text strong>Nhóm B - X-quang ngực nghiêng/chếch</Text>
+                    <Text type="secondary" className="chest-code-subtitle">
                       Các mã X-quang ngực nghiêng hoặc chếch
                     </Text>
                   </div>
 
-                  <Tag color="purple">
-                    {groupBCodes.length} mã
-                  </Tag>
+                  <Tag color="purple">{groupBCodes.length} mã</Tag>
                 </div>
 
                 <Input.TextArea
                   value={groupBText}
                   disabled={!original || loading}
-                  onChange={(event) =>
-                    setGroupBText(event.target.value)
-                  }
+                  onChange={(event) => setGroupBText(event.target.value)}
                   rows={4}
                   spellCheck={false}
                   placeholder="Mỗi dòng một mã DVKT"
                   className="chest-code-input"
                 />
 
-                <Text
-                  type="secondary"
-                  className="chest-code-hint"
-                >
-                  Phát hiện khi có cả nhóm A và nhóm B
-                  trong cùng một hồ sơ.
+                <Text type="secondary" className="chest-code-hint">
+                  Phát hiện khi có cả nhóm A và nhóm B trong cùng một hồ sơ.
                 </Text>
 
                 <div className="chest-code-tags">
@@ -566,13 +436,7 @@ export default function ServiceChestXray() {
             </Col>
           </Row>
 
-          {validationError && (
-            <Alert
-              type="error"
-              showIcon
-              message={validationError}
-            />
-          )}
+          {validationError && <Alert type="error" showIcon message={validationError} />}
 
           <Card className="chest-rule-card">
             <div className="chest-preview-heading">
@@ -587,8 +451,7 @@ export default function ServiceChestXray() {
               </Text>
 
               <Tag color="processing">
-                {groupACodes.length * groupBCodes.length}
-                {" "}cặp mã có thể đối chiếu
+                {groupACodes.length * groupBCodes.length} cặp mã có thể đối chiếu
               </Tag>
             </div>
 
@@ -615,23 +478,18 @@ export default function ServiceChestXray() {
             </div>
 
             <Text type="secondary">
-              Khi XML3 chứa mã thuộc cả hai nhóm trong
-              cùng một hồ sơ GENERAL, hệ thống ghi nhận
-              cảnh báo cần rà soát điều kiện thanh toán
-              BHYT. Không tự động kết luận từ chối thanh toán.
+              Khi XML3 chứa mã thuộc cả hai nhóm trong cùng một hồ sơ GENERAL, hệ thống ghi nhận
+              cảnh báo cần rà soát điều kiện thanh toán BHYT. Không tự động kết luận từ chối thanh
+              toán.
             </Text>
           </Card>
 
           <div className="chest-rule-footer">
             <Space wrap>
-              <Tag color={enabled ? "success" : "default"}>
-                {enabled ? "Đang bật" : "Đã tắt"}
-              </Tag>
+              <Tag color={enabled ? "success" : "default"}>{enabled ? "Đang bật" : "Đã tắt"}</Tag>
 
               <Text type="secondary">
-                {isDirty
-                  ? "Có thay đổi chưa lưu"
-                  : "Cấu hình đã đồng bộ"}
+                {isDirty ? "Có thay đổi chưa lưu" : "Cấu hình đã đồng bộ"}
               </Text>
             </Space>
 
@@ -644,10 +502,7 @@ export default function ServiceChestXray() {
                 Hủy thay đổi
               </Button>
 
-              <Button
-                disabled={!original || saving}
-                onClick={resetDefaults}
-              >
+              <Button disabled={!original || saving} onClick={resetDefaults}>
                 Mã mặc định
               </Button>
 

@@ -1,4 +1,3 @@
-
 import {
   Alert,
   Breadcrumb,
@@ -26,12 +25,7 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../api/apiClient";
@@ -86,19 +80,15 @@ export default function ServiceCalciumElectrolyte() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  const [original, setOriginal] =
-    useState<RuleData | null>(null);
+  const [original, setOriginal] = useState<RuleData | null>(null);
 
   const [enabled, setEnabled] = useState(true);
 
-  const [severity, setSeverity] =
-    useState<Severity>("WARNING");
+  const [severity, setSeverity] = useState<Severity>("WARNING");
 
-  const [serviceACode, setServiceACode] =
-    useState(DEFAULT_A);
+  const [serviceACode, setServiceACode] = useState(DEFAULT_A);
 
-  const [serviceBCode, setServiceBCode] =
-    useState(DEFAULT_B);
+  const [serviceBCode, setServiceBCode] = useState(DEFAULT_B);
 
   // ====================================================
   // VALIDATION
@@ -112,10 +102,7 @@ export default function ServiceCalciumElectrolyte() {
       return "Không được để trống mã DVKT A hoặc B.";
     }
 
-    if (
-      normalizedA.length > 100 ||
-      normalizedB.length > 100
-    ) {
+    if (normalizedA.length > 100 || normalizedB.length > 100) {
       return "Mỗi mã DVKT tối đa 100 ký tự.";
     }
 
@@ -132,18 +119,10 @@ export default function ServiceCalciumElectrolyte() {
     return (
       original.enabled !== enabled ||
       original.severity !== severity ||
-      normalizeCode(original.config.serviceACode) !==
-        normalizedA ||
-      normalizeCode(original.config.serviceBCode) !==
-        normalizedB
+      normalizeCode(original.config.serviceACode) !== normalizedA ||
+      normalizeCode(original.config.serviceBCode) !== normalizedB
     );
-  }, [
-    original,
-    enabled,
-    severity,
-    normalizedA,
-    normalizedB,
-  ]);
+  }, [original, enabled, severity, normalizedA, normalizedB]);
 
   // ====================================================
   // APPLY DATA
@@ -155,13 +134,9 @@ export default function ServiceCalciumElectrolyte() {
     setEnabled(rule.enabled);
     setSeverity(rule.severity);
 
-    setServiceACode(
-      rule.config.serviceACode ?? DEFAULT_A
-    );
+    setServiceACode(rule.config.serviceACode ?? DEFAULT_A);
 
-    setServiceBCode(
-      rule.config.serviceBCode ?? DEFAULT_B
-    );
+    setServiceBCode(rule.config.serviceBCode ?? DEFAULT_B);
   }, []);
 
   // ====================================================
@@ -177,26 +152,15 @@ export default function ServiceCalciumElectrolyte() {
         method: "GET",
       });
 
-      const json =
-        (await response.json()) as ApiResponse;
+      const json = (await response.json()) as ApiResponse;
 
-      if (
-        !response.ok ||
-        !json.success ||
-        !json.data
-      ) {
-        throw new Error(
-          json.message || "Không thể tải cấu hình rule."
-        );
+      if (!response.ok || !json.success || !json.data) {
+        throw new Error(json.message || "Không thể tải cấu hình rule.");
       }
 
       applyRule(json.data);
     } catch (error) {
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải cấu hình."
-      );
+      setLoadError(error instanceof Error ? error.message : "Không thể tải cấu hình.");
     } finally {
       setLoading(false);
     }
@@ -237,30 +201,17 @@ export default function ServiceCalciumElectrolyte() {
         }),
       });
 
-      const json =
-        (await response.json()) as ApiResponse;
+      const json = (await response.json()) as ApiResponse;
 
-      if (
-        !response.ok ||
-        !json.success ||
-        !json.data
-      ) {
-        throw new Error(
-          json.message || "Lưu cấu hình thất bại."
-        );
+      if (!response.ok || !json.success || !json.data) {
+        throw new Error(json.message || "Lưu cấu hình thất bại.");
       }
 
       applyRule(json.data);
 
-      message.success(
-        json.message || "Đã lưu cấu hình thành công."
-      );
+      message.success(json.message || "Đã lưu cấu hình thành công.");
     } catch (error) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể lưu cấu hình."
-      );
+      message.error(error instanceof Error ? error.message : "Không thể lưu cấu hình.");
     } finally {
       setSaving(false);
     }
@@ -299,11 +250,7 @@ export default function ServiceCalciumElectrolyte() {
             ),
           },
           {
-            title: (
-              <a onClick={() => navigate("/catalog")}>
-                Danh mục
-              </a>
-            ),
+            title: <a onClick={() => navigate("/catalog")}>Danh mục</a>,
           },
           {
             title: "Canxi toàn phần - Điện giải đồ",
@@ -322,31 +269,16 @@ export default function ServiceCalciumElectrolyte() {
               Canxi toàn phần - Điện giải đồ
             </Title>
 
-            <Text type="secondary">
-              Cấu hình quy luật không thanh toán đồng thời hai DVKT
-            </Text>
+            <Text type="secondary">Cấu hình quy luật không thanh toán đồng thời hai DVKT</Text>
           </div>
         </div>
 
         <Space wrap size={8}>
           <Button
-            icon={<ReloadOutlined />}
-            disabled={saving}
-            onClick={() => void loadRule()}
-          >
-            Làm mới
-          </Button>
-
-          <Button
             type="primary"
             icon={<SaveOutlined />}
             loading={saving}
-            disabled={
-              loading ||
-              !original ||
-              !isDirty ||
-              Boolean(validationError)
-            }
+            disabled={loading || !original || !isDirty || Boolean(validationError)}
             onClick={() => void handleSave()}
           >
             Lưu cấu hình
@@ -361,10 +293,7 @@ export default function ServiceCalciumElectrolyte() {
           message="Không thể tải cấu hình"
           description={loadError}
           action={
-            <Button
-              size="small"
-              onClick={() => void loadRule()}
-            >
+            <Button size="small" onClick={() => void loadRule()}>
               Thử lại
             </Button>
           }
@@ -391,14 +320,11 @@ export default function ServiceCalciumElectrolyte() {
                   <Space size={6} wrap>
                     <Tag color="blue">GENERAL</Tag>
                     <Tag>XML3</Tag>
-                    <Tag color="orange">
-                      Chỉ cho phép 1 trong 2
-                    </Tag>
+                    <Tag color="orange">Chỉ cho phép 1 trong 2</Tag>
                   </Space>
 
                   <Text type="secondary">
-                    Kiểm tra hai mã DVKT trong cùng một hồ sơ,
-                    không phụ thuộc thời gian thực hiện.
+                    Kiểm tra hai mã DVKT trong cùng một hồ sơ, không phụ thuộc thời gian thực hiện.
                   </Text>
                 </div>
               </Col>
@@ -453,16 +379,11 @@ export default function ServiceCalciumElectrolyte() {
                   </Tag>
                 </div>
 
-                <Text
-                  strong
-                  className="calcium-service-title"
-                >
+                <Text strong className="calcium-service-title">
                   Định lượng Canxi toàn phần [Máu]
                 </Text>
 
-                <Text className="calcium-field-label">
-                  Mã dịch vụ kỹ thuật
-                </Text>
+                <Text className="calcium-field-label">Mã dịch vụ kỹ thuật</Text>
 
                 <Input
                   size="large"
@@ -471,9 +392,7 @@ export default function ServiceCalciumElectrolyte() {
                   maxLength={100}
                   spellCheck={false}
                   placeholder="Nhập mã DVKT A"
-                  onChange={(event) =>
-                    setServiceACode(event.target.value)
-                  }
+                  onChange={(event) => setServiceACode(event.target.value)}
                 />
               </Card>
             </Col>
@@ -487,16 +406,11 @@ export default function ServiceCalciumElectrolyte() {
                   </Tag>
                 </div>
 
-                <Text
-                  strong
-                  className="calcium-service-title"
-                >
+                <Text strong className="calcium-service-title">
                   Điện giải đồ (Na, K, Cl) [Máu]
                 </Text>
 
-                <Text className="calcium-field-label">
-                  Mã dịch vụ kỹ thuật
-                </Text>
+                <Text className="calcium-field-label">Mã dịch vụ kỹ thuật</Text>
 
                 <Input
                   size="large"
@@ -505,32 +419,20 @@ export default function ServiceCalciumElectrolyte() {
                   maxLength={100}
                   spellCheck={false}
                   placeholder="Nhập mã DVKT B"
-                  onChange={(event) =>
-                    setServiceBCode(event.target.value)
-                  }
+                  onChange={(event) => setServiceBCode(event.target.value)}
                 />
               </Card>
             </Col>
           </Row>
 
-          {validationError && (
-            <Alert
-              type="error"
-              showIcon
-              message={validationError}
-            />
-          )}
+          {validationError && <Alert type="error" showIcon message={validationError} />}
 
           {/* RULE EXPLANATION */}
           <Card className="calcium-explanation-card">
             <div className="calcium-explanation-title">
-              <WarningOutlined
-                style={{ color: "#fa8c16" }}
-              />
+              <WarningOutlined style={{ color: "#fa8c16" }} />
 
-              <Text strong>
-                Nguyên tắc phát hiện
-              </Text>
+              <Text strong>Nguyên tắc phát hiện</Text>
             </div>
 
             <div className="calcium-rule-cases">
@@ -552,9 +454,8 @@ export default function ServiceCalciumElectrolyte() {
             </div>
 
             <Text type="secondary">
-              Nếu cả hai mã xuất hiện trong cùng một hồ sơ XML3,
-              hệ thống phát hiện quy luật loại trừ và yêu cầu
-              rà soát điều kiện thanh toán BHYT.
+              Nếu cả hai mã xuất hiện trong cùng một hồ sơ XML3, hệ thống phát hiện quy luật loại
+              trừ và yêu cầu rà soát điều kiện thanh toán BHYT.
             </Text>
           </Card>
 
@@ -568,9 +469,7 @@ export default function ServiceCalciumElectrolyte() {
               )}
 
               <Text type="secondary">
-                {isDirty
-                  ? "Có thay đổi chưa được lưu"
-                  : "Cấu hình đã đồng bộ"}
+                {isDirty ? "Có thay đổi chưa được lưu" : "Cấu hình đã đồng bộ"}
               </Text>
             </Space>
 
@@ -583,10 +482,7 @@ export default function ServiceCalciumElectrolyte() {
                 Hủy thay đổi
               </Button>
 
-              <Button
-                disabled={!original}
-                onClick={resetDefaults}
-              >
+              <Button disabled={!original} onClick={resetDefaults}>
                 Mã mặc định
               </Button>
 
@@ -594,12 +490,7 @@ export default function ServiceCalciumElectrolyte() {
                 type="primary"
                 icon={<SaveOutlined />}
                 loading={saving}
-                disabled={
-                  loading ||
-                  !original ||
-                  !isDirty ||
-                  Boolean(validationError)
-                }
+                disabled={loading || !original || !isDirty || Boolean(validationError)}
                 onClick={() => void handleSave()}
               >
                 Lưu cấu hình

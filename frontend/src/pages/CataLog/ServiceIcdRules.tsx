@@ -1,10 +1,6 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   Alert,
@@ -14,11 +10,13 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
@@ -26,336 +24,301 @@ import {
 import type { ColumnsType } from "antd/es/table";
 
 import {
+  ArrowLeftOutlined,
+  CloseOutlined,
   HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 
-import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../../api/apiClient";
 
 const { Title, Text } = Typography;
 
-const API = "/api/catalog/service-icd-rules";
+const API = "/catalog/service-icd";
 
-// ======================================================
-// TYPES
-// ======================================================
-
-interface ServiceIcdRow {
-  id: string;
-  service_code: string;
-  icd_code: string;
-  allowed: boolean;
-  active: boolean;
-  note: string | null;
-  created_at?: string;
-}
-
-interface GroupedServiceIcd {
-  serviceCode: string;
-  rows: ServiceIcdRow[];
-}
+const MATCH_OPTIONS = [
+  {
+    label: "Bắt đầu bằng",
+    value: "PREFIX",
+  },
+  {
+    label: "Chính xác",
+    value: "EXACT",
+  },
+  {
+    label: "Có chứa",
+    value: "CONTAINS",
+  },
+];
 
 interface FormValues {
   service_code: string;
   icd_code: string;
+  match_type: string;
   active: boolean;
   note?: string | null;
+}
+
+interface RuleRow extends FormValues {
+  id: string | number;
+  service_name?: string | null;
+}
+
+interface GroupedRow {
+  serviceCode: string;
+  serviceName: string;
+  rows: RuleRow[];
 }
 
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  total?: number;
   message?: string;
   error?: string;
 }
 
-// ======================================================
-// HELPERS
-// ======================================================
+type StatusFilter = "active" | "inactive";
 
-function isRule(
-  value: unknown
-): value is ServiceIcdRow {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
+const text = (value: unknown): string => String(value ?? "").trim();
 
-  const r = value as Record<string, unknown>;
+const normalize = (value: unknown): string =>
+  text(value).normalize("NFC").replace(/\s+/gu, " ").toLocaleLowerCase("vi");
 
-  return (
-    typeof r.id === "string" &&
-    typeof r.service_code === "string" &&
-    typeof r.icd_code === "string" &&
-    typeof r.allowed === "boolean" &&
-    typeof r.active === "boolean"
-  );
+function getMatchLabel(value: string): string {
+  return MATCH_OPTIONS.find((item) => item.value === value)?.label ?? value;
 }
 
-async function request<T>(
-  path = "",
-  init?: RequestInit
-): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
+function getMatchColor(value: string): string {
+  if (value === "EXACT") return "blue";
+  if (value === "PREFIX") return "purple";
+  return "cyan";
+}
+
+async function request<T>(path = "", init?: RequestInit): Promise<T | undefined> {
+  const headers = new Headers(init?.headers);
+
+  if (init?.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const headerObject: Record<string, string> = {};
+
+  headers.forEach((value, key) => {
+    headerObject[key] = value;
   });
 
-  const contentType =
-    response.headers.get("content-type") ?? "";
+  const response = await apiFetch(`${API}${path}`, {
+    ...init,
+    headers: headerObject,
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
 
   if (!contentType.includes("application/json")) {
-    throw new Error(
-      `API không trả về JSON (HTTP ${response.status}).`
-    );
+    throw new Error(`API không trả về JSON (HTTP ${response.status}).`);
   }
 
-  const body: unknown = await response.json();
+  const json = (await response.json()) as ApiResponse<T>;
 
-  if (!body || typeof body !== "object") {
-    throw new Error("Phản hồi API không hợp lệ.");
+  if (!response.ok || json.success !== true) {
+    throw new Error(json.message || json.error || `Lỗi HTTP ${response.status}`);
   }
 
-  const result = body as ApiResponse<T>;
-
-  if (!response.ok || result.success !== true) {
-    throw new Error(
-      result.message ||
-        result.error ||
-        `Lỗi HTTP ${response.status}`
-    );
-  }
-
-  return result;
+  return json.data;
 }
 
-// ======================================================
-// COMPONENT
-// ======================================================
-
-export default function ServiceIcdRules() {
+export default function ServiceIcd() {
   const navigate = useNavigate();
+
+  const [messageApi, contextHolder] = message.useMessage();
 
   const [form] = Form.useForm<FormValues>();
 
-  const [rows, setRows] = useState<ServiceIcdRow[]>([]);
+  const requestSequence = useRef(0);
+  const savingRef = useRef(false);
+
+  const [rows, setRows] = useState<RuleRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+
+  const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [editing, setEditing] =
-    useState<ServiceIcdRow | null>(null);
+  const [editing, setEditing] = useState<RuleRow | null>(null);
 
-  const [
-    selectedServiceCode,
-    setSelectedServiceCode,
-  ] = useState<string | undefined>();
+  const [selectedServiceCode, setSelectedServiceCode] = useState<string | undefined>();
 
-  // ======================================================
-  // LOAD DATA
-  // ======================================================
+  const [icdFilter, setIcdFilter] = useState("");
+
+  const [status, setStatus] = useState<StatusFilter | undefined>();
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const busy = saving || deletingId !== null;
 
   const loadData = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+
     setLoading(true);
     setError("");
 
     try {
-      const result =
-        await request<ServiceIcdRow[]>();
+      const data = await request<RuleRow[] | { items: RuleRow[] }>();
 
-      if (
-        !Array.isArray(result.data) ||
-        !result.data.every(isRule)
-      ) {
-        throw new Error(
-          "API trả về dữ liệu DVKT–ICD không hợp lệ."
-        );
+      const items = Array.isArray(data) ? data : data?.items;
+
+      if (!Array.isArray(items)) {
+        throw new Error("Danh sách cấu hình không hợp lệ.");
       }
 
-      setRows(result.data);
+      if (sequence === requestSequence.current) {
+        setRows(items);
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Không thể tải dữ liệu."
-      );
+      if (sequence === requestSequence.current) {
+        setError(err instanceof Error ? err.message : "Không thể tải danh mục.");
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     void loadData();
+
+    return () => {
+      requestSequence.current++;
+    };
   }, [loadData]);
 
-  // ======================================================
-  // DVKT OPTIONS
-  // ======================================================
+  const serviceNameMap = useMemo(() => {
+    const map = new Map<string, string>();
 
-  const serviceOptions = useMemo(() => {
-    const codes = Array.from(
-      new Set(
-        rows
-          .map((item) =>
-            String(item.service_code ?? "").trim()
-          )
-          .filter(Boolean)
-      )
-    );
+    for (const row of rows) {
+      const code = text(row.service_code);
+      const name = text(row.service_name);
 
-    codes.sort((a, b) => a.localeCompare(b));
-
-    return codes.map((code) => ({
-      value: code,
-      label: code,
-    }));
-  }, [rows]);
-
-  // ======================================================
-  // FILTER
-  // ======================================================
-
-  const filteredRows = useMemo(() => {
-    if (!selectedServiceCode) {
-      return rows;
+      if (code && name) {
+        map.set(code, name);
+      }
     }
 
-    return rows.filter(
-      (item) =>
-        item.service_code === selectedServiceCode
-    );
-  }, [rows, selectedServiceCode]);
+    return map;
+  }, [rows]);
 
-  // ======================================================
-  // GROUP BY DVKT
-  // ======================================================
+  const serviceOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => text(row.service_code)).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, "vi"))
+        .map((code) => {
+          const name = serviceNameMap.get(code);
 
-  const groupedRows: GroupedServiceIcd[] =
-    useMemo(() => {
-      const map = new Map<
-        string,
-        ServiceIcdRow[]
-      >();
+          return {
+            value: code,
+            label: name ? `${code} - ${name}` : code,
+          };
+        }),
+    [rows, serviceNameMap],
+  );
 
-      for (const item of filteredRows) {
-        const code = item.service_code.trim();
-        const list = map.get(code) ?? [];
+  const filteredRows = useMemo(() => {
+    const search = normalize(icdFilter);
 
-        list.push(item);
-        map.set(code, list);
-      }
+    return rows.filter((row) => {
+      const matchesService = !selectedServiceCode || text(row.service_code) === selectedServiceCode;
 
-      return Array.from(map.entries())
-        .map(([serviceCode, values]) => ({
-          serviceCode,
-          rows: [...values].sort((a, b) =>
-            a.icd_code.localeCompare(b.icd_code)
-          ),
-        }))
-        .sort((a, b) =>
-          a.serviceCode.localeCompare(b.serviceCode)
-        );
-    }, [filteredRows]);
+      const matchesIcd = normalize(row.icd_code).includes(search);
 
-  // ======================================================
-  // OPEN CREATE
-  // ======================================================
+      const matchesStatus = status === undefined || row.active === (status === "active");
 
-  function openCreate() {
-    setEditing(null);
+      return matchesService && matchesIcd && matchesStatus;
+    });
+  }, [rows, selectedServiceCode, icdFilter, status]);
+
+  const groupedRows = useMemo<GroupedRow[]>(() => {
+    const groups = new Map<string, RuleRow[]>();
+
+    for (const row of filteredRows) {
+      const code = text(row.service_code);
+      const items = groups.get(code) ?? [];
+
+      items.push(row);
+      groups.set(code, items);
+    }
+
+    return Array.from(groups.entries()).map(([serviceCode, items]) => ({
+      serviceCode,
+      serviceName: serviceNameMap.get(serviceCode) ?? "",
+      rows: items,
+    }));
+  }, [filteredRows, serviceNameMap]);
+
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(groupedRows.length / pageSize)));
+
+  function backToCatalog() {
+    sessionStorage.setItem("catalog-active-tab", "rules");
+
+    navigate("/catalog");
+  }
+
+  function resetFilters() {
+    setSelectedServiceCode(undefined);
+    setIcdFilter("");
+    setStatus(undefined);
+    setPage(1);
+  }
+
+  function openForm(record?: RuleRow) {
+    setEditing(record ?? null);
     form.resetFields();
 
     form.setFieldsValue({
-      service_code: selectedServiceCode ?? "",
-      icd_code: "",
-      active: false,
-      note: "",
+      service_code: record ? text(record.service_code) : (selectedServiceCode ?? ""),
+      icd_code: text(record?.icd_code),
+      match_type: record?.match_type || "PREFIX",
+      active: record ? record.active === true : true,
+      note: text(record?.note),
     });
 
     setModalOpen(true);
   }
 
-  // ======================================================
-  // OPEN EDIT
-  // ======================================================
-
-  function openEdit(record: ServiceIcdRow) {
-    setEditing(record);
-    form.resetFields();
-
-    form.setFieldsValue({
-      service_code: record.service_code,
-      icd_code: record.icd_code,
-      active: record.active,
-      note: record.note ?? "",
-    });
-
-    setModalOpen(true);
-  }
-
-  // ======================================================
-  // CLOSE MODAL
-  // ======================================================
-
-  function closeModal() {
-    if (saving) return;
+  function closeForm() {
+    if (savingRef.current) return;
 
     setModalOpen(false);
     setEditing(null);
     form.resetFields();
   }
 
-  // ======================================================
-  // SAVE
-  //
-  // Quy tắc mới: allowed = true.
-  // Khi sửa: giữ allowed hiện tại.
-  // ======================================================
-
   async function handleSave(values: FormValues) {
-    if (saving) return;
+    if (savingRef.current) return;
 
+    savingRef.current = true;
     setSaving(true);
 
     try {
-      const payload = {
-        service_code:
-          values.service_code.trim().toUpperCase(),
+      const path = editing ? `/${encodeURIComponent(String(editing.id))}` : "";
 
-        icd_code:
-          values.icd_code.trim().toUpperCase(),
+      await request(path, {
+        method: editing ? "PUT" : "POST",
+        body: JSON.stringify({
+          service_code: text(values.service_code),
+          icd_code: text(values.icd_code).toUpperCase(),
+          match_type: values.match_type,
+          active: values.active === true,
+          note: text(values.note) || null,
+        }),
+      });
 
-        allowed: editing?.allowed ?? true,
-
-        active: values.active ?? false,
-
-        note: values.note?.trim() || null,
-      };
-
-      await request<ServiceIcdRow>(
-        editing
-          ? `/${encodeURIComponent(editing.id)}`
-          : "",
-        {
-          method: editing ? "PUT" : "POST",
-          body: JSON.stringify(payload),
-        }
-      );
-
-      message.success(
-        editing
-          ? "Cập nhật cấu hình thành công."
-          : "Thêm mới cấu hình thành công."
-      );
+      messageApi.success(editing ? "Đã cập nhật cấu hình." : "Đã thêm cấu hình.");
 
       setModalOpen(false);
       setEditing(null);
@@ -363,242 +326,182 @@ export default function ServiceIcdRules() {
 
       await loadData();
     } catch (err) {
-      message.error(
-        err instanceof Error
-          ? err.message
-          : "Không thể lưu cấu hình."
-      );
+      messageApi.error(err instanceof Error ? err.message : "Không thể lưu cấu hình.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
-  // ======================================================
-  // DELETE
-  // ======================================================
+  async function handleDelete(record: RuleRow) {
+    setDeletingId(record.id);
 
-  async function handleDelete(id: string) {
-    await request<unknown>(
-      `/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-      }
-    );
+    try {
+      await request(`/${encodeURIComponent(String(record.id))}`, { method: "DELETE" });
 
-    message.success("Đã xóa cấu hình.");
-    await loadData();
+      messageApi.success("Đã xóa cấu hình ICD.");
+
+      await loadData();
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Không thể xóa cấu hình.");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
-  // ======================================================
-  // CONFIRM DELETE
-  // ======================================================
-
-  function confirmDelete(record: ServiceIcdRow) {
-    Modal.confirm({
-      title: "Xóa cấu hình DVKT – ICD?",
-      centered: true,
-      okText: "Xóa",
-      cancelText: "Hủy",
-      okButtonProps: { danger: true },
-
-      content: (
-        <div style={{ marginTop: 12 }}>
-          <Text type="secondary">
-            Bạn có chắc muốn xóa mã ICD này?
-          </Text>
-
-          <div className="service-icd-delete-preview">
-            <div>
-              <Text type="secondary">
-                Mã DVKT:{" "}
-              </Text>
-
-              <Text strong>
-                {record.service_code}
-              </Text>
-            </div>
-
-            <div style={{ marginTop: 4 }}>
-              <Text type="secondary">
-                Mã ICD:{" "}
-              </Text>
-
-              <Text strong>
-                {record.icd_code}
-              </Text>
-            </div>
-          </div>
-
-          <Text
-            type="secondary"
-            style={{ fontSize: 12 }}
-          >
-            Hành động này không thể hoàn tác.
-          </Text>
+  const columns: ColumnsType<GroupedRow> = [
+    {
+      title: "STT",
+      key: "index",
+      width: 56,
+      align: "center",
+      render: (_, __, index) => (currentPage - 1) * pageSize + index + 1,
+    },
+    {
+      title: "Tên dịch vụ kỹ thuật",
+      dataIndex: "serviceName",
+      width: 240,
+      render: (value: string) => (
+        <div className={value ? "si-service-name" : "si-service-name si-muted"}>
+          {value || "Chưa có tên trong danh mục"}
         </div>
       ),
-
-      onOk: async () => {
-        try {
-          await handleDelete(record.id);
-        } catch (err) {
-          message.error(
-            err instanceof Error
-              ? err.message
-              : "Không thể xóa cấu hình."
-          );
-
-          throw err;
-        }
-      },
-    });
-  }
-
-  // ======================================================
-  // TABLE COLUMNS
-  // ======================================================
-
-  const columns: ColumnsType<GroupedServiceIcd> = [
-    {
-      title: "DVKT",
-      dataIndex: "serviceCode",
-      key: "serviceCode",
-      width: 280,
-
-      render: (value: string) => (
-        <Text
-          strong
-          style={{ color: "#172033" }}
-        >
-          {value}
-        </Text>
-      ),
     },
-
+    {
+      title: "Mã DVKT",
+      dataIndex: "serviceCode",
+      width: 170,
+      render: (value: string) => <div className="si-code">{value || "—"}</div>,
+    },
     {
       title: "Mã ICD",
       key: "icd",
-
       render: (_, record) => (
-        <div className="service-icd-tags">
+        <div className="si-tags">
           {record.rows.map((item) => (
-            <Tag
-              key={item.id}
-              color={item.active ? "blue" : "default"}
-              className="service-icd-tag"
-              closable
-              onClose={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                confirmDelete(item);
-              }}
-            >
-              <span
-                title={[
-                  item.icd_code,
-                  item.active
-                    ? "Đang hoạt động"
-                    : "Đang tắt",
-                  item.note ?? "",
-                ]
-                  .filter(Boolean)
-                  .join(" • ")}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEdit(item);
-                }}
+            <div key={item.id} className={item.active ? "si-icd" : "si-icd si-icd-inactive"}>
+              <Tooltip
+                title={
+                  <div>
+                    <div>Kiểu so khớp: {getMatchLabel(item.match_type)}</div>
+
+                    <div>Trạng thái: {item.active ? "Đang bật" : "Đã tắt"}</div>
+
+                    {item.note && <div>Ghi chú: {item.note}</div>}
+
+                    <div>Bấm để chỉnh sửa</div>
+                  </div>
+                }
               >
-                {item.icd_code}
-              </span>
-            </Tag>
+                <Button
+                  type="text"
+                  size="small"
+                  className="si-icd-edit"
+                  aria-label={`Chỉnh sửa ICD ${item.icd_code}`}
+                  disabled={busy || loading}
+                  onClick={() => openForm(item)}
+                >
+                  {item.icd_code}
+                </Button>
+              </Tooltip>
+
+              <Popconfirm
+                title="Xóa cấu hình ICD?"
+                description={`${record.serviceCode} — ` + item.icd_code}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{
+                  danger: true,
+                }}
+                disabled={busy || loading}
+                onConfirm={() => handleDelete(item)}
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  className="si-icd-delete"
+                  aria-label={`Xóa ICD ${item.icd_code}`}
+                  icon={<CloseOutlined />}
+                  disabled={busy || loading}
+                  loading={deletingId === item.id}
+                />
+              </Popconfirm>
+            </div>
           ))}
         </div>
       ),
     },
-
     {
-      title: "Hoạt động",
+      title: "Kiểu so khớp",
+      key: "matchType",
+      width: 175,
+      render: (_, record) => (
+        <Space size={[4, 5]} wrap>
+          {Array.from(new Set(record.rows.map((item) => item.match_type))).map((value) => (
+            <Tag key={value} color={getMatchColor(value)}>
+              {getMatchLabel(value)}
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: "Đang bật / Tổng",
       key: "active",
       width: 130,
       align: "center",
-
       render: (_, record) => {
-        const activeCount = record.rows.filter(
-          (item) => item.active
-        ).length;
+        const count = record.rows.filter((item) => item.active).length;
 
         return (
           <Tag
-            color={
-              activeCount === record.rows.length
-                ? "success"
-                : activeCount === 0
-                  ? "default"
-                  : "warning"
-            }
-            className="service-icd-status-tag"
+            color={count === 0 ? "default" : count === record.rows.length ? "success" : "warning"}
           >
-            {activeCount}/{record.rows.length}
+            {count}/{record.rows.length}
           </Tag>
         );
       },
     },
   ];
 
-  // ======================================================
-  // UI
-  // ======================================================
-
   return (
-    <div className="service-icd-page">
-      {/* BREADCRUMB */}
+    <div className="si-page">
+      {contextHolder}
 
-      <div className="service-icd-breadcrumb">
-        <Breadcrumb
-          items={[
-            {
-              title: (
-                <HomeOutlined
-                  style={{ cursor: "pointer" }}
-                  onClick={() => navigate("/")}
-                />
-              ),
-            },
-            {
-              title: (
-                <span
-                  style={{ cursor: "pointer" }}
-                  onClick={() => {
-                    sessionStorage.setItem(
-                      "catalog-active-tab",
-                      "rules"
-                    );
+      <Breadcrumb
+        items={[
+          {
+            title: (
+              <Button
+                type="link"
+                size="small"
+                className="si-crumb"
+                aria-label="Trang chủ"
+                icon={<HomeOutlined />}
+                onClick={() => navigate("/")}
+              />
+            ),
+          },
+          {
+            title: (
+              <Button type="link" size="small" className="si-crumb" onClick={backToCatalog}>
+                Danh mục
+              </Button>
+            ),
+          },
+          { title: "DVKT - ICD" },
+        ]}
+      />
 
-                    navigate("/catalog");
-                  }}
-                >
-                  Danh mục
-                </span>
-              ),
-            },
-            {
-              title: "DVKT - ICD",
-            },
-          ]}
-        />
-      </div>
-
-      {/* HEADER */}
-
-      <div className="service-icd-header">
+      <div className="si-header">
         <div>
           <Title
             level={3}
             style={{
               margin: 0,
               color: "#172033",
-              fontWeight: 800,
               fontSize: 21,
+              fontWeight: 800,
             }}
           >
             <SafetyCertificateOutlined
@@ -607,44 +510,25 @@ export default function ServiceIcdRules() {
                 color: "#1677ff",
               }}
             />
-
             DVKT - ICD
           </Title>
 
-          <Text
-            type="secondary"
-            style={{
-              display: "block",
-              marginTop: 4,
-              fontSize: 12,
-            }}
-          >
+          <Text type="secondary" className="si-subtitle">
             Quản lý mã ICD phù hợp theo từng dịch vụ kỹ thuật
           </Text>
         </div>
 
         <Space size={8} wrap>
           <Button
-            icon={<ReloadOutlined />}
-            loading={loading}
-            onClick={() => void loadData()}
-            className="service-icd-header-button"
-          >
-            Làm mới
-          </Button>
-
-          <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={openCreate}
-            className="service-icd-header-button service-icd-add-button"
+            disabled={busy || loading}
+            onClick={() => openForm()}
           >
             Thêm mới
           </Button>
         </Space>
       </div>
-
-      {/* ERROR */}
 
       {error && (
         <Alert
@@ -653,164 +537,177 @@ export default function ServiceIcdRules() {
           message="Không thể tải danh mục DVKT - ICD"
           description={error}
           action={
-            <Button
-              size="small"
-              onClick={() => void loadData()}
-            >
+            <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>
               Thử lại
             </Button>
           }
         />
       )}
 
-      {/* FILTER */}
+      <div className="si-filters">
+        <div className="si-filter">
+          <label htmlFor="si-service">Dịch vụ kỹ thuật</label>
 
-      <div className="service-icd-filter-block">
-        <div className="service-icd-filter-label">
-          DVKT
-        </div>
-
-        <div className="service-icd-filter-row">
-          <Select
+          <Select<string>
+            id="si-service"
             showSearch
             allowClear
-            value={selectedServiceCode}
-            placeholder="Chọn DVKT"
             optionFilterProp="label"
+            value={selectedServiceCode}
+            placeholder="Tìm theo mã hoặc tên DVKT"
             options={serviceOptions}
-            className="service-icd-filter-select"
-            onChange={(value) =>
-              setSelectedServiceCode(value)
-            }
-          />
-
-          <Button
-            type="primary"
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              setSelectedServiceCode(undefined);
-              void loadData();
+            onChange={(value) => {
+              setSelectedServiceCode(value);
+              setPage(1);
             }}
-            className="service-icd-filter-refresh"
-          >
-            Làm mới
-          </Button>
+          />
         </div>
+
+        <div className="si-filter">
+          <label htmlFor="si-icd-search">Mã ICD</label>
+
+          <Input
+            id="si-icd-search"
+            allowClear
+            value={icdFilter}
+            placeholder="Nhập mã ICD cần tìm"
+            onChange={(event) => {
+              setIcdFilter(event.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+
+        <div className="si-filter">
+          <label htmlFor="si-status">Trạng thái</label>
+
+          <Select<StatusFilter>
+            id="si-status"
+            allowClear
+            value={status}
+            placeholder="Tất cả trạng thái"
+            options={[
+              {
+                value: "active",
+                label: "Đang bật",
+              },
+              {
+                value: "inactive",
+                label: "Đã tắt",
+              },
+            ]}
+            onChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+          />
+        </div>
+
+        <Button icon={<ReloadOutlined />} onClick={resetFilters}>
+          Xóa bộ lọc
+        </Button>
       </div>
 
-      {/* TABLE */}
-
       <Card
-        className="service-icd-table-card"
+        className="si-table"
         styles={{
           body: { padding: 0 },
         }}
       >
-        <Table<GroupedServiceIcd>
+        <Table<GroupedRow>
           rowKey="serviceCode"
-          loading={loading}
-          dataSource={groupedRows}
           columns={columns}
+          dataSource={groupedRows}
+          loading={loading}
+          tableLayout="fixed"
           size="middle"
-          scroll={{ x: 720 }}
-          pagination={{
-            defaultPageSize: 10,
-            showSizeChanger: true,
-            pageSizeOptions: [
-              "10",
-              "20",
-              "50",
-            ],
-            showTotal: (count) =>
-              `Tổng số: ${count}`,
-          }}
+          scroll={{ x: 1120 }}
           locale={{
-            emptyText: "Chưa có dữ liệu DVKT - ICD.",
+            emptyText: error
+              ? "Chưa tải được dữ liệu."
+              : rows.length === 0
+                ? "Chưa có cấu hình DVKT - ICD."
+                : "Không có cấu hình phù hợp bộ lọc.",
+          }}
+          pagination={{
+            current: currentPage,
+            pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "20", "50", "100"],
+            showTotal: (total) => `Tổng số: ${total} DVKT`,
+            onChange: (nextPage, nextSize) => {
+              setPage(nextSize !== pageSize ? 1 : nextPage);
+              setPageSize(nextSize);
+            },
           }}
         />
       </Card>
 
-      <div className="service-icd-legend">
-        <Text type="secondary">
-          Nhấp mã ICD để chỉnh sửa hoặc dấu × để xóa.
-          Thẻ xanh đang hoạt động, thẻ xám đang tắt.
-        </Text>
-      </div>
-
-      {/* ================================================= */}
-      {/* MODAL ADD / EDIT */}
-      {/* ================================================= */}
+      <Text type="secondary" className="si-legend">
+        Bấm mã ICD để chỉnh sửa, bấm dấu × để xóa. Khi lọc, bảng chỉ hiển thị và đếm các cấu hình
+        phù hợp bộ lọc.
+      </Text>
 
       <Modal
         open={modalOpen}
         centered
-        width={600}
+        width={720}
         destroyOnHidden
-        className="service-icd-modal"
+        className="si-modal"
         title={
-          <div className="service-icd-modal-heading">
-            <div className="service-icd-modal-icon">
+          <div className="si-modal-heading">
+            <div className="si-modal-icon">
               <SafetyCertificateOutlined />
             </div>
 
             <div>
-              <div className="service-icd-modal-title">
-                {editing
-                  ? "Cập nhật DVKT - ICD"
-                  : "Thêm DVKT - ICD"}
+              <div className="si-modal-title">
+                {editing ? "Cập nhật DVKT - ICD" : "Thêm DVKT - ICD"}
               </div>
 
-              <div className="service-icd-modal-description">
-                Thiết lập mã ICD phù hợp với dịch vụ kỹ thuật
-              </div>
+              <div className="si-subtitle">Thiết lập mã ICD phù hợp cho dịch vụ kỹ thuật</div>
             </div>
           </div>
         }
         okText={editing ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
         confirmLoading={saving}
-        okButtonProps={{
+        cancelButtonProps={{
           disabled: saving,
-          style: {
-            borderRadius: 8,
-            fontWeight: 600,
-          },
         }}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
+        onCancel={closeForm}
         onOk={() => form.submit()}
-        onCancel={closeModal}
       >
         <Form<FormValues>
           form={form}
           layout="vertical"
           requiredMark={false}
-          onFinish={(values) =>
-            void handleSave(values)
-          }
+          preserve={false}
+          disabled={saving}
+          onFinish={handleSave}
           style={{ marginTop: 18 }}
         >
-          {/* DVKT / ICD */}
+          <Form.Item
+            name="service_code"
+            label="Mã DVKT"
+            rules={[
+              {
+                required: true,
+                whitespace: true,
+                message: "Vui lòng nhập mã DVKT.",
+              },
+            ]}
+          >
+            <Input placeholder="Ví dụ: 21.0014.1778" />
+          </Form.Item>
 
-          <div className="service-icd-form-grid">
-            <Form.Item
-              name="service_code"
-              label="Mã DVKT"
-              rules={[
-                {
-                  required: true,
-                  whitespace: true,
-                  message: "Vui lòng nhập mã DVKT.",
-                },
-              ]}
-            >
-              <Input
-                placeholder="VD: 23.0083.1523"
-                maxLength={100}
-              />
-            </Form.Item>
-
+          <div className="si-form-grid">
             <Form.Item
               name="icd_code"
-              label="Mã ICD-10"
+              label="Mã ICD"
               rules={[
                 {
                   required: true,
@@ -819,260 +716,300 @@ export default function ServiceIcdRules() {
                 },
               ]}
             >
-              <Input
-                placeholder="VD: E11.9"
-                maxLength={100}
-              />
+              <Input placeholder="Ví dụ: E11.9" />
+            </Form.Item>
+
+            <Form.Item
+              name="match_type"
+              label="Kiểu so khớp"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng chọn kiểu so khớp.",
+                },
+              ]}
+            >
+              <Select options={MATCH_OPTIONS} />
             </Form.Item>
           </div>
 
-          {/* GHI CHÚ */}
-
-          <Form.Item
-            name="note"
-            label="Ghi chú / Diễn giải"
-          >
+          <Form.Item name="note" label="Ghi chú">
             <Input.TextArea
-              rows={3}
-              maxLength={2000}
-              placeholder="Nhập ghi chú nếu có..."
-              style={{ borderRadius: 8 }}
+              autoSize={{
+                minRows: 3,
+                maxRows: 6,
+              }}
+              placeholder="Nhập ghi chú nếu có"
             />
           </Form.Item>
 
-          {/* HOẠT ĐỘNG */}
-
-          <div className="service-icd-active-setting">
+          <div className="si-active">
             <div>
-              <Text strong>
-                Kích hoạt quy tắc
-              </Text>
+              <Text strong>Kích hoạt quy tắc</Text>
 
-              <div>
-                <Text
-                  type="secondary"
-                  style={{ fontSize: 11 }}
-                >
-                  Áp dụng trong lần kiểm tra hồ sơ tiếp theo
-                </Text>
-              </div>
+              <Text type="secondary" className="si-subtitle">
+                Áp dụng trong lần kiểm tra hồ sơ tiếp theo
+              </Text>
             </div>
 
-            <Form.Item
-              name="active"
-              valuePropName="checked"
-              noStyle
-            >
-              <Switch
-                checkedChildren="Bật"
-                unCheckedChildren="Tắt"
-              />
+            <Form.Item name="active" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
             </Form.Item>
           </div>
-
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginTop: 14 }}
-            message="Lưu ý"
-            description="Quy tắc mới mặc định được tắt. Chỉ kích hoạt khi danh sách ICD phù hợp với DVKT đã được xác minh."
-          />
         </Form>
       </Modal>
 
-      {/* ================================================= */}
-      {/* STYLES */}
-      {/* ================================================= */}
-
       <style>
         {`
-          .service-icd-page {
+          .si-page {
             display: flex;
             flex-direction: column;
             gap: 15px;
             min-width: 0;
           }
 
-          .service-icd-breadcrumb {
-            margin-bottom: -2px;
+          .si-page .ant-breadcrumb {
             font-size: 12px;
           }
 
-          .service-icd-header {
+          .si-crumb.ant-btn {
+            height: auto;
+            padding: 0;
+            font-size: 12px;
+            line-height: inherit;
+          }
+
+          .si-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
           }
 
-          .service-icd-header-button {
+          .si-header .ant-btn {
             height: 36px;
             border-radius: 8px;
             font-weight: 600;
           }
 
-          .service-icd-add-button {
-            box-shadow:
-              0 4px 12px rgba(22,119,255,.20);
+          .si-subtitle {
+            display: block;
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.6;
           }
 
-          .service-icd-filter-block {
-            padding: 2px 0 3px;
+          .si-filters {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1.5fr)
+              minmax(0, 1fr)
+              minmax(160px, .7fr)
+              auto;
+            align-items: end;
+            gap: 10px;
           }
 
-          .service-icd-filter-label {
-            margin-bottom: 6px;
-            color: #172033;
-            font-size: 13px;
-            font-weight: 700;
-          }
-
-          .service-icd-filter-row {
+          .si-filter {
             display: flex;
-            align-items: center;
-            gap: 9px;
+            flex-direction: column;
+            min-width: 0;
+            gap: 6px;
           }
 
-          .service-icd-filter-select {
-            width: 310px;
-            max-width: 100%;
+          .si-filter > label {
+            color: #172033;
+            font-size: 12px;
+            font-weight: 600;
           }
 
-          .service-icd-filter-refresh {
-            height: 34px;
-            min-width: 105px;
+          .si-filter .ant-select {
+            width: 100%;
+          }
+
+          .si-filters > .ant-btn {
+            height: 32px;
             border-radius: 7px;
             font-weight: 600;
           }
 
-          .service-icd-table-card {
+          .si-table {
+            min-width: 0;
             overflow: hidden;
             border: 1px solid #dfe6ee;
             border-radius: 8px;
             box-shadow:
-              0 2px 8px rgba(15,23,42,.03);
+              0 2px 8px rgba(15, 23, 42, .03);
           }
 
-          .service-icd-table-card
+          .si-table
           .ant-table-thead > tr > th {
             background: #f2f5f8 !important;
-            color: #334155 !important;
-            font-size: 12px;
-            font-weight: 700 !important;
-            border-bottom:
-              1px solid #d8e0e8 !important;
-          }
-
-          .service-icd-table-card
-          .ant-table-tbody > tr > td {
-            padding: 11px 12px !important;
             color: #334155;
             font-size: 12px;
-            vertical-align: middle;
+            font-weight: 700;
+            border-bottom: 1px solid #d8e0e8;
           }
 
-          .service-icd-table-card
+          .si-table
+          .ant-table-tbody > tr > td {
+            padding: 12px;
+            color: #334155;
+            font-size: 12px;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+          }
+
+          .si-table
           .ant-table-tbody > tr:hover > td {
             background: #f7fbff !important;
           }
 
-          .service-icd-table-card .ant-pagination {
+          .si-service-name,
+          .si-code {
+            color: #172033;
+            font-weight: 600;
+            line-height: 1.7;
+            white-space: normal;
+            overflow-wrap: anywhere;
+          }
+
+          .si-muted {
+            color: #94a3b8;
+            font-weight: 400;
+          }
+
+          .si-tags {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 7px;
+          }
+
+          .si-icd {
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            overflow: hidden;
+            border: 1px solid #bae0ff;
+            border-radius: 12px;
+            background: #e6f4ff;
+          }
+
+          .si-icd-edit.ant-btn {
+            display: block;
+            height: auto;
+            min-height: 28px;
+            max-width: 100%;
+            padding: 4px 9px;
+            color: #1677ff;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.6;
+            white-space: normal;
+          }
+
+          .si-icd-edit.ant-btn > span {
+            white-space: normal;
+            overflow-wrap: anywhere;
+          }
+
+          .si-icd-delete.ant-btn {
+            flex-shrink: 0;
+            width: 25px;
+            height: 25px;
+            margin-right: 3px;
+            color: #64748b;
+            font-size: 10px;
+          }
+
+          .si-icd-delete.ant-btn:hover {
+            color: #ff4d4f !important;
+            background: #fff1f0 !important;
+          }
+
+          .si-icd-inactive {
+            border-color: #e2e8f0;
+            background: #f8fafc;
+          }
+
+          .si-icd-inactive
+          .si-icd-edit.ant-btn {
+            color: #64748b;
+          }
+
+          .si-table .ant-tag {
+            margin: 0;
+            border-radius: 999px;
+            font-size: 11px;
+          }
+
+          .si-table .ant-pagination {
             padding: 0 12px 10px;
           }
 
-          .service-icd-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-          }
-
-          .service-icd-tag {
-            display: inline-flex;
-            align-items: center;
-            margin: 0;
-            padding: 3px 7px 3px 9px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all .18s ease;
-          }
-
-          .service-icd-tag:hover {
-            transform: translateY(-1px);
-            box-shadow:
-              0 3px 8px rgba(22,119,255,.18);
-          }
-
-          .service-icd-tag .ant-tag-close-icon {
-            margin-left: 5px;
-            font-size: 10px;
-            opacity: .7;
-          }
-
-          .service-icd-tag:hover .ant-tag-close-icon {
-            opacity: 1;
-          }
-
-          .service-icd-status-tag {
-            min-width: 46px;
-            margin: 0;
-            text-align: center;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 700;
-          }
-
-          .service-icd-legend {
+          .si-legend {
             margin-top: -5px;
             font-size: 11px;
+            line-height: 1.7;
           }
 
-          .service-icd-modal .ant-modal-content {
+          .si-modal .ant-modal-content {
             border-radius: 14px;
-            overflow: hidden;
           }
 
-          .service-icd-modal-heading {
+          .si-modal-heading {
             display: flex;
             align-items: center;
             gap: 12px;
             padding-bottom: 8px;
           }
 
-          .service-icd-modal-icon {
-            width: 42px;
-            height: 42px;
+          .si-modal-icon {
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
             border-radius: 12px;
-            color: #1677ff;
             background: #e6f4ff;
+            color: #1677ff;
             font-size: 21px;
           }
 
-          .service-icd-modal-title {
+          .si-modal-title {
             color: #172033;
             font-size: 18px;
             font-weight: 800;
           }
 
-          .service-icd-modal-description {
-            margin-top: 3px;
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 400;
-          }
-
-          .service-icd-form-grid {
+          .si-form-grid {
             display: grid;
             grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-            gap: 12px;
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+            column-gap: 16px;
           }
 
-          .service-icd-active-setting {
+          .si-modal
+          .ant-form-item-label > label {
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .si-modal .ant-input,
+          .si-modal .ant-select-selector {
+            border-radius: 8px;
+          }
+
+          .si-modal input.ant-input {
+            min-height: 36px;
+          }
+
+          .si-active {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -1083,30 +1020,30 @@ export default function ServiceIcdRules() {
             background: #fafcff;
           }
 
-          .service-icd-delete-preview {
-            margin: 10px 0;
-            padding: 10px 12px;
+          .si-modal
+          .ant-modal-footer .ant-btn {
             border-radius: 8px;
-            background: #f5f7fa;
           }
 
-          @media (max-width: 700px) {
-            .service-icd-header {
+          @media (max-width: 1000px) {
+            .si-header {
               flex-direction: column;
             }
 
-            .service-icd-filter-row {
-              align-items: stretch;
-              flex-direction: column;
+            .si-filters {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
             }
+          }
 
-            .service-icd-filter-select {
-              width: 100%;
-            }
-
-            .service-icd-form-grid {
+          @media (max-width: 600px) {
+            .si-filters,
+            .si-form-grid {
               grid-template-columns: 1fr;
-              gap: 0;
+            }
+
+            .si-modal-title {
+              font-size: 16px;
             }
           }
         `}

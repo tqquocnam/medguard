@@ -23,25 +23,13 @@ interface CatalogSpec {
 const SPECS: Record<CatalogType, CatalogSpec> = {
   "service-icd": {
     table: "catalog.service_icd_rules",
-    columns: [
-      "service_code",
-      "icd_code",
-      "match_type",
-      "active",
-      "note",
-    ],
+    columns: ["service_code", "icd_code", "match_type", "active", "note"],
     required: ["service_code", "icd_code"],
   },
 
   "service-diagnosis": {
     table: "catalog.service_diagnosis_rules",
-    columns: [
-      "service_code",
-      "diagnosis_pattern",
-      "match_type",
-      "active",
-      "note",
-    ],
+    columns: ["service_code", "diagnosis_pattern", "match_type", "active", "note"],
     required: ["service_code", "diagnosis_pattern"],
   },
 
@@ -56,52 +44,24 @@ const SPECS: Record<CatalogType, CatalogSpec> = {
       "active",
       "note",
     ],
-    required: [
-      "service_code",
-      "staff_code",
-      "activity_type",
-    ],
+    required: ["service_code", "staff_code", "activity_type"],
   },
 
   "drug-icd": {
     table: "catalog.drug_icd_rules",
-    columns: [
-      "drug_code",
-      "icd_code",
-      "match_type",
-      "active",
-      "note",
-    ],
+    columns: ["drug_code", "icd_code", "match_type", "active", "note"],
     required: ["drug_code", "icd_code"],
   },
 
   "drug-icd-interactions": {
     table: "catalog.drug_icd_interactions",
-    columns: [
-      "active_ingredient",
-      "icd_code",
-      "icd_name",
-      "match_type",
-      "note",
-      "active",
-    ],
-    required: [
-      "active_ingredient",
-      "icd_code",
-      "match_type",
-      "note",
-    ],
+    columns: ["active_ingredient", "icd_code", "icd_name", "match_type", "note", "active"],
+    required: ["active_ingredient", "icd_code", "match_type", "note"],
   },
 
   "drug-ingredient": {
     table: "catalog.drug_active_ingredients",
-    columns: [
-      "drug_code",
-      "active_ingredient",
-      "active_ingredient_code",
-      "active",
-      "note",
-    ],
+    columns: ["drug_code", "active_ingredient", "active_ingredient_code", "active", "note"],
     required: ["drug_code", "active_ingredient"],
   },
 
@@ -117,13 +77,7 @@ const SPECS: Record<CatalogType, CatalogSpec> = {
       "active",
     ],
 
-    required: [
-      "drug_name_a",
-      "drug_name_b",
-      "ingredient_a",
-      "ingredient_b",
-      "description",
-    ],
+    required: ["drug_name_a", "drug_name_b", "ingredient_a", "ingredient_b", "description"],
   },
 };
 
@@ -155,9 +109,7 @@ function getSpec(type: string): CatalogSpec {
   const spec = SPECS[type as CatalogType];
 
   if (!spec) {
-    throw new Error(
-      `Loại danh mục không hợp lệ: ${type}`
-    );
+    throw new Error(`Loại danh mục không hợp lệ: ${type}`);
   }
 
   return spec;
@@ -174,48 +126,55 @@ function normalizeText(value: unknown) {
 export async function listCatalogRules(type: string) {
   const spec = getSpec(type);
 
-  const result = await db.query(`
+  if (type === "service-diagnosis" || type === "service-icd") {
+    const result = await db.query(
+      `
+      SELECT
+        r.*,
+        s.name AS service_name
+      FROM ${spec.table} r
+      LEFT JOIN catalog.services s
+        ON s.code = r.service_code
+      ORDER BY
+        r.created_at DESC,
+        r.id DESC
+      `,
+    );
+
+    return result.rows;
+  }
+
+  const result = await db.query(
+    `
     SELECT *
     FROM ${spec.table}
-    ORDER BY created_at DESC, id DESC
-  `);
+    ORDER BY
+      created_at DESC,
+      id DESC
+    `,
+  );
 
   return result.rows;
 }
 
-export async function createCatalogRule(
-  type: string,
-  data: Record<string, unknown>
-) {
+export async function createCatalogRule(type: string, data: Record<string, unknown>) {
   const spec = getSpec(type);
 
   for (const field of spec.required) {
-    if (
-      data[field] === undefined ||
-      data[field] === null ||
-      String(data[field]).trim() === ""
-    ) {
-      throw new Error(
-        `Thiếu trường bắt buộc: ${field}`
-      );
+    if (data[field] === undefined || data[field] === null || String(data[field]).trim() === "") {
+      throw new Error(`Thiếu trường bắt buộc: ${field}`);
     }
   }
 
-  const columns = spec.columns.filter(
-    column => data[column] !== undefined
-  );
+  const columns = spec.columns.filter((column) => data[column] !== undefined);
 
   if (columns.length === 0) {
     throw new Error("Không có dữ liệu để thêm.");
   }
 
-  const values = columns.map(
-    column => data[column]
-  );
+  const values = columns.map((column) => data[column]);
 
-  const placeholders = columns.map(
-    (_, index) => `$${index + 1}`
-  );
+  const placeholders = columns.map((_, index) => `$${index + 1}`);
 
   const result = await db.query(
     `
@@ -225,34 +184,24 @@ export async function createCatalogRule(
       (${placeholders.join(", ")})
     RETURNING *
     `,
-    values
+    values,
   );
 
   return result.rows[0];
 }
 
-export async function updateCatalogRule(
-  type: string,
-  id: string,
-  data: Record<string, unknown>
-) {
+export async function updateCatalogRule(type: string, id: string, data: Record<string, unknown>) {
   const spec = getSpec(type);
 
-  const columns = spec.columns.filter(
-    column => data[column] !== undefined
-  );
+  const columns = spec.columns.filter((column) => data[column] !== undefined);
 
   if (columns.length === 0) {
     throw new Error("Không có dữ liệu cập nhật.");
   }
 
-  const values = columns.map(
-    column => data[column]
-  );
+  const values = columns.map((column) => data[column]);
 
-  const sets = columns.map(
-    (column, index) => `${column} = $${index + 1}`
-  );
+  const sets = columns.map((column, index) => `${column} = $${index + 1}`);
 
   values.push(id);
 
@@ -265,7 +214,7 @@ export async function updateCatalogRule(
     WHERE id = $${values.length}
     RETURNING *
     `,
-    values
+    values,
   );
 
   if (result.rowCount === 0) {
@@ -275,10 +224,7 @@ export async function updateCatalogRule(
   return result.rows[0];
 }
 
-export async function deleteCatalogRule(
-  type: string,
-  id: string
-) {
+export async function deleteCatalogRule(type: string, id: string) {
   const spec = getSpec(type);
 
   const result = await db.query(
@@ -287,7 +233,7 @@ export async function deleteCatalogRule(
     WHERE id = $1
     RETURNING id
     `,
-    [id]
+    [id],
   );
 
   if (result.rowCount === 0) {
@@ -301,50 +247,30 @@ export async function deleteCatalogRule(
 // MACHINE CRUD
 // ======================================================
 
-export async function listMachines(
-  params: ListMachinesParams
-) {
-  const {
-    code,
-    name,
-    active,
-    limit,
-    offset,
-  } = params;
+export async function listMachines(params: ListMachinesParams) {
+  const { code, name, active, limit, offset } = params;
 
   const conditions: string[] = [];
   const values: unknown[] = [];
 
   if (code) {
     values.push(`%${code}%`);
-    conditions.push(
-      `m.code ILIKE $${values.length}`
-    );
+    conditions.push(`m.code ILIKE $${values.length}`);
   }
 
   if (name) {
     values.push(`%${name}%`);
-    conditions.push(
-      `COALESCE(m.name, '') ILIKE $${values.length}`
-    );
+    conditions.push(`COALESCE(m.name, '') ILIKE $${values.length}`);
   }
 
   if (active !== undefined) {
     values.push(active);
-    conditions.push(
-      `m.active = $${values.length}`
-    );
+    conditions.push(`m.active = $${values.length}`);
   }
 
-  const whereSql = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const dataValues = [
-    ...values,
-    limit,
-    offset,
-  ];
+  const dataValues = [...values, limit, offset];
 
   const limitIndex = values.length + 1;
   const offsetIndex = values.length + 2;
@@ -381,7 +307,7 @@ export async function listMachines(
     LIMIT $${limitIndex}
     OFFSET $${offsetIndex}
     `,
-    dataValues
+    dataValues,
   );
 
   const countResult = await db.query(
@@ -390,31 +316,23 @@ export async function listMachines(
     FROM catalog.machines m
     ${whereSql}
     `,
-    values
+    values,
   );
 
   return {
-    items: result.rows.map(row => ({
+    items: result.rows.map((row) => ({
       code: String(row.code),
       name: row.name ? String(row.name) : "",
-      legacyServiceCode: row.service_code
-        ? String(row.service_code)
-        : null,
-      warnTimeOverlap: Boolean(
-        row.warn_time_overlap
-      ),
+      legacyServiceCode: row.service_code ? String(row.service_code) : null,
+      warnTimeOverlap: Boolean(row.warn_time_overlap),
       note: row.note ? String(row.note) : null,
       active: Boolean(row.active),
-      serviceCount: Number(
-        row.service_count ?? 0
-      ),
+      serviceCount: Number(row.service_count ?? 0),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     })),
 
-    total: Number(
-      countResult.rows[0]?.total ?? 0
-    ),
+    total: Number(countResult.rows[0]?.total ?? 0),
   };
 }
 
@@ -466,7 +384,7 @@ export async function getMachine(code: string) {
       m.created_at,
       m.updated_at
     `,
-    [normalizedCode]
+    [normalizedCode],
   );
 
   if (result.rowCount === 0) {
@@ -478,25 +396,17 @@ export async function getMachine(code: string) {
   return {
     code: String(row.code),
     name: row.name ? String(row.name) : "",
-    legacyServiceCode: row.service_code
-      ? String(row.service_code)
-      : null,
-    warnTimeOverlap: Boolean(
-      row.warn_time_overlap
-    ),
+    legacyServiceCode: row.service_code ? String(row.service_code) : null,
+    warnTimeOverlap: Boolean(row.warn_time_overlap),
     note: row.note ? String(row.note) : null,
     active: Boolean(row.active),
-    services: Array.isArray(row.services)
-      ? row.services
-      : [],
+    services: Array.isArray(row.services) ? row.services : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-export async function createMachine(
-  data: MachineInput
-) {
+export async function createMachine(data: MachineInput) {
   const code = normalizeText(data.code);
   const name = normalizeText(data.name);
 
@@ -515,16 +425,11 @@ export async function createMachine(
     WHERE code = $1
     LIMIT 1
     `,
-    [code]
+    [code],
   );
 
-  if (
-    existing.rowCount &&
-    existing.rowCount > 0
-  ) {
-    throw new Error(
-      `Mã máy "${code}" đã tồn tại.`
-    );
+  if (existing.rowCount && existing.rowCount > 0) {
+    throw new Error(`Mã máy "${code}" đã tồn tại.`);
   }
 
   const result = await db.query(
@@ -554,11 +459,9 @@ export async function createMachine(
       code,
       name,
       data.warnTimeOverlap ?? false,
-      data.note
-        ? normalizeText(data.note)
-        : null,
+      data.note ? normalizeText(data.note) : null,
       data.active ?? true,
-    ]
+    ],
   );
 
   const row = result.rows[0];
@@ -574,17 +477,11 @@ export async function createMachine(
   };
 }
 
-export async function updateMachine(
-  oldCode: string,
-  data: MachineInput
-) {
-  const normalizedOldCode =
-    normalizeText(oldCode);
+export async function updateMachine(oldCode: string, data: MachineInput) {
+  const normalizedOldCode = normalizeText(oldCode);
 
   if (!normalizedOldCode) {
-    throw new Error(
-      "Thiếu mã máy cần cập nhật."
-    );
+    throw new Error("Thiếu mã máy cần cập nhật.");
   }
 
   const currentResult = await db.query(
@@ -599,7 +496,7 @@ export async function updateMachine(
     WHERE code = $1
     LIMIT 1
     `,
-    [normalizedOldCode]
+    [normalizedOldCode],
   );
 
   if (currentResult.rowCount === 0) {
@@ -608,24 +505,16 @@ export async function updateMachine(
 
   const current = currentResult.rows[0];
 
-  const newCode = data.code !== undefined
-    ? normalizeText(data.code)
-    : String(current.code);
+  const newCode = data.code !== undefined ? normalizeText(data.code) : String(current.code);
 
-  const newName = data.name !== undefined
-    ? normalizeText(data.name)
-    : String(current.name ?? "");
+  const newName = data.name !== undefined ? normalizeText(data.name) : String(current.name ?? "");
 
   if (!newCode) {
-    throw new Error(
-      "Mã máy không được để trống."
-    );
+    throw new Error("Mã máy không được để trống.");
   }
 
   if (!newName) {
-    throw new Error(
-      "Tên máy không được để trống."
-    );
+    throw new Error("Tên máy không được để trống.");
   }
 
   if (newCode !== normalizedOldCode) {
@@ -636,16 +525,11 @@ export async function updateMachine(
       WHERE code = $1
       LIMIT 1
       `,
-      [newCode]
+      [newCode],
     );
 
-    if (
-      duplicate.rowCount &&
-      duplicate.rowCount > 0
-    ) {
-      throw new Error(
-        `Mã máy "${newCode}" đã tồn tại.`
-      );
+    if (duplicate.rowCount && duplicate.rowCount > 0) {
+      throw new Error(`Mã máy "${newCode}" đã tồn tại.`);
     }
   }
 
@@ -654,17 +538,10 @@ export async function updateMachine(
       ? Boolean(data.warnTimeOverlap)
       : Boolean(current.warn_time_overlap);
 
-  const note = data.note !== undefined
-    ? (
-      data.note
-        ? normalizeText(data.note)
-        : null
-    )
-    : current.note;
+  const note =
+    data.note !== undefined ? (data.note ? normalizeText(data.note) : null) : current.note;
 
-  const active = data.active !== undefined
-    ? Boolean(data.active)
-    : Boolean(current.active);
+  const active = data.active !== undefined ? Boolean(data.active) : Boolean(current.active);
 
   const result = await db.query(
     `
@@ -686,14 +563,7 @@ export async function updateMachine(
       created_at,
       updated_at
     `,
-    [
-      normalizedOldCode,
-      newCode,
-      newName,
-      warnTimeOverlap,
-      note,
-      active,
-    ]
+    [normalizedOldCode, newCode, newName, warnTimeOverlap, note, active],
   );
 
   const row = result.rows[0];
@@ -709,9 +579,7 @@ export async function updateMachine(
   };
 }
 
-export async function deleteMachine(
-  code: string
-) {
+export async function deleteMachine(code: string) {
   const normalizedCode = normalizeText(code);
 
   if (!normalizedCode) {
@@ -727,7 +595,7 @@ export async function deleteMachine(
     WHERE code = $1
     RETURNING code
     `,
-    [normalizedCode]
+    [normalizedCode],
   );
 
   if (result.rowCount === 0) {
@@ -771,52 +639,33 @@ export interface ServiceInput {
 // SERVICE CRUD
 // ======================================================
 
-export async function listServices(
-  params: ListServicesParams
-) {
-  const {
-    code,
-    name,
-    groupCode,
-    active,
-    limit,
-    offset,
-  } = params;
+export async function listServices(params: ListServicesParams) {
+  const { code, name, groupCode, active, limit, offset } = params;
 
   const conditions: string[] = [];
   const values: unknown[] = [];
 
   if (code) {
     values.push(`%${code}%`);
-    conditions.push(
-      `s.code ILIKE $${values.length}`
-    );
+    conditions.push(`s.code ILIKE $${values.length}`);
   }
 
   if (name) {
     values.push(`%${name}%`);
-    conditions.push(
-      `s.name ILIKE $${values.length}`
-    );
+    conditions.push(`s.name ILIKE $${values.length}`);
   }
 
   if (groupCode) {
     values.push(groupCode);
-    conditions.push(
-      `s.group_code = $${values.length}`
-    );
+    conditions.push(`s.group_code = $${values.length}`);
   }
 
   if (active !== undefined) {
     values.push(active);
-    conditions.push(
-      `s.active = $${values.length}`
-    );
+    conditions.push(`s.active = $${values.length}`);
   }
 
-  const whereSql = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const limitIndex = values.length + 1;
   const offsetIndex = values.length + 2;
@@ -863,7 +712,7 @@ export async function listServices(
     LIMIT $${limitIndex}
     OFFSET $${offsetIndex}
     `,
-    [...values, limit, offset]
+    [...values, limit, offset],
   );
 
   const countResult = await db.query(
@@ -872,66 +721,38 @@ export async function listServices(
     FROM catalog.services s
     ${whereSql}
     `,
-    values
+    values,
   );
 
   return {
-    items: result.rows.map(row => {
-      const machines =
-        Array.isArray(row.machines)
-          ? row.machines
-          : [];
+    items: result.rows.map((row) => {
+      const machines = Array.isArray(row.machines) ? row.machines : [];
 
       return {
         code: String(row.code),
         name: String(row.name),
-        groupCode: row.group_code
-          ? String(row.group_code)
-          : null,
-        unitPrice: Number(
-          row.unit_price ?? 0
-        ),
-        decisionNo: row.decision_no
-          ? String(row.decision_no)
-          : null,
-        requiresResult: Boolean(
-          row.requires_result
-        ),
-        requiresMachine: Boolean(
-          row.requires_machine
-        ),
-        allowSimultaneous: Boolean(
-          row.allow_simultaneous
-        ),
-        minDurationMinutes: Number(
-          row.min_duration_minutes ?? 0
-        ),
-        maxDurationMinutes: Number(
-          row.max_duration_minutes ?? 0
-        ),
-        nextExecutionDays: Number(
-          row.next_execution_days ?? 0
-        ),
-        note: row.note
-          ? String(row.note)
-          : null,
+        groupCode: row.group_code ? String(row.group_code) : null,
+        unitPrice: Number(row.unit_price ?? 0),
+        decisionNo: row.decision_no ? String(row.decision_no) : null,
+        requiresResult: Boolean(row.requires_result),
+        requiresMachine: Boolean(row.requires_machine),
+        allowSimultaneous: Boolean(row.allow_simultaneous),
+        minDurationMinutes: Number(row.min_duration_minutes ?? 0),
+        maxDurationMinutes: Number(row.max_duration_minutes ?? 0),
+        nextExecutionDays: Number(row.next_execution_days ?? 0),
+        note: row.note ? String(row.note) : null,
         active: Boolean(row.active),
         machines,
         machineCount: machines.length,
       };
     }),
 
-    total: Number(
-      countResult.rows[0]?.total ?? 0
-    ),
+    total: Number(countResult.rows[0]?.total ?? 0),
   };
 }
 
-export async function getService(
-  code: string
-) {
-  const normalizedCode =
-    String(code ?? "").trim();
+export async function getService(code: string) {
+  const normalizedCode = String(code ?? "").trim();
 
   const result = await db.query(
     `
@@ -958,7 +779,7 @@ export async function getService(
     WHERE s.code = $1
     GROUP BY s.code
     `,
-    [normalizedCode]
+    [normalizedCode],
   );
 
   if (result.rowCount === 0) {
@@ -973,113 +794,63 @@ export async function getService(
     groupCode: row.group_code,
     unitPrice: Number(row.unit_price ?? 0),
     decisionNo: row.decision_no,
-    requiresResult: Boolean(
-      row.requires_result
-    ),
-    requiresMachine: Boolean(
-      row.requires_machine
-    ),
-    allowSimultaneous: Boolean(
-      row.allow_simultaneous
-    ),
-    minDurationMinutes: Number(
-      row.min_duration_minutes ?? 0
-    ),
-    maxDurationMinutes: Number(
-      row.max_duration_minutes ?? 0
-    ),
-    nextExecutionDays: Number(
-      row.next_execution_days ?? 0
-    ),
+    requiresResult: Boolean(row.requires_result),
+    requiresMachine: Boolean(row.requires_machine),
+    allowSimultaneous: Boolean(row.allow_simultaneous),
+    minDurationMinutes: Number(row.min_duration_minutes ?? 0),
+    maxDurationMinutes: Number(row.max_duration_minutes ?? 0),
+    nextExecutionDays: Number(row.next_execution_days ?? 0),
     note: row.note,
     active: Boolean(row.active),
-    machines: Array.isArray(row.machines)
-      ? row.machines
-      : [],
+    machines: Array.isArray(row.machines) ? row.machines : [],
   };
 }
 
-function validateServiceInput(
-  data: ServiceInput
-) {
-  const code =
-    String(data.code ?? "").trim();
+function validateServiceInput(data: ServiceInput) {
+  const code = String(data.code ?? "").trim();
 
-  const name =
-    String(data.name ?? "").trim();
+  const name = String(data.name ?? "").trim();
 
   if (!code) {
-    throw new Error(
-      "Vui lòng nhập mã dịch vụ."
-    );
+    throw new Error("Vui lòng nhập mã dịch vụ.");
   }
 
   if (!name) {
-    throw new Error(
-      "Vui lòng nhập tên dịch vụ."
-    );
+    throw new Error("Vui lòng nhập tên dịch vụ.");
   }
 
-  const unitPrice =
-    Number(data.unitPrice ?? 0);
+  const unitPrice = Number(data.unitPrice ?? 0);
 
-  const min =
-    Number(data.minDurationMinutes ?? 0);
+  const min = Number(data.minDurationMinutes ?? 0);
 
-  const max =
-    Number(data.maxDurationMinutes ?? 0);
+  const max = Number(data.maxDurationMinutes ?? 0);
 
-  const nextDays =
-    Number(data.nextExecutionDays ?? 0);
+  const nextDays = Number(data.nextExecutionDays ?? 0);
 
-  const requiresMachine = Boolean(
-    data.requiresMachine ?? false
-  );
+  const requiresMachine = Boolean(data.requiresMachine ?? false);
 
-  const machineCodes =
-    Array.isArray(data.machineCodes)
-      ? [
-        ...new Set(
-          data.machineCodes
-            .map(item =>
-              String(item ?? "").trim()
-            )
-            .filter(Boolean)
-        ),
-      ]
-      : [];
+  const machineCodes = Array.isArray(data.machineCodes)
+    ? [...new Set(data.machineCodes.map((item) => String(item ?? "").trim()).filter(Boolean))]
+    : [];
 
   if (unitPrice < 0) {
-    throw new Error(
-      "Đơn giá không được nhỏ hơn 0."
-    );
+    throw new Error("Đơn giá không được nhỏ hơn 0.");
   }
 
   if (min < 0 || max < 0) {
-    throw new Error(
-      "Thời gian thực hiện không được nhỏ hơn 0."
-    );
+    throw new Error("Thời gian thực hiện không được nhỏ hơn 0.");
   }
 
   if (max > 0 && max < min) {
-    throw new Error(
-      "Max thời gian phải lớn hơn hoặc bằng Min."
-    );
+    throw new Error("Max thời gian phải lớn hơn hoặc bằng Min.");
   }
 
   if (nextDays < 0) {
-    throw new Error(
-      "Số ngày thực hiện tiếp theo không hợp lệ."
-    );
+    throw new Error("Số ngày thực hiện tiếp theo không hợp lệ.");
   }
 
-  if (
-    requiresMachine &&
-    machineCodes.length === 0
-  ) {
-    throw new Error(
-      "DVKT bắt buộc mã máy nên phải chọn ít nhất 1 máy."
-    );
+  if (requiresMachine && machineCodes.length === 0) {
+    throw new Error("DVKT bắt buộc mã máy nên phải chọn ít nhất 1 máy.");
   }
 
   return {
@@ -1097,23 +868,17 @@ function validateServiceInput(
 async function replaceServiceMachines(
   client: PoolClient,
   serviceCode: string,
-  machineCodes: string[]
+  machineCodes: string[],
 ) {
   await client.query(
     `
     DELETE FROM catalog.service_machines
     WHERE service_code = $1
     `,
-    [serviceCode]
+    [serviceCode],
   );
 
-  const uniqueCodes = [
-    ...new Set(
-      machineCodes
-        .map(code => String(code).trim())
-        .filter(Boolean)
-    ),
-  ];
+  const uniqueCodes = [...new Set(machineCodes.map((code) => String(code).trim()).filter(Boolean))];
 
   for (const machineCode of uniqueCodes) {
     const machineResult = await client.query(
@@ -1124,13 +889,11 @@ async function replaceServiceMachines(
         AND active = true
       LIMIT 1
       `,
-      [machineCode]
+      [machineCode],
     );
 
     if (machineResult.rowCount === 0) {
-      throw new Error(
-        `Không tìm thấy mã máy: ${machineCode}`
-      );
+      throw new Error(`Không tìm thấy mã máy: ${machineCode}`);
     }
 
     await client.query(
@@ -1146,16 +909,13 @@ async function replaceServiceMachines(
         $1, $2, true, NOW(), NOW()
       )
       `,
-      [serviceCode, machineCode]
+      [serviceCode, machineCode],
     );
   }
 }
 
-export async function createService(
-  data: ServiceInput
-) {
-  const validated =
-    validateServiceInput(data);
+export async function createService(data: ServiceInput) {
+  const validated = validateServiceInput(data);
 
   const client = await db.connect();
 
@@ -1169,16 +929,11 @@ export async function createService(
       WHERE code = $1
       LIMIT 1
       `,
-      [validated.code]
+      [validated.code],
     );
 
-    if (
-      duplicate.rowCount &&
-      duplicate.rowCount > 0
-    ) {
-      throw new Error(
-        `Mã dịch vụ "${validated.code}" đã tồn tại.`
-      );
+    if (duplicate.rowCount && duplicate.rowCount > 0) {
+      throw new Error(`Mã dịch vụ "${validated.code}" đã tồn tại.`);
     }
 
     await client.query(
@@ -1220,20 +975,14 @@ export async function createService(
         validated.nextDays,
         data.note || null,
         data.active ?? true,
-      ]
+      ],
     );
 
-    await replaceServiceMachines(
-      client,
-      validated.code,
-      validated.machineCodes
-    );
+    await replaceServiceMachines(client, validated.code, validated.machineCodes);
 
     await client.query("COMMIT");
 
-    return await getService(
-      validated.code
-    );
+    return await getService(validated.code);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -1242,12 +991,8 @@ export async function createService(
   }
 }
 
-export async function updateService(
-  oldCode: string,
-  data: ServiceInput
-) {
-  const validated =
-    validateServiceInput(data);
+export async function updateService(oldCode: string, data: ServiceInput) {
+  const validated = validateServiceInput(data);
 
   const client = await db.connect();
 
@@ -1261,13 +1006,11 @@ export async function updateService(
       WHERE code = $1
       LIMIT 1
       `,
-      [oldCode]
+      [oldCode],
     );
 
     if (current.rowCount === 0) {
-      throw new Error(
-        "Không tìm thấy DVKT."
-      );
+      throw new Error("Không tìm thấy DVKT.");
     }
 
     if (validated.code !== oldCode) {
@@ -1278,16 +1021,11 @@ export async function updateService(
         WHERE code = $1
         LIMIT 1
         `,
-        [validated.code]
+        [validated.code],
       );
 
-      if (
-        duplicate.rowCount &&
-        duplicate.rowCount > 0
-      ) {
-        throw new Error(
-          `Mã dịch vụ "${validated.code}" đã tồn tại.`
-        );
+      if (duplicate.rowCount && duplicate.rowCount > 0) {
+        throw new Error(`Mã dịch vụ "${validated.code}" đã tồn tại.`);
       }
     }
 
@@ -1326,20 +1064,14 @@ export async function updateService(
         validated.nextDays,
         data.note || null,
         data.active ?? true,
-      ]
+      ],
     );
 
-    await replaceServiceMachines(
-      client,
-      validated.code,
-      data.machineCodes ?? []
-    );
+    await replaceServiceMachines(client, validated.code, data.machineCodes ?? []);
 
     await client.query("COMMIT");
 
-    return await getService(
-      validated.code
-    );
+    return await getService(validated.code);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -1348,9 +1080,7 @@ export async function updateService(
   }
 }
 
-export async function deleteService(
-  code: string
-) {
+export async function deleteService(code: string) {
   const result = await db.query(
     `
     UPDATE catalog.services
@@ -1360,13 +1090,11 @@ export async function deleteService(
     WHERE code = $1
     RETURNING code
     `,
-    [code]
+    [code],
   );
 
   if (result.rowCount === 0) {
-    throw new Error(
-      "Không tìm thấy DVKT."
-    );
+    throw new Error("Không tìm thấy DVKT.");
   }
 
   return true;
@@ -1395,51 +1123,31 @@ export interface DepartmentInput {
 // DEPARTMENT CRUD
 // ======================================================
 
-export async function listDepartments(
-  params: ListDepartmentsParams
-) {
-  const {
-    code,
-    name,
-    active,
-    limit,
-    offset,
-  } = params;
+export async function listDepartments(params: ListDepartmentsParams) {
+  const { code, name, active, limit, offset } = params;
 
   const conditions: string[] = [];
   const values: unknown[] = [];
 
   if (code) {
-    values.push(
-      `%${normalizeText(code)}%`
-    );
+    values.push(`%${normalizeText(code)}%`);
 
-    conditions.push(
-      `d.code ILIKE $${values.length}`
-    );
+    conditions.push(`d.code ILIKE $${values.length}`);
   }
 
   if (name) {
-    values.push(
-      `%${normalizeText(name)}%`
-    );
+    values.push(`%${normalizeText(name)}%`);
 
-    conditions.push(
-      `d.name ILIKE $${values.length}`
-    );
+    conditions.push(`d.name ILIKE $${values.length}`);
   }
 
   if (active !== undefined) {
     values.push(active);
 
-    conditions.push(
-      `d.active = $${values.length}`
-    );
+    conditions.push(`d.active = $${values.length}`);
   }
 
-  const whereSql = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const limitIndex = values.length + 1;
   const offsetIndex = values.length + 2;
@@ -1459,7 +1167,7 @@ export async function listDepartments(
     LIMIT $${limitIndex}
     OFFSET $${offsetIndex}
     `,
-    [...values, limit, offset]
+    [...values, limit, offset],
   );
 
   const countResult = await db.query(
@@ -1468,32 +1176,25 @@ export async function listDepartments(
     FROM catalog.departments d
     ${whereSql}
     `,
-    values
+    values,
   );
 
   return {
-    items: result.rows.map(row => ({
+    items: result.rows.map((row) => ({
       code: String(row.code),
       name: String(row.name),
-      description: row.description
-        ? String(row.description)
-        : null,
+      description: row.description ? String(row.description) : null,
       active: Boolean(row.active),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     })),
 
-    total: Number(
-      countResult.rows[0]?.total ?? 0
-    ),
+    total: Number(countResult.rows[0]?.total ?? 0),
   };
 }
 
-export async function getDepartment(
-  code: string
-) {
-  const normalizedCode =
-    normalizeText(code);
+export async function getDepartment(code: string) {
+  const normalizedCode = normalizeText(code);
 
   if (!normalizedCode) {
     throw new Error("Thiếu mã khoa.");
@@ -1512,7 +1213,7 @@ export async function getDepartment(
     WHERE code = $1
     LIMIT 1
     `,
-    [normalizedCode]
+    [normalizedCode],
   );
 
   if (result.rowCount === 0) {
@@ -1524,48 +1225,35 @@ export async function getDepartment(
   return {
     code: String(row.code),
     name: String(row.name),
-    description: row.description
-      ? String(row.description)
-      : null,
+    description: row.description ? String(row.description) : null,
     active: Boolean(row.active),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function validateDepartmentInput(
-  data: DepartmentInput
-) {
+function validateDepartmentInput(data: DepartmentInput) {
   const code = normalizeText(data.code);
   const name = normalizeText(data.name);
 
   if (!code) {
-    throw new Error(
-      "Vui lòng nhập mã khoa."
-    );
+    throw new Error("Vui lòng nhập mã khoa.");
   }
 
   if (!name) {
-    throw new Error(
-      "Vui lòng nhập tên khoa."
-    );
+    throw new Error("Vui lòng nhập tên khoa.");
   }
 
   return {
     code,
     name,
-    description: data.description
-      ? normalizeText(data.description)
-      : null,
+    description: data.description ? normalizeText(data.description) : null,
     active: data.active ?? true,
   };
 }
 
-export async function createDepartment(
-  data: DepartmentInput
-) {
-  const validated =
-    validateDepartmentInput(data);
+export async function createDepartment(data: DepartmentInput) {
+  const validated = validateDepartmentInput(data);
 
   const duplicate = await db.query(
     `
@@ -1574,16 +1262,11 @@ export async function createDepartment(
     WHERE code = $1
     LIMIT 1
     `,
-    [validated.code]
+    [validated.code],
   );
 
-  if (
-    duplicate.rowCount &&
-    duplicate.rowCount > 0
-  ) {
-    throw new Error(
-      `Mã khoa "${validated.code}" đã tồn tại.`
-    );
+  if (duplicate.rowCount && duplicate.rowCount > 0) {
+    throw new Error(`Mã khoa "${validated.code}" đã tồn tại.`);
   }
 
   await db.query(
@@ -1600,34 +1283,20 @@ export async function createDepartment(
       $1, $2, $3, $4, NOW(), NOW()
     )
     `,
-    [
-      validated.code,
-      validated.name,
-      validated.description,
-      validated.active,
-    ]
+    [validated.code, validated.name, validated.description, validated.active],
   );
 
-  return await getDepartment(
-    validated.code
-  );
+  return await getDepartment(validated.code);
 }
 
-export async function updateDepartment(
-  oldCode: string,
-  data: DepartmentInput
-) {
-  const normalizedOldCode =
-    normalizeText(oldCode);
+export async function updateDepartment(oldCode: string, data: DepartmentInput) {
+  const normalizedOldCode = normalizeText(oldCode);
 
   if (!normalizedOldCode) {
-    throw new Error(
-      "Thiếu mã khoa cần cập nhật."
-    );
+    throw new Error("Thiếu mã khoa cần cập nhật.");
   }
 
-  const validated =
-    validateDepartmentInput(data);
+  const validated = validateDepartmentInput(data);
 
   const current = await db.query(
     `
@@ -1636,18 +1305,14 @@ export async function updateDepartment(
     WHERE code = $1
     LIMIT 1
     `,
-    [normalizedOldCode]
+    [normalizedOldCode],
   );
 
   if (current.rowCount === 0) {
-    throw new Error(
-      "Không tìm thấy khoa."
-    );
+    throw new Error("Không tìm thấy khoa.");
   }
 
-  if (
-    validated.code !== normalizedOldCode
-  ) {
+  if (validated.code !== normalizedOldCode) {
     const duplicate = await db.query(
       `
       SELECT code
@@ -1655,16 +1320,11 @@ export async function updateDepartment(
       WHERE code = $1
       LIMIT 1
       `,
-      [validated.code]
+      [validated.code],
     );
 
-    if (
-      duplicate.rowCount &&
-      duplicate.rowCount > 0
-    ) {
-      throw new Error(
-        `Mã khoa "${validated.code}" đã tồn tại.`
-      );
+    if (duplicate.rowCount && duplicate.rowCount > 0) {
+      throw new Error(`Mã khoa "${validated.code}" đã tồn tại.`);
     }
   }
 
@@ -1679,25 +1339,14 @@ export async function updateDepartment(
       updated_at = NOW()
     WHERE code = $1
     `,
-    [
-      normalizedOldCode,
-      validated.code,
-      validated.name,
-      validated.description,
-      validated.active,
-    ]
+    [normalizedOldCode, validated.code, validated.name, validated.description, validated.active],
   );
 
-  return await getDepartment(
-    validated.code
-  );
+  return await getDepartment(validated.code);
 }
 
-export async function deleteDepartment(
-  code: string
-) {
-  const normalizedCode =
-    normalizeText(code);
+export async function deleteDepartment(code: string) {
+  const normalizedCode = normalizeText(code);
 
   if (!normalizedCode) {
     throw new Error("Thiếu mã khoa.");
@@ -1712,13 +1361,11 @@ export async function deleteDepartment(
     WHERE code = $1
     RETURNING code
     `,
-    [normalizedCode]
+    [normalizedCode],
   );
 
   if (result.rowCount === 0) {
-    throw new Error(
-      "Không tìm thấy khoa."
-    );
+    throw new Error("Không tìm thấy khoa.");
   }
 
   return true;
@@ -1760,9 +1407,7 @@ export interface MedicalStaffInput {
 // MEDICAL STAFF HELPERS
 // ======================================================
 
-function formatDatabaseDateOnly(
-  value: unknown
-): string | null {
+function formatDatabaseDateOnly(value: unknown): string | null {
   if (!value) {
     return null;
   }
@@ -1770,22 +1415,16 @@ function formatDatabaseDateOnly(
   if (value instanceof Date) {
     const year = value.getFullYear();
 
-    const month = String(
-      value.getMonth() + 1
-    ).padStart(2, "0");
+    const month = String(value.getMonth() + 1).padStart(2, "0");
 
-    const day = String(
-      value.getDate()
-    ).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   }
 
   const text = String(value).trim();
 
-  const match = text.match(
-    /^(\d{4})-(\d{2})-(\d{2})/
-  );
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
 
   if (match) {
     return `${match[1]}-${match[2]}-${match[3]}`;
@@ -1794,138 +1433,73 @@ function formatDatabaseDateOnly(
   return null;
 }
 
-function normalizeDateOnly(
-  value: unknown
-): string | null {
+function normalizeDateOnly(value: unknown): string | null {
   const text = normalizeText(value);
 
   if (!text) {
     return null;
   }
 
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(text)
-  ) {
-    throw new Error(
-      "Ngày cấp CCHN phải có định dạng YYYY-MM-DD."
-    );
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    throw new Error("Ngày cấp CCHN phải có định dạng YYYY-MM-DD.");
   }
 
-  const [
-    yearText,
-    monthText,
-    dayText,
-  ] = text.split("-");
+  const [yearText, monthText, dayText] = text.split("-");
 
   const year = Number(yearText);
   const month = Number(monthText);
   const day = Number(dayText);
 
-  const date = new Date(
-    Date.UTC(year, month - 1, day)
-  );
+  const date = new Date(Date.UTC(year, month - 1, day));
 
   if (
     date.getUTCFullYear() !== year ||
     date.getUTCMonth() !== month - 1 ||
     date.getUTCDate() !== day
   ) {
-    throw new Error(
-      "Ngày cấp CCHN không hợp lệ."
-    );
+    throw new Error("Ngày cấp CCHN không hợp lệ.");
   }
 
   return text;
 }
 
-function validateMedicalStaffInput(
-  data: MedicalStaffInput
-) {
-  const fullName =
-    normalizeText(data.fullName);
+function validateMedicalStaffInput(data: MedicalStaffInput) {
+  const fullName = normalizeText(data.fullName);
 
   if (!fullName) {
-    throw new Error(
-      "Vui lòng nhập họ tên nhân viên y tế."
-    );
+    throw new Error("Vui lòng nhập họ tên nhân viên y tế.");
   }
 
-  const departmentCodes =
-    Array.isArray(data.departmentCodes)
-      ? [
-        ...new Set(
-          data.departmentCodes
-            .map(code =>
-              normalizeText(code)
-            )
-            .filter(Boolean)
-        ),
-      ]
-      : [];
+  const departmentCodes = Array.isArray(data.departmentCodes)
+    ? [...new Set(data.departmentCodes.map((code) => normalizeText(code)).filter(Boolean))]
+    : [];
 
   return {
     fullName,
 
-    socialInsuranceCode:
-      data.socialInsuranceCode
-        ? normalizeText(
-          data.socialInsuranceCode
-        )
-        : null,
+    socialInsuranceCode: data.socialInsuranceCode ? normalizeText(data.socialInsuranceCode) : null,
 
-    licenseNumber: data.licenseNumber
-      ? normalizeText(data.licenseNumber)
-      : null,
+    licenseNumber: data.licenseNumber ? normalizeText(data.licenseNumber) : null,
 
-    gender: data.gender
-      ? normalizeText(data.gender)
-      : null,
+    gender: data.gender ? normalizeText(data.gender) : null,
 
-    licenseIssueDate:
-      normalizeDateOnly(
-        data.licenseIssueDate
-      ),
+    licenseIssueDate: normalizeDateOnly(data.licenseIssueDate),
 
-    professionalTitle:
-      data.professionalTitle
-        ? normalizeText(
-          data.professionalTitle
-        )
-        : null,
+    professionalTitle: data.professionalTitle ? normalizeText(data.professionalTitle) : null,
 
-    licenseIssuer: data.licenseIssuer
-      ? normalizeText(data.licenseIssuer)
-      : null,
+    licenseIssuer: data.licenseIssuer ? normalizeText(data.licenseIssuer) : null,
 
-    professionalScope:
-      data.professionalScope
-        ? normalizeText(
-          data.professionalScope
-        )
-        : null,
+    professionalScope: data.professionalScope ? normalizeText(data.professionalScope) : null,
 
-    registrationTime:
-      data.registrationTime
-        ? normalizeText(
-          data.registrationTime
-        )
-        : null,
+    registrationTime: data.registrationTime ? normalizeText(data.registrationTime) : null,
 
-    dailyTime: data.dailyTime
-      ? normalizeText(data.dailyTime)
-      : null,
+    dailyTime: data.dailyTime ? normalizeText(data.dailyTime) : null,
 
-    weeklyTime: data.weeklyTime
-      ? normalizeText(data.weeklyTime)
-      : null,
+    weeklyTime: data.weeklyTime ? normalizeText(data.weeklyTime) : null,
 
-    position: data.position
-      ? normalizeText(data.position)
-      : null,
+    position: data.position ? normalizeText(data.position) : null,
 
-    note: data.note
-      ? normalizeText(data.note)
-      : null,
+    note: data.note ? normalizeText(data.note) : null,
 
     active: data.active ?? true,
 
@@ -1936,7 +1510,7 @@ function validateMedicalStaffInput(
 async function replaceMedicalStaffDepartments(
   client: PoolClient,
   staffId: string,
-  departmentCodes: string[]
+  departmentCodes: string[],
 ) {
   await client.query(
     `
@@ -1947,39 +1521,29 @@ async function replaceMedicalStaffDepartments(
     WHERE staff_id = $1
       AND active = true
     `,
-    [staffId]
+    [staffId],
   );
 
   if (departmentCodes.length === 0) {
     return;
   }
 
-  const departmentResult =
-    await client.query<{ code: string }>(
-      `
+  const departmentResult = await client.query<{ code: string }>(
+    `
       SELECT code
       FROM catalog.departments
       WHERE code = ANY($1::varchar[])
         AND active = true
       `,
-      [departmentCodes]
-    );
-
-  const foundCodes = new Set(
-    departmentResult.rows.map(
-      row => String(row.code)
-    )
+    [departmentCodes],
   );
 
-  const missingCodes =
-    departmentCodes.filter(
-      code => !foundCodes.has(code)
-    );
+  const foundCodes = new Set(departmentResult.rows.map((row) => String(row.code)));
+
+  const missingCodes = departmentCodes.filter((code) => !foundCodes.has(code));
 
   if (missingCodes.length > 0) {
-    throw new Error(
-      `Không tìm thấy khoa đang hoạt động: ${missingCodes.join(", ")}`
-    );
+    throw new Error(`Không tìm thấy khoa đang hoạt động: ${missingCodes.join(", ")}`);
   }
 
   await client.query(
@@ -2007,7 +1571,7 @@ async function replaceMedicalStaffDepartments(
       active = true,
       updated_at = NOW()
     `,
-    [staffId, departmentCodes]
+    [staffId, departmentCodes],
   );
 }
 
@@ -2015,56 +1579,33 @@ async function replaceMedicalStaffDepartments(
 // MEDICAL STAFF CRUD
 // ======================================================
 
-export async function listMedicalStaff(
-  params: ListMedicalStaffParams
-) {
-  const {
-    fullName,
-    socialInsuranceCode,
-    licenseNumber,
-    departmentCode,
-    active,
-    limit,
-    offset,
-  } = params;
+export async function listMedicalStaff(params: ListMedicalStaffParams) {
+  const { fullName, socialInsuranceCode, licenseNumber, departmentCode, active, limit, offset } =
+    params;
 
   const conditions: string[] = [];
   const values: unknown[] = [];
 
   if (fullName) {
-    values.push(
-      `%${normalizeText(fullName)}%`
-    );
+    values.push(`%${normalizeText(fullName)}%`);
 
-    conditions.push(
-      `s.full_name ILIKE $${values.length}`
-    );
+    conditions.push(`s.full_name ILIKE $${values.length}`);
   }
 
   if (socialInsuranceCode) {
-    values.push(
-      `%${normalizeText(socialInsuranceCode)}%`
-    );
+    values.push(`%${normalizeText(socialInsuranceCode)}%`);
 
-    conditions.push(
-      `COALESCE(s.social_insurance_code, '') ILIKE $${values.length}`
-    );
+    conditions.push(`COALESCE(s.social_insurance_code, '') ILIKE $${values.length}`);
   }
 
   if (licenseNumber) {
-    values.push(
-      `%${normalizeText(licenseNumber)}%`
-    );
+    values.push(`%${normalizeText(licenseNumber)}%`);
 
-    conditions.push(
-      `COALESCE(s.license_number, '') ILIKE $${values.length}`
-    );
+    conditions.push(`COALESCE(s.license_number, '') ILIKE $${values.length}`);
   }
 
   if (departmentCode) {
-    values.push(
-      normalizeText(departmentCode)
-    );
+    values.push(normalizeText(departmentCode));
 
     conditions.push(`
       EXISTS (
@@ -2080,14 +1621,10 @@ export async function listMedicalStaff(
   if (active !== undefined) {
     values.push(active);
 
-    conditions.push(
-      `s.active = $${values.length}`
-    );
+    conditions.push(`s.active = $${values.length}`);
   }
 
-  const whereSql = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const limitIndex = values.length + 1;
   const offsetIndex = values.length + 2;
@@ -2135,7 +1672,7 @@ export async function listMedicalStaff(
     LIMIT $${limitIndex}
     OFFSET $${offsetIndex}
     `,
-    [...values, limit, offset]
+    [...values, limit, offset],
   );
 
   const countResult = await db.query(
@@ -2144,100 +1681,57 @@ export async function listMedicalStaff(
     FROM catalog.medical_staff s
     ${whereSql}
     `,
-    values
+    values,
   );
 
   return {
-    items: result.rows.map(row => ({
+    items: result.rows.map((row) => ({
       id: String(row.id),
       fullName: String(row.full_name),
 
-      socialInsuranceCode:
-        row.social_insurance_code
-          ? String(
-            row.social_insurance_code
-          )
-          : null,
+      socialInsuranceCode: row.social_insurance_code ? String(row.social_insurance_code) : null,
 
-      licenseNumber: row.license_number
-        ? String(row.license_number)
-        : null,
+      licenseNumber: row.license_number ? String(row.license_number) : null,
 
-      gender: row.gender
-        ? String(row.gender)
-        : null,
+      gender: row.gender ? String(row.gender) : null,
 
-      licenseIssueDate:
-        formatDatabaseDateOnly(
-          row.license_issue_date
-        ),
+      licenseIssueDate: formatDatabaseDateOnly(row.license_issue_date),
 
-      professionalTitle:
-        row.professional_title
-          ? String(row.professional_title)
-          : null,
+      professionalTitle: row.professional_title ? String(row.professional_title) : null,
 
-      licenseIssuer: row.license_issuer
-        ? String(row.license_issuer)
-        : null,
+      licenseIssuer: row.license_issuer ? String(row.license_issuer) : null,
 
-      professionalScope:
-        row.professional_scope
-          ? String(row.professional_scope)
-          : null,
+      professionalScope: row.professional_scope ? String(row.professional_scope) : null,
 
-      registrationTime:
-        row.registration_time
-          ? String(row.registration_time)
-          : null,
+      registrationTime: row.registration_time ? String(row.registration_time) : null,
 
-      dailyTime: row.daily_time
-        ? String(row.daily_time)
-        : null,
+      dailyTime: row.daily_time ? String(row.daily_time) : null,
 
-      weeklyTime: row.weekly_time
-        ? String(row.weekly_time)
-        : null,
+      weeklyTime: row.weekly_time ? String(row.weekly_time) : null,
 
-      position: row.position
-        ? String(row.position)
-        : null,
+      position: row.position ? String(row.position) : null,
 
-      note: row.note
-        ? String(row.note)
-        : null,
+      note: row.note ? String(row.note) : null,
 
       active: Boolean(row.active),
 
-      departments:
-        Array.isArray(row.departments)
-          ? row.departments
-          : [],
+      departments: Array.isArray(row.departments) ? row.departments : [],
 
-      departmentCount:
-        Array.isArray(row.departments)
-          ? row.departments.length
-          : 0,
+      departmentCount: Array.isArray(row.departments) ? row.departments.length : 0,
 
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     })),
 
-    total: Number(
-      countResult.rows[0]?.total ?? 0
-    ),
+    total: Number(countResult.rows[0]?.total ?? 0),
   };
 }
 
-export async function getMedicalStaff(
-  id: string
-) {
+export async function getMedicalStaff(id: string) {
   const normalizedId = normalizeText(id);
 
   if (!normalizedId) {
-    throw new Error(
-      "Thiếu ID nhân viên y tế."
-    );
+    throw new Error("Thiếu ID nhân viên y tế.");
   }
 
   const result = await db.query(
@@ -2281,7 +1775,7 @@ export async function getMedicalStaff(
     WHERE s.id = $1::uuid
     LIMIT 1
     `,
-    [normalizedId]
+    [normalizedId],
   );
 
   if (result.rowCount === 0) {
@@ -2294,76 +1788,41 @@ export async function getMedicalStaff(
     id: String(row.id),
     fullName: String(row.full_name),
 
-    socialInsuranceCode:
-      row.social_insurance_code
-        ? String(row.social_insurance_code)
-        : null,
+    socialInsuranceCode: row.social_insurance_code ? String(row.social_insurance_code) : null,
 
-    licenseNumber: row.license_number
-      ? String(row.license_number)
-      : null,
+    licenseNumber: row.license_number ? String(row.license_number) : null,
 
-    gender: row.gender
-      ? String(row.gender)
-      : null,
+    gender: row.gender ? String(row.gender) : null,
 
-    licenseIssueDate:
-      formatDatabaseDateOnly(
-        row.license_issue_date
-      ),
+    licenseIssueDate: formatDatabaseDateOnly(row.license_issue_date),
 
-    professionalTitle:
-      row.professional_title
-        ? String(row.professional_title)
-        : null,
+    professionalTitle: row.professional_title ? String(row.professional_title) : null,
 
-    licenseIssuer: row.license_issuer
-      ? String(row.license_issuer)
-      : null,
+    licenseIssuer: row.license_issuer ? String(row.license_issuer) : null,
 
-    professionalScope:
-      row.professional_scope
-        ? String(row.professional_scope)
-        : null,
+    professionalScope: row.professional_scope ? String(row.professional_scope) : null,
 
-    registrationTime:
-      row.registration_time
-        ? String(row.registration_time)
-        : null,
+    registrationTime: row.registration_time ? String(row.registration_time) : null,
 
-    dailyTime: row.daily_time
-      ? String(row.daily_time)
-      : null,
+    dailyTime: row.daily_time ? String(row.daily_time) : null,
 
-    weeklyTime: row.weekly_time
-      ? String(row.weekly_time)
-      : null,
+    weeklyTime: row.weekly_time ? String(row.weekly_time) : null,
 
-    position: row.position
-      ? String(row.position)
-      : null,
+    position: row.position ? String(row.position) : null,
 
-    note: row.note
-      ? String(row.note)
-      : null,
+    note: row.note ? String(row.note) : null,
 
     active: Boolean(row.active),
 
-    departments:
-      Array.isArray(row.departments)
-        ? row.departments
-        : [],
+    departments: Array.isArray(row.departments) ? row.departments : [],
 
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-export async function createMedicalStaff(
-  data: MedicalStaffInput
-) {
-  const validated =
-    validateMedicalStaffInput(data);
+export async function createMedicalStaff(data: MedicalStaffInput) {
+  const validated = validateMedicalStaffInput(data);
 
   const client = await db.connect();
 
@@ -2413,17 +1872,12 @@ export async function createMedicalStaff(
         validated.position,
         validated.note,
         validated.active,
-      ]
+      ],
     );
 
-    const staffId =
-      String(result.rows[0].id);
+    const staffId = String(result.rows[0].id);
 
-    await replaceMedicalStaffDepartments(
-      client,
-      staffId,
-      validated.departmentCodes
-    );
+    await replaceMedicalStaffDepartments(client, staffId, validated.departmentCodes);
 
     await client.query("COMMIT");
 
@@ -2436,20 +1890,14 @@ export async function createMedicalStaff(
   }
 }
 
-export async function updateMedicalStaff(
-  id: string,
-  data: MedicalStaffInput
-) {
+export async function updateMedicalStaff(id: string, data: MedicalStaffInput) {
   const normalizedId = normalizeText(id);
 
   if (!normalizedId) {
-    throw new Error(
-      "Thiếu ID nhân viên y tế."
-    );
+    throw new Error("Thiếu ID nhân viên y tế.");
   }
 
-  const validated =
-    validateMedicalStaffInput(data);
+  const validated = validateMedicalStaffInput(data);
 
   const client = await db.connect();
 
@@ -2463,13 +1911,11 @@ export async function updateMedicalStaff(
       WHERE id = $1::uuid
       LIMIT 1
       `,
-      [normalizedId]
+      [normalizedId],
     );
 
     if (current.rowCount === 0) {
-      throw new Error(
-        "Không tìm thấy nhân viên y tế."
-      );
+      throw new Error("Không tìm thấy nhân viên y tế.");
     }
 
     await client.query(
@@ -2509,20 +1955,14 @@ export async function updateMedicalStaff(
         validated.position,
         validated.note,
         validated.active,
-      ]
+      ],
     );
 
-    await replaceMedicalStaffDepartments(
-      client,
-      normalizedId,
-      validated.departmentCodes
-    );
+    await replaceMedicalStaffDepartments(client, normalizedId, validated.departmentCodes);
 
     await client.query("COMMIT");
 
-    return await getMedicalStaff(
-      normalizedId
-    );
+    return await getMedicalStaff(normalizedId);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -2531,15 +1971,11 @@ export async function updateMedicalStaff(
   }
 }
 
-export async function deleteMedicalStaff(
-  id: string
-) {
+export async function deleteMedicalStaff(id: string) {
   const normalizedId = normalizeText(id);
 
   if (!normalizedId) {
-    throw new Error(
-      "Thiếu ID nhân viên y tế."
-    );
+    throw new Error("Thiếu ID nhân viên y tế.");
   }
 
   const result = await db.query(
@@ -2551,13 +1987,11 @@ export async function deleteMedicalStaff(
     WHERE id = $1::uuid
     RETURNING id
     `,
-    [normalizedId]
+    [normalizedId],
   );
 
   if (result.rowCount === 0) {
-    throw new Error(
-      "Không tìm thấy nhân viên y tế."
-    );
+    throw new Error("Không tìm thấy nhân viên y tế.");
   }
 
   return true;
@@ -2615,236 +2049,128 @@ export interface DrugInput {
 // DRUG HELPERS
 // ======================================================
 
-function normalizeDrugOptionalText(
-  value: unknown
-): string | null {
+function normalizeDrugOptionalText(value: unknown): string | null {
   const text = normalizeText(value);
 
   return text || null;
 }
 
-function normalizeDrugNullableNumber(
-  value: unknown,
-  fieldName: string
-): number | null {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
+function normalizeDrugNullableNumber(value: unknown, fieldName: string): number | null {
+  if (value === null || value === undefined || value === "") {
     return null;
   }
 
   const numberValue = Number(value);
 
   if (!Number.isFinite(numberValue)) {
-    throw new Error(
-      `${fieldName} không hợp lệ.`
-    );
+    throw new Error(`${fieldName} không hợp lệ.`);
   }
 
   if (numberValue < 0) {
-    throw new Error(
-      `${fieldName} không được nhỏ hơn 0.`
-    );
+    throw new Error(`${fieldName} không được nhỏ hơn 0.`);
   }
 
   return numberValue;
 }
 
-function validateDrugInput(
-  data: DrugInput
-) {
+function validateDrugInput(data: DrugInput) {
   const code = normalizeText(data.code);
   const name = normalizeText(data.name);
 
   if (!code) {
-    throw new Error(
-      "Vui lòng nhập mã thuốc."
-    );
+    throw new Error("Vui lòng nhập mã thuốc.");
   }
 
   if (!name) {
-    throw new Error(
-      "Vui lòng nhập tên thuốc."
-    );
+    throw new Error("Vui lòng nhập tên thuốc.");
   }
 
-  const quantity =
-    normalizeDrugNullableNumber(
-      data.quantity,
-      "Số lượng"
-    );
+  const quantity = normalizeDrugNullableNumber(data.quantity, "Số lượng");
 
-  const unitPrice =
-    Number(data.unitPrice ?? 0);
+  const unitPrice = Number(data.unitPrice ?? 0);
 
-  if (
-    !Number.isFinite(unitPrice) ||
-    unitPrice < 0
-  ) {
-    throw new Error(
-      "Đơn giá thuốc không hợp lệ."
-    );
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    throw new Error("Đơn giá thuốc không hợp lệ.");
   }
 
-  const insuranceUnitPrice =
-    normalizeDrugNullableNumber(
-      data.insuranceUnitPrice,
-      "Đơn giá BH"
-    );
+  const insuranceUnitPrice = normalizeDrugNullableNumber(data.insuranceUnitPrice, "Đơn giá BH");
 
-  const processingLossRate =
-    normalizeDrugNullableNumber(
-      data.processingLossRate,
-      "Tỷ lệ hao hụt chế biến"
-    );
+  const processingLossRate = normalizeDrugNullableNumber(
+    data.processingLossRate,
+    "Tỷ lệ hao hụt chế biến",
+  );
 
-  const preservationLossRate =
-    normalizeDrugNullableNumber(
-      data.preservationLossRate,
-      "Tỷ lệ hao hụt bảo quản"
-    );
+  const preservationLossRate = normalizeDrugNullableNumber(
+    data.preservationLossRate,
+    "Tỷ lệ hao hụt bảo quản",
+  );
 
-  const insurancePaymentRate =
-    Number(
-      data.insurancePaymentRate ?? 100
-    );
+  const insurancePaymentRate = Number(data.insurancePaymentRate ?? 100);
 
   if (
-    !Number.isFinite(
-      insurancePaymentRate
-    ) ||
+    !Number.isFinite(insurancePaymentRate) ||
     insurancePaymentRate < 0 ||
     insurancePaymentRate > 100
   ) {
-    throw new Error(
-      "Tỷ lệ thanh toán BHYT phải từ 0 đến 100."
-    );
+    throw new Error("Tỷ lệ thanh toán BHYT phải từ 0 đến 100.");
   }
 
   return {
     code,
     name,
 
-    activeIngredient:
-      normalizeDrugOptionalText(
-        data.activeIngredient
-      ),
+    activeIngredient: normalizeDrugOptionalText(data.activeIngredient),
 
-    strength:
-      normalizeDrugOptionalText(
-        data.strength
-      ),
+    strength: normalizeDrugOptionalText(data.strength),
 
-    unit:
-      normalizeDrugOptionalText(
-        data.unit
-      ),
+    unit: normalizeDrugOptionalText(data.unit),
 
-    groupCode:
-      normalizeDrugOptionalText(
-        data.groupCode
-      ),
+    groupCode: normalizeDrugOptionalText(data.groupCode),
 
-    route:
-      normalizeDrugOptionalText(
-        data.route
-      ),
+    route: normalizeDrugOptionalText(data.route),
 
-    routeCode:
-      normalizeDrugOptionalText(
-        data.routeCode
-      ),
+    routeCode: normalizeDrugOptionalText(data.routeCode),
 
-    dosageForm:
-      normalizeDrugOptionalText(
-        data.dosageForm
-      ),
+    dosageForm: normalizeDrugOptionalText(data.dosageForm),
 
-    registrationNumber:
-      normalizeDrugOptionalText(
-        data.registrationNumber
-      ),
+    registrationNumber: normalizeDrugOptionalText(data.registrationNumber),
 
     quantity,
     unitPrice,
     insuranceUnitPrice,
 
-    packaging:
-      normalizeDrugOptionalText(
-        data.packaging
-      ),
+    packaging: normalizeDrugOptionalText(data.packaging),
 
-    manufacturer:
-      normalizeDrugOptionalText(
-        data.manufacturer
-      ),
+    manufacturer: normalizeDrugOptionalText(data.manufacturer),
 
-    country:
-      normalizeDrugOptionalText(
-        data.country
-      ),
+    country: normalizeDrugOptionalText(data.country),
 
-    contractor:
-      normalizeDrugOptionalText(
-        data.contractor
-      ),
+    contractor: normalizeDrugOptionalText(data.contractor),
 
-    tenderInfo:
-      normalizeDrugOptionalText(
-        data.tenderInfo
-      ),
+    tenderInfo: normalizeDrugOptionalText(data.tenderInfo),
 
-    drugType:
-      normalizeDrugOptionalText(
-        data.drugType
-      ),
+    drugType: normalizeDrugOptionalText(data.drugType),
 
-    scientificName:
-      normalizeDrugOptionalText(
-        data.scientificName
-      ),
+    scientificName: normalizeDrugOptionalText(data.scientificName),
 
-    origin:
-      normalizeDrugOptionalText(
-        data.origin
-      ),
+    origin: normalizeDrugOptionalText(data.origin),
 
-    processingMethod:
-      normalizeDrugOptionalText(
-        data.processingMethod
-      ),
+    processingMethod: normalizeDrugOptionalText(data.processingMethod),
 
-    importedMaterialCode:
-      normalizeDrugOptionalText(
-        data.importedMaterialCode
-      ),
+    importedMaterialCode: normalizeDrugOptionalText(data.importedMaterialCode),
 
-    processedMaterialCode:
-      normalizeDrugOptionalText(
-        data.processedMaterialCode
-      ),
+    processedMaterialCode: normalizeDrugOptionalText(data.processedMaterialCode),
 
     processingLossRate,
     preservationLossRate,
 
-    qualityStandard:
-      normalizeDrugOptionalText(
-        data.qualityStandard
-      ),
+    qualityStandard: normalizeDrugOptionalText(data.qualityStandard),
 
-    decisionNo:
-      normalizeDrugOptionalText(
-        data.decisionNo
-      ),
+    decisionNo: normalizeDrugOptionalText(data.decisionNo),
 
     insurancePaymentRate,
 
-    note:
-      normalizeDrugOptionalText(
-        data.note
-      ),
+    note: normalizeDrugOptionalText(data.note),
 
     active: data.active ?? true,
   };
@@ -2857,168 +2183,97 @@ function mapDrugRow(row: any) {
     name: String(row.name),
 
     activeIngredient:
-      row.active_ingredient !== null &&
-      row.active_ingredient !== undefined
+      row.active_ingredient !== null && row.active_ingredient !== undefined
         ? String(row.active_ingredient)
         : null,
 
-    strength:
-      row.strength !== null &&
-      row.strength !== undefined
-        ? String(row.strength)
-        : null,
+    strength: row.strength !== null && row.strength !== undefined ? String(row.strength) : null,
 
-    unit:
-      row.unit !== null &&
-      row.unit !== undefined
-        ? String(row.unit)
-        : null,
+    unit: row.unit !== null && row.unit !== undefined ? String(row.unit) : null,
 
     groupCode:
-      row.group_code !== null &&
-      row.group_code !== undefined
-        ? String(row.group_code)
-        : null,
+      row.group_code !== null && row.group_code !== undefined ? String(row.group_code) : null,
 
-    route:
-      row.route !== null &&
-      row.route !== undefined
-        ? String(row.route)
-        : null,
+    route: row.route !== null && row.route !== undefined ? String(row.route) : null,
 
     routeCode:
-      row.route_code !== null &&
-      row.route_code !== undefined
-        ? String(row.route_code)
-        : null,
+      row.route_code !== null && row.route_code !== undefined ? String(row.route_code) : null,
 
     dosageForm:
-      row.dosage_form !== null &&
-      row.dosage_form !== undefined
-        ? String(row.dosage_form)
-        : null,
+      row.dosage_form !== null && row.dosage_form !== undefined ? String(row.dosage_form) : null,
 
     registrationNumber:
-      row.registration_number !== null &&
-      row.registration_number !== undefined
+      row.registration_number !== null && row.registration_number !== undefined
         ? String(row.registration_number)
         : null,
 
-    quantity:
-      row.quantity !== null &&
-      row.quantity !== undefined
-        ? Number(row.quantity)
-        : null,
+    quantity: row.quantity !== null && row.quantity !== undefined ? Number(row.quantity) : null,
 
-    unitPrice: Number(
-      row.unit_price ?? 0
-    ),
+    unitPrice: Number(row.unit_price ?? 0),
 
     insuranceUnitPrice:
-      row.insurance_unit_price !== null &&
-      row.insurance_unit_price !== undefined
+      row.insurance_unit_price !== null && row.insurance_unit_price !== undefined
         ? Number(row.insurance_unit_price)
         : null,
 
-    packaging:
-      row.packaging !== null &&
-      row.packaging !== undefined
-        ? String(row.packaging)
-        : null,
+    packaging: row.packaging !== null && row.packaging !== undefined ? String(row.packaging) : null,
 
     manufacturer:
-      row.manufacturer !== null &&
-      row.manufacturer !== undefined
-        ? String(row.manufacturer)
-        : null,
+      row.manufacturer !== null && row.manufacturer !== undefined ? String(row.manufacturer) : null,
 
-    country:
-      row.country !== null &&
-      row.country !== undefined
-        ? String(row.country)
-        : null,
+    country: row.country !== null && row.country !== undefined ? String(row.country) : null,
 
     contractor:
-      row.contractor !== null &&
-      row.contractor !== undefined
-        ? String(row.contractor)
-        : null,
+      row.contractor !== null && row.contractor !== undefined ? String(row.contractor) : null,
 
     tenderInfo:
-      row.tender_info !== null &&
-      row.tender_info !== undefined
-        ? String(row.tender_info)
-        : null,
+      row.tender_info !== null && row.tender_info !== undefined ? String(row.tender_info) : null,
 
-    drugType:
-      row.drug_type !== null &&
-      row.drug_type !== undefined
-        ? String(row.drug_type)
-        : null,
+    drugType: row.drug_type !== null && row.drug_type !== undefined ? String(row.drug_type) : null,
 
     scientificName:
-      row.scientific_name !== null &&
-      row.scientific_name !== undefined
+      row.scientific_name !== null && row.scientific_name !== undefined
         ? String(row.scientific_name)
         : null,
 
-    origin:
-      row.origin !== null &&
-      row.origin !== undefined
-        ? String(row.origin)
-        : null,
+    origin: row.origin !== null && row.origin !== undefined ? String(row.origin) : null,
 
     processingMethod:
-      row.processing_method !== null &&
-      row.processing_method !== undefined
+      row.processing_method !== null && row.processing_method !== undefined
         ? String(row.processing_method)
         : null,
 
     importedMaterialCode:
-      row.imported_material_code !== null &&
-      row.imported_material_code !== undefined
+      row.imported_material_code !== null && row.imported_material_code !== undefined
         ? String(row.imported_material_code)
         : null,
 
     processedMaterialCode:
-      row.processed_material_code !== null &&
-      row.processed_material_code !== undefined
+      row.processed_material_code !== null && row.processed_material_code !== undefined
         ? String(row.processed_material_code)
         : null,
 
     processingLossRate:
-      row.processing_loss_rate !== null &&
-      row.processing_loss_rate !== undefined
+      row.processing_loss_rate !== null && row.processing_loss_rate !== undefined
         ? Number(row.processing_loss_rate)
         : null,
 
     preservationLossRate:
-      row.preservation_loss_rate !== null &&
-      row.preservation_loss_rate !== undefined
+      row.preservation_loss_rate !== null && row.preservation_loss_rate !== undefined
         ? Number(row.preservation_loss_rate)
         : null,
 
     qualityStandard:
-      row.quality_standard !== null &&
-      row.quality_standard !== undefined
+      row.quality_standard !== null && row.quality_standard !== undefined
         ? String(row.quality_standard)
         : null,
 
     decisionNo:
-      row.decision_no !== null &&
-      row.decision_no !== undefined
-        ? String(row.decision_no)
-        : null,
+      row.decision_no !== null && row.decision_no !== undefined ? String(row.decision_no) : null,
 
-    insurancePaymentRate: Number(
-      row.insurance_payment_rate ?? 100
-    ),
+    insurancePaymentRate: Number(row.insurance_payment_rate ?? 100),
 
-    note:
-      row.note !== null &&
-      row.note !== undefined
-        ? String(row.note)
-        : null,
+    note: row.note !== null && row.note !== undefined ? String(row.note) : null,
 
     active: Boolean(row.active),
     createdAt: row.created_at,
@@ -3067,73 +2322,43 @@ const DRUG_SELECT_COLUMNS = `
 // DRUG CRUD
 // ======================================================
 
-export async function listDrugs(
-  params: ListDrugsParams
-) {
-  const {
-    code,
-    name,
-    activeIngredient,
-    groupCode,
-    active,
-    limit,
-    offset,
-  } = params;
+export async function listDrugs(params: ListDrugsParams) {
+  const { code, name, activeIngredient, groupCode, active, limit, offset } = params;
 
   const conditions: string[] = [];
   const values: unknown[] = [];
 
   if (code) {
-    values.push(
-      `%${normalizeText(code)}%`
-    );
+    values.push(`%${normalizeText(code)}%`);
 
-    conditions.push(
-      `d.code ILIKE $${values.length}`
-    );
+    conditions.push(`d.code ILIKE $${values.length}`);
   }
 
   if (name) {
-    values.push(
-      `%${normalizeText(name)}%`
-    );
+    values.push(`%${normalizeText(name)}%`);
 
-    conditions.push(
-      `d.name ILIKE $${values.length}`
-    );
+    conditions.push(`d.name ILIKE $${values.length}`);
   }
 
   if (activeIngredient) {
-    values.push(
-      `%${normalizeText(activeIngredient)}%`
-    );
+    values.push(`%${normalizeText(activeIngredient)}%`);
 
-    conditions.push(
-      `COALESCE(d.active_ingredient, '') ILIKE $${values.length}`
-    );
+    conditions.push(`COALESCE(d.active_ingredient, '') ILIKE $${values.length}`);
   }
 
   if (groupCode) {
-    values.push(
-      normalizeText(groupCode)
-    );
+    values.push(normalizeText(groupCode));
 
-    conditions.push(
-      `d.group_code = $${values.length}`
-    );
+    conditions.push(`d.group_code = $${values.length}`);
   }
 
   if (active !== undefined) {
     values.push(active);
 
-    conditions.push(
-      `d.active = $${values.length}`
-    );
+    conditions.push(`d.active = $${values.length}`);
   }
 
-  const whereSql = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const limitIndex = values.length + 1;
   const offsetIndex = values.length + 2;
@@ -3147,7 +2372,7 @@ export async function listDrugs(
     LIMIT $${limitIndex}
     OFFSET $${offsetIndex}
     `,
-    [...values, limit, offset]
+    [...values, limit, offset],
   );
 
   const countResult = await db.query(
@@ -3156,23 +2381,17 @@ export async function listDrugs(
     FROM catalog.drugs d
     ${whereSql}
     `,
-    values
+    values,
   );
 
   return {
-    items: result.rows.map(
-      row => mapDrugRow(row)
-    ),
+    items: result.rows.map((row) => mapDrugRow(row)),
 
-    total: Number(
-      countResult.rows[0]?.total ?? 0
-    ),
+    total: Number(countResult.rows[0]?.total ?? 0),
   };
 }
 
-export async function getDrug(
-  id: string
-) {
+export async function getDrug(id: string) {
   const normalizedId = normalizeText(id);
 
   if (!normalizedId) {
@@ -3186,23 +2405,18 @@ export async function getDrug(
     WHERE d.id = $1::uuid
     LIMIT 1
     `,
-    [normalizedId]
+    [normalizedId],
   );
 
   if (result.rowCount === 0) {
     return null;
   }
 
-  return mapDrugRow(
-    result.rows[0]
-  );
+  return mapDrugRow(result.rows[0]);
 }
 
-export async function createDrug(
-  data: DrugInput
-) {
-  const validated =
-    validateDrugInput(data);
+export async function createDrug(data: DrugInput) {
+  const validated = validateDrugInput(data);
 
   const duplicate = await db.query(
     `
@@ -3216,23 +2430,15 @@ export async function createDrug(
         = LOWER(BTRIM(COALESCE($4, '')))
     LIMIT 1
     `,
-    [
-      validated.code,
-      validated.name,
-      validated.activeIngredient,
-      validated.registrationNumber,
-    ]
+    [validated.code, validated.name, validated.activeIngredient, validated.registrationNumber],
   );
 
   if ((duplicate.rowCount ?? 0) > 0) {
-    throw new Error(
-      "Thuốc trùng mã, tên, hoạt chất và số đăng ký đã tồn tại."
-    );
+    throw new Error("Thuốc trùng mã, tên, hoạt chất và số đăng ký đã tồn tại.");
   }
 
-  const insertedResult =
-    await db.query<{ id: string }>(
-      `
+  const insertedResult = await db.query<{ id: string }>(
+    `
       INSERT INTO catalog.drugs (
         code,
         name,
@@ -3279,56 +2485,49 @@ export async function createDrug(
       )
       RETURNING id
       `,
-      [
-        validated.code,
-        validated.name,
-        validated.activeIngredient,
-        validated.strength,
-        validated.unit,
-        validated.groupCode,
-        validated.route,
-        validated.routeCode,
-        validated.dosageForm,
-        validated.registrationNumber,
-        validated.quantity,
-        validated.unitPrice,
-        validated.insuranceUnitPrice,
-        validated.packaging,
-        validated.manufacturer,
-        validated.country,
-        validated.contractor,
-        validated.tenderInfo,
-        validated.drugType,
-        validated.scientificName,
-        validated.origin,
-        validated.processingMethod,
-        validated.importedMaterialCode,
-        validated.processedMaterialCode,
-        validated.processingLossRate,
-        validated.preservationLossRate,
-        validated.qualityStandard,
-        validated.decisionNo,
-        validated.insurancePaymentRate,
-        validated.note,
-        validated.active,
-      ]
-    );
-
-  return await getDrug(
-    insertedResult.rows[0].id
+    [
+      validated.code,
+      validated.name,
+      validated.activeIngredient,
+      validated.strength,
+      validated.unit,
+      validated.groupCode,
+      validated.route,
+      validated.routeCode,
+      validated.dosageForm,
+      validated.registrationNumber,
+      validated.quantity,
+      validated.unitPrice,
+      validated.insuranceUnitPrice,
+      validated.packaging,
+      validated.manufacturer,
+      validated.country,
+      validated.contractor,
+      validated.tenderInfo,
+      validated.drugType,
+      validated.scientificName,
+      validated.origin,
+      validated.processingMethod,
+      validated.importedMaterialCode,
+      validated.processedMaterialCode,
+      validated.processingLossRate,
+      validated.preservationLossRate,
+      validated.qualityStandard,
+      validated.decisionNo,
+      validated.insurancePaymentRate,
+      validated.note,
+      validated.active,
+    ],
   );
+
+  return await getDrug(insertedResult.rows[0].id);
 }
 
-export async function updateDrug(
-  id: string,
-  data: DrugInput
-) {
+export async function updateDrug(id: string, data: DrugInput) {
   const normalizedId = normalizeText(id);
 
   if (!normalizedId) {
-    throw new Error(
-      "Thiếu ID thuốc cần cập nhật."
-    );
+    throw new Error("Thiếu ID thuốc cần cập nhật.");
   }
 
   const current = await db.query(
@@ -3338,20 +2537,16 @@ export async function updateDrug(
     WHERE id = $1::uuid
     LIMIT 1
     `,
-    [normalizedId]
+    [normalizedId],
   );
 
   if (current.rowCount === 0) {
-    throw new Error(
-      "Không tìm thấy thuốc."
-    );
+    throw new Error("Không tìm thấy thuốc.");
   }
 
   const validated = validateDrugInput({
     ...data,
-    code: String(
-      current.rows[0].code
-    ),
+    code: String(current.rows[0].code),
   });
 
   await db.query(
@@ -3423,15 +2618,13 @@ export async function updateDrug(
       validated.insurancePaymentRate,
       validated.note,
       validated.active,
-    ]
+    ],
   );
 
   return await getDrug(normalizedId);
 }
 
-export async function deleteDrug(
-  id: string
-) {
+export async function deleteDrug(id: string) {
   const normalizedId = normalizeText(id);
 
   if (!normalizedId) {
@@ -3447,13 +2640,11 @@ export async function deleteDrug(
     WHERE id = $1::uuid
     RETURNING id
     `,
-    [normalizedId]
+    [normalizedId],
   );
 
   if (result.rowCount === 0) {
-    throw new Error(
-      "Không tìm thấy thuốc."
-    );
+    throw new Error("Không tìm thấy thuốc.");
   }
 
   return true;

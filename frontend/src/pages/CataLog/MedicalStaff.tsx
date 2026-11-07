@@ -1,3407 +1,1723 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useNavigate } from "react-router-dom";
+
 import {
   Alert,
+  Breadcrumb,
   Button,
-  Dropdown,
+  Card,
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message,
 } from "antd";
 
-import type {
-  UploadFile,
-} from "antd";
+import type { TableColumnsType, UploadFile } from "antd";
 
 import {
-  EllipsisOutlined,
+  ArrowLeftOutlined,
+  EditOutlined,
+  HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SearchOutlined,
+  StopOutlined,
   TeamOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { apiFetch } from "../../api/apiClient";
 
-import {
-  apiFetch,
-} from "../../api/apiClient";
+const { Title, Text } = Typography;
 
-
-const {
-  Title,
-  Text,
-} = Typography;
-
-
-// ======================================================
-// HELPERS
-// ======================================================
-
-function formatDate(
-  value:
-    | string
-    | null
-    | undefined
-) {
-
-  if (
-    !value
-  ) {
-
-    return "-";
-  }
-
-
-  const text =
-    String(
-      value
-    ).trim();
-
-
-  const match =
-    text.match(
-      /^(\d{4})-(\d{2})-(\d{2})/
-    );
-
-
-  if (
-    match
-  ) {
-
-    return `${match[3]}/${match[2]}/${match[1]}`;
-  }
-
-
-  return text;
-}
-
-
-// ======================================================
-// TYPES
-// ======================================================
+const API = "/catalog/medical-staff";
 
 interface DepartmentOption {
   code: string;
-
   name: string;
 }
 
+interface StaffFormValues {
+  fullName: string;
+  socialInsuranceCode?: string | null;
+  licenseNumber?: string | null;
+  gender?: string | null;
+  licenseIssueDate?: string | null;
+  professionalTitle?: string | null;
+  licenseIssuer?: string | null;
+  professionalScope?: string | null;
+  registrationTime?: string | null;
+  dailyTime?: string | null;
+  weeklyTime?: string | null;
+  position?: string | null;
+  note?: string | null;
+  departmentCodes: string[];
+  active: boolean;
+}
 
 interface MedicalStaffItem {
   id: string;
-
   fullName: string;
-
-  socialInsuranceCode:
-    | string
-    | null;
-
-  licenseNumber:
-    | string
-    | null;
-
-  gender:
-    | string
-    | null;
-
-  licenseIssueDate:
-    | string
-    | null;
-
-  professionalTitle:
-    | string
-    | null;
-
-  licenseIssuer:
-    | string
-    | null;
-
-  professionalScope:
-    | string
-    | null;
-
-  registrationTime:
-    | string
-    | null;
-
-  dailyTime:
-    | string
-    | null;
-
-  weeklyTime:
-    | string
-    | null;
-
-  position:
-    | string
-    | null;
-
-  note:
-    | string
-    | null;
-
-  active:
-    boolean;
-
-  departments:
-    DepartmentOption[];
-
-  departmentCount?:
-    number;
+  socialInsuranceCode: string | null;
+  licenseNumber: string | null;
+  gender: string | null;
+  licenseIssueDate: string | null;
+  professionalTitle: string | null;
+  licenseIssuer: string | null;
+  professionalScope: string | null;
+  registrationTime: string | null;
+  dailyTime: string | null;
+  weeklyTime: string | null;
+  position: string | null;
+  note: string | null;
+  active: boolean;
+  departments: DepartmentOption[];
+  departmentCount?: number;
 }
 
-
-interface MedicalStaffFormValues {
+interface Filters {
   fullName: string;
-
-  socialInsuranceCode?:
-    string;
-
-  licenseNumber?:
-    string;
-
-  gender?:
-    string;
-
-  licenseIssueDate?:
-    string;
-
-  professionalTitle?:
-    string;
-
-  licenseIssuer?:
-    string;
-
-  professionalScope?:
-    string;
-
-  registrationTime?:
-    string;
-
-  dailyTime?:
-    string;
-
-  weeklyTime?:
-    string;
-
-  position?:
-    string;
-
-  note?:
-    string;
-
-  departmentCodes:
-    string[];
-
-  active:
-    boolean;
+  licenseNumber: string;
+  socialInsuranceCode: string;
+  departmentCode?: string;
 }
 
+interface ListData<T> {
+  items: T[];
+  total: number;
+}
 
-interface MedicalStaffImportError {
+interface ImportError {
   row: number;
-
   field: string;
-
   message: string;
 }
 
-
-interface MedicalStaffImportResult {
+interface ImportResult {
   totalRows: number;
-
   inserted: number;
-
   updated: number;
-
   skipped: number;
 }
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  errors?: ImportError[];
+}
 
-// ======================================================
-// COMPONENT
-// ======================================================
+const EMPTY_FILTERS: Filters = {
+  fullName: "",
+  licenseNumber: "",
+  socialInsuranceCode: "",
+  departmentCode: undefined,
+};
+
+const OPTIONAL_FIELDS = [
+  "socialInsuranceCode",
+  "licenseNumber",
+  "gender",
+  "professionalTitle",
+  "licenseIssuer",
+  "professionalScope",
+  "registrationTime",
+  "dailyTime",
+  "weeklyTime",
+  "position",
+  "note",
+] as const;
+
+const text = (value: unknown): string => String(value ?? "").trim();
+
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message : "Không thể thực hiện yêu cầu.";
+
+function formatDate(value: unknown): string {
+  const content = text(value);
+
+  if (!content) return "—";
+
+  const match = content.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : content;
+}
+
+function dateInputValue(value: unknown): string {
+  const content = text(value);
+
+  return content.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? "";
+}
+
+async function readResponse<T>(response: Response): Promise<ApiResponse<T>> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(`API không trả về JSON (HTTP ${response.status}).`);
+  }
+
+  return (await response.json()) as ApiResponse<T>;
+}
+
+async function request<T>(url: string, init?: RequestInit): Promise<T | undefined> {
+  const headers = new Headers(init?.headers);
+
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const headerObject: Record<string, string> = {};
+
+  headers.forEach((value, key) => {
+    headerObject[key] = value;
+  });
+
+  const response = await apiFetch(url, {
+    ...init,
+    headers: headerObject,
+  });
+
+  const json = await readResponse<T>(response);
+
+  if (!response.ok || json.success !== true) {
+    throw new Error(json.message || json.error || `Lỗi HTTP ${response.status}`);
+  }
+
+  return json.data;
+}
 
 export default function MedicalStaff() {
+  const navigate = useNavigate();
 
-  // ====================================================
-  // FILTER
-  // ====================================================
-
-  const [
-    searchName,
-    setSearchName,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    searchLicense,
-    setSearchLicense,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    searchBhxh,
-    setSearchBhxh,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    searchDepartment,
-    setSearchDepartment,
-  ] = useState<
-    string |
-    undefined
-  >();
-
-
-  // ====================================================
-  // DATA
-  // ====================================================
-
-  const [
-    items,
-    setItems,
-  ] = useState<
-    MedicalStaffItem[]
-  >(
-    []
-  );
-
-
-  const [
-    departments,
-    setDepartments,
-  ] = useState<
-    DepartmentOption[]
-  >(
-    []
-  );
-
-
-  const [
-    total,
-    setTotal,
-  ] = useState(
-    0
-  );
-
-
-  const [
-    page,
-    setPage,
-  ] = useState(
-    1
-  );
-
-
-  const [
-    pageSize,
-    setPageSize,
-  ] = useState(
-    10
-  );
-
-
-  // ====================================================
-  // UI STATE
-  // ====================================================
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    saving,
-    setSaving,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    modalOpen,
-    setModalOpen,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    editingStaff,
-    setEditingStaff,
-  ] = useState<
-    MedicalStaffItem |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    form,
-  ] =
-    Form.useForm<
-      MedicalStaffFormValues
-    >();
-
-
-  // ====================================================
-  // IMPORT STATE
-  // ====================================================
-
-  const [
-    importModalOpen,
-    setImportModalOpen,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    importFileList,
-    setImportFileList,
-  ] = useState<
-    UploadFile[]
-  >(
-    []
-  );
-
-
-  const [
-    importing,
-    setImporting,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    importResult,
-    setImportResult,
-  ] = useState<
-    MedicalStaffImportResult |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    importErrors,
-    setImportErrors,
-  ] = useState<
-    MedicalStaffImportError[]
-  >(
-    []
-  );
-
-
-  const [
-    importMessage,
-    setImportMessage,
-  ] = useState(
-    ""
-  );
-
-
-  // ====================================================
-  // LOAD DEPARTMENTS
-  // ====================================================
-
-  const loadDepartments =
-    useCallback(
-      async () => {
-
-        try {
-
-          const response =
-            await apiFetch(
-              "/catalog/departments?active=true&page=1&pageSize=100",
-              {
-                method:
-                  "GET",
-              }
-            );
-
-
-          const json =
-            await response.json();
-
-
-          if (
-            !response.ok ||
-            json.success !==
-              true
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải danh mục khoa."
-            );
-          }
-
-
-          setDepartments(
-            (
-              json.data
-                ?.items ??
-              []
-            ).map(
-              (
-                item:
-                  DepartmentOption
-              ) => ({
-                code:
-                  item.code,
-
-                name:
-                  item.name,
-              })
-            )
-          );
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Load departments error:",
-            error
-          );
-        }
-      },
-      []
-    );
-
-
-  // ====================================================
-  // LOAD MEDICAL STAFF
-  // ====================================================
-
-  const loadMedicalStaff =
-    useCallback(
-      async () => {
-
-        try {
-
-          setLoading(
-            true
-          );
-
-
-          const params =
-            new URLSearchParams({
-              page:
-                String(
-                  page
-                ),
-
-              pageSize:
-                String(
-                  pageSize
-                ),
-            });
-
-
-          if (
-            searchName.trim()
-          ) {
-
-            params.set(
-              "fullName",
-              searchName.trim()
-            );
-          }
-
-
-          if (
-            searchLicense.trim()
-          ) {
-
-            params.set(
-              "licenseNumber",
-              searchLicense.trim()
-            );
-          }
-
-
-          if (
-            searchBhxh.trim()
-          ) {
-
-            params.set(
-              "socialInsuranceCode",
-              searchBhxh.trim()
-            );
-          }
-
-
-          if (
-            searchDepartment
-          ) {
-
-            params.set(
-              "departmentCode",
-              searchDepartment
-            );
-          }
-
-
-          const response =
-            await apiFetch(
-              `/catalog/medical-staff?${params.toString()}`,
-              {
-                method:
-                  "GET",
-              }
-            );
-
-
-          const json =
-            await response.json();
-
-
-          if (
-            !response.ok ||
-            json.success !==
-              true
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải danh mục nhân viên y tế."
-            );
-          }
-
-
-          setItems(
-            json.data
-              ?.items ??
-            []
-          );
+  const [messageApi, contextHolder] = message.useMessage();
 
+  const [form] = Form.useForm<StaffFormValues>();
 
-          setTotal(
-            Number(
-              json.data
-                ?.total ??
-              0
-            )
-          );
+  const requestSequence = useRef(0);
+  const savingRef = useRef(false);
+  const importingRef = useRef(false);
+  const detailRequestRef = useRef(0);
 
-        } catch (
-          error
-        ) {
+  const [items, setItems] = useState<MedicalStaffItem[]>([]);
 
-          message.error(
-            error instanceof
-            Error
-              ? error.message
-              : "Không thể tải nhân viên y tế."
-          );
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
 
-        } finally {
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-          setLoading(
-            false
-          );
-        }
-      },
-      [
-        page,
-        pageSize,
-        searchName,
-        searchLicense,
-        searchBhxh,
-        searchDepartment,
-      ]
-    );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [departmentError, setDepartmentError] = useState("");
 
+  const [inputs, setInputs] = useState<Filters>({ ...EMPTY_FILTERS });
 
-  // ====================================================
-  // INITIAL LOAD
-  // ====================================================
+  const [filters, setFilters] = useState<Filters>({ ...EMPTY_FILTERS });
 
-  useEffect(
-    () => {
+  const [modalOpen, setModalOpen] = useState(false);
 
-      void loadDepartments();
+  const [editingStaff, setEditingStaff] = useState<MedicalStaffItem | null>(null);
 
-      void loadMedicalStaff();
+  const [saving, setSaving] = useState(false);
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
 
-    },
-    [
-      loadDepartments,
-      loadMedicalStaff,
-    ]
-  );
+  const [disablingId, setDisablingId] = useState<string | null>(null);
 
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
-  // ====================================================
-  // ADD
-  // ====================================================
+  const [importFileList, setImportFileList] = useState<UploadFile[]>([]);
 
-  function openAddModal() {
+  const [importing, setImporting] = useState(false);
 
-    setEditingStaff(
-      null
-    );
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
+  const [importErrors, setImportErrors] = useState<ImportError[]>([]);
 
-    form.resetFields();
+  const [importMessage, setImportMessage] = useState("");
 
+  const busy = saving || importing || disablingId !== null || detailLoadingId !== null;
 
-    form.setFieldsValue({
-      fullName:
-        "",
-
-      socialInsuranceCode:
-        "",
-
-      licenseNumber:
-        "",
-
-      gender:
-        undefined,
-
-      licenseIssueDate:
-        "",
-
-      professionalTitle:
-        "",
-
-      licenseIssuer:
-        "",
-
-      professionalScope:
-        "",
-
-      registrationTime:
-        "",
-
-      dailyTime:
-        "",
-
-      weeklyTime:
-        "",
-
-      position:
-        "",
-
-      note:
-        "",
-
-      departmentCodes:
-        [],
-
-      active:
-        true,
-    });
-
-
-    setModalOpen(
-      true
-    );
-  }
-
-
-  // ====================================================
-  // EDIT
-  // ====================================================
-
-  async function openEditModal(
-    record:
-      MedicalStaffItem
-  ) {
+  const loadDepartments = useCallback(async () => {
+    setDepartmentError("");
 
     try {
+      const all: DepartmentOption[] = [];
+      let nextPage = 1;
 
-      const response =
-        await apiFetch(
-          `/catalog/medical-staff/${encodeURIComponent(
-            record.id
-          )}`,
-          {
-            method:
-              "GET",
-          }
+      while (true) {
+        const data = await request<ListData<DepartmentOption>>(
+          "/catalog/departments" + `?active=true&page=${nextPage}&pageSize=100`,
         );
 
+        if (!data || !Array.isArray(data.items)) {
+          throw new Error("Danh sách khoa không hợp lệ.");
+        }
 
-      const json =
-        await response.json();
+        all.push(...data.items);
 
+        if (data.items.length === 0 || all.length >= Number(data.total ?? 0)) {
+          break;
+        }
 
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể tải nhân viên y tế."
-        );
+        nextPage++;
       }
 
+      setDepartments(Array.from(new Map(all.map((item) => [item.code, item])).values()));
+    } catch (err) {
+      setDepartmentError(errorText(err));
+    }
+  }, []);
 
-      const data =
-        json.data;
+  const loadMedicalStaff = useCallback(async () => {
+    const sequence = ++requestSequence.current;
 
+    setLoading(true);
+    setError("");
 
-      setEditingStaff(
-        record
-      );
-
-
-      form.setFieldsValue({
-        fullName:
-          data.fullName ??
-          "",
-
-        socialInsuranceCode:
-          data.socialInsuranceCode ??
-          "",
-
-        licenseNumber:
-          data.licenseNumber ??
-          "",
-
-        gender:
-          data.gender ??
-          undefined,
-
-        licenseIssueDate:
-          data.licenseIssueDate ??
-          "",
-
-        professionalTitle:
-          data.professionalTitle ??
-          "",
-
-        licenseIssuer:
-          data.licenseIssuer ??
-          "",
-
-        professionalScope:
-          data.professionalScope ??
-          "",
-
-        registrationTime:
-          data.registrationTime ??
-          "",
-
-        dailyTime:
-          data.dailyTime ??
-          "",
-
-        weeklyTime:
-          data.weeklyTime ??
-          "",
-
-        position:
-          data.position ??
-          "",
-
-        note:
-          data.note ??
-          "",
-
-        departmentCodes:
-          Array.isArray(
-            data.departments
-          )
-            ? data.departments.map(
-                (
-                  item:
-                    DepartmentOption
-                ) =>
-                  item.code
-              )
-            : [],
-
-        active:
-          Boolean(
-            data.active
-          ),
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
       });
 
-
-      setModalOpen(
-        true
-      );
-
-    } catch (
-      error
-    ) {
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể tải nhân viên y tế."
-      );
-    }
-  }
-
-
-  // ====================================================
-  // SAVE
-  // ====================================================
-
-  async function handleSave() {
-
-    try {
-
-      const values =
-        await form.validateFields();
-
-
-      setSaving(
-        true
-      );
-
-
-      const isEdit =
-        editingStaff !==
-        null;
-
-
-      const endpoint =
-        isEdit
-          ? `/catalog/medical-staff/${encodeURIComponent(
-              editingStaff.id
-            )}`
-          : "/catalog/medical-staff";
-
-
-      const response =
-        await apiFetch(
-          endpoint,
-          {
-            method:
-              isEdit
-                ? "PUT"
-                : "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                fullName:
-                  values.fullName
-                    .trim(),
-
-                socialInsuranceCode:
-                  values
-                    .socialInsuranceCode
-                    ?.trim() ||
-                  null,
-
-                licenseNumber:
-                  values
-                    .licenseNumber
-                    ?.trim() ||
-                  null,
-
-                gender:
-                  values.gender ||
-                  null,
-
-                licenseIssueDate:
-                  values
-                    .licenseIssueDate ||
-                  null,
-
-                professionalTitle:
-                  values
-                    .professionalTitle
-                    ?.trim() ||
-                  null,
-
-                licenseIssuer:
-                  values
-                    .licenseIssuer
-                    ?.trim() ||
-                  null,
-
-                professionalScope:
-                  values
-                    .professionalScope
-                    ?.trim() ||
-                  null,
-
-                registrationTime:
-                  values
-                    .registrationTime
-                    ?.trim() ||
-                  null,
-
-                dailyTime:
-                  values
-                    .dailyTime
-                    ?.trim() ||
-                  null,
-
-                weeklyTime:
-                  values
-                    .weeklyTime
-                    ?.trim() ||
-                  null,
-
-                position:
-                  values
-                    .position
-                    ?.trim() ||
-                  null,
-
-                note:
-                  values.note
-                    ?.trim() ||
-                  null,
-
-                departmentCodes:
-                  values
-                    .departmentCodes ??
-                  [],
-
-                active:
-                  values.active,
-              }),
-          }
-        );
-
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể lưu nhân viên y tế."
-        );
+      for (const [key, value] of Object.entries(filters)) {
+        if (text(value)) {
+          params.set(key, text(value));
+        }
       }
 
+      const data = await request<ListData<MedicalStaffItem>>(`${API}?${params.toString()}`);
 
-      message.success(
-        isEdit
-          ? "Cập nhật nhân viên y tế thành công."
-          : "Thêm nhân viên y tế thành công."
-      );
+      if (!data || !Array.isArray(data.items)) {
+        throw new Error("Danh sách nhân viên không hợp lệ.");
+      }
 
-
-      setModalOpen(
-        false
-      );
-
-
-      setEditingStaff(
-        null
-      );
-
-
-      form.resetFields();
-
-
-      await loadMedicalStaff();
-
-    } catch (
-      error
-    ) {
-
-      if (
-        error &&
-        typeof error ===
-          "object" &&
-        "errorFields" in
-          error
-      ) {
-
+      if (sequence !== requestSequence.current) {
         return;
       }
 
+      const nextTotal = Number(data.total ?? 0);
+      const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize));
 
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể lưu nhân viên y tế."
-      );
+      if (page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
 
+      setItems(data.items);
+      setTotal(nextTotal);
+    } catch (err) {
+      if (sequence === requestSequence.current) {
+        setError(errorText(err));
+      }
     } finally {
-
-      setSaving(
-        false
-      );
+      if (sequence === requestSequence.current) {
+        setLoading(false);
+      }
     }
+  }, [page, pageSize, filters]);
+
+  useEffect(() => {
+    void loadDepartments();
+  }, [loadDepartments]);
+
+  useEffect(() => {
+    void loadMedicalStaff();
+
+    return () => {
+      requestSequence.current++;
+    };
+  }, [loadMedicalStaff]);
+
+  useEffect(
+    () => () => {
+      detailRequestRef.current++;
+    },
+    [],
+  );
+
+  const departmentOptions = useMemo(() => {
+    const map = new Map(departments.map((item) => [item.code, item]));
+
+    for (const department of editingStaff?.departments ?? []) {
+      if (!map.has(department.code)) {
+        map.set(department.code, department);
+      }
+    }
+
+    return Array.from(map.values())
+      .sort((a, b) => a.name.localeCompare(b.name, "vi"))
+      .map((item) => ({
+        value: item.code,
+        label: `${item.code} - ${item.name}`,
+      }));
+  }, [departments, editingStaff]);
+
+  function backToCatalog() {
+    sessionStorage.setItem("catalog-active-tab", "bhxh");
+
+    navigate("/catalog");
   }
 
+  function search() {
+    setPage(1);
 
-  // ====================================================
-  // DISABLE
-  // ====================================================
-
-  function confirmDisable(
-    record:
-      MedicalStaffItem
-  ) {
-
-    Modal.confirm({
-      title:
-        "Ngừng sử dụng nhân viên y tế?",
-
-      content:
-        `${record.fullName}${
-          record.licenseNumber
-            ? ` - ${record.licenseNumber}`
-            : ""
-        }`,
-
-      okText:
-        "Đồng ý",
-
-      cancelText:
-        "Hủy",
-
-      okButtonProps: {
-        danger:
-          true,
-      },
-
-      onOk:
-        async () => {
-
-          try {
-
-            const response =
-              await apiFetch(
-                `/catalog/medical-staff/${encodeURIComponent(
-                  record.id
-                )}`,
-                {
-                  method:
-                    "DELETE",
-                }
-              );
-
-
-            const json =
-              await response.json();
-
-
-            if (
-              !response.ok ||
-              json.success !==
-                true
-            ) {
-
-              throw new Error(
-                json.message ||
-                "Không thể ngừng sử dụng nhân viên y tế."
-              );
-            }
-
-
-            message.success(
-              "Đã ngừng sử dụng nhân viên y tế."
-            );
-
-
-            await loadMedicalStaff();
-
-          } catch (
-            error
-          ) {
-
-            message.error(
-              error instanceof
-              Error
-                ? error.message
-                : "Không thể ngừng sử dụng nhân viên y tế."
-            );
-          }
-        },
+    setFilters({
+      fullName: text(inputs.fullName),
+      licenseNumber: text(inputs.licenseNumber),
+      socialInsuranceCode: text(inputs.socialInsuranceCode),
+      departmentCode: inputs.departmentCode || undefined,
     });
   }
 
-
-  // ====================================================
-  // REFRESH
-  // ====================================================
-
-  function handleRefresh() {
-
-    setSearchName(
-      ""
-    );
-
-
-    setSearchLicense(
-      ""
-    );
-
-
-    setSearchBhxh(
-      ""
-    );
-
-
-    setSearchDepartment(
-      undefined
-    );
-
-
-    setPage(
-      1
-    );
+  function resetFilters() {
+    setInputs({ ...EMPTY_FILTERS });
+    setFilters({ ...EMPTY_FILTERS });
+    setPage(1);
   }
 
-
-  // ====================================================
-  // IMPORT OPEN / CLOSE
-  // ====================================================
-
-  function openImportModal() {
-
-    setImportFileList(
-      []
-    );
-
-
-    setImportResult(
-      null
-    );
-
-
-    setImportErrors(
-      []
-    );
-
-
-    setImportMessage(
-      ""
-    );
-
-
-    setImportModalOpen(
-      true
-    );
+  function refresh() {
+    void loadMedicalStaff();
+    void loadDepartments();
   }
 
+  function fillForm(staff?: MedicalStaffItem) {
+    const values: StaffFormValues = {
+      fullName: staff?.fullName ?? "",
+      departmentCodes: staff?.departments?.map((item) => item.code) ?? [],
+      active: staff ? staff.active : true,
+      licenseIssueDate: dateInputValue(staff?.licenseIssueDate),
+    };
 
-  function closeImportModal() {
-
-    if (
-      importing
-    ) {
-
-      return;
+    for (const field of OPTIONAL_FIELDS) {
+      values[field] = text(staff?.[field]);
     }
 
-
-    setImportModalOpen(
-      false
-    );
-
-
-    setImportFileList(
-      []
-    );
-
-
-    setImportResult(
-      null
-    );
-
-
-    setImportErrors(
-      []
-    );
-
-
-    setImportMessage(
-      ""
-    );
+    form.resetFields();
+    form.setFieldsValue(values);
   }
 
+  function openCreate() {
+    setEditingStaff(null);
+    fillForm();
+    setModalOpen(true);
+  }
 
-  // ====================================================
-  // IMPORT EXCEL
-  // ====================================================
+  async function openEdit(record: MedicalStaffItem) {
+    const sequence = ++detailRequestRef.current;
 
-  async function handleImportExcel() {
-
-    const file =
-      importFileList[0]
-        ?.originFileObj;
-
-
-    if (
-      !file
-    ) {
-
-      message.warning(
-        "Vui lòng chọn file Excel."
-      );
-
-      return;
-    }
-
-
-    if (
-      !file.name
-        .toLowerCase()
-        .endsWith(
-          ".xlsx"
-        )
-    ) {
-
-      message.error(
-        "Chỉ hỗ trợ file Excel .xlsx."
-      );
-
-      return;
-    }
-
+    setDetailLoadingId(record.id);
 
     try {
+      const data = await request<MedicalStaffItem>(`${API}/${encodeURIComponent(record.id)}`);
 
-      setImporting(
-        true
-      );
-
-
-      setImportResult(
-        null
-      );
-
-
-      setImportErrors(
-        []
-      );
-
-
-      setImportMessage(
-        ""
-      );
-
-
-      const formData =
-        new FormData();
-
-
-      formData.append(
-        "file",
-        file
-      );
-
-
-      const response =
-        await apiFetch(
-          "/catalog/medical-staff/import",
-          {
-            method:
-              "POST",
-
-            body:
-              formData,
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
-
-      try {
-
-        json =
-          await response.json();
-
-      } catch {
-
-        // Backend không trả JSON.
-      }
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-
-        const errors =
-          Array.isArray(
-            json?.errors
-          )
-            ? json.errors
-            : [];
-
-
-        setImportErrors(
-          errors
-        );
-
-
-        setImportMessage(
-          json?.message ||
-          "Import nhân viên y tế thất bại."
-        );
-
-
-        message.error(
-          json?.message ||
-          "Import nhân viên y tế thất bại."
-        );
-
-
+      if (sequence !== detailRequestRef.current) {
         return;
       }
 
-
-      const result:
-        MedicalStaffImportResult = {
-
-        totalRows:
-          Number(
-            json.data
-              ?.totalRows ??
-            0
-          ),
-
-        inserted:
-          Number(
-            json.data
-              ?.inserted ??
-            0
-          ),
-
-        updated:
-          Number(
-            json.data
-              ?.updated ??
-            0
-          ),
-
-        skipped:
-          Number(
-            json.data
-              ?.skipped ??
-            0
-          ),
-      };
-
-
-      setImportResult(
-        result
-      );
-
-
-      setImportMessage(
-        json?.message ||
-        "Import nhân viên y tế thành công."
-      );
-
-
-      message.success(
-        json?.message ||
-        "Import nhân viên y tế thành công."
-      );
-
-
-      if (
-        page !==
-        1
-      ) {
-
-        setPage(
-          1
-        );
-
-      } else {
-
-        await loadMedicalStaff();
+      if (!data) {
+        throw new Error("Thông tin nhân viên không hợp lệ.");
       }
 
-    } catch (
-      error
-    ) {
-
-      const text =
-        error instanceof
-        Error
-          ? error.message
-          : "Import nhân viên y tế thất bại.";
-
-
-      setImportMessage(
-        text
-      );
-
-
-      message.error(
-        text
-      );
-
+      setEditingStaff(data);
+      fillForm(data);
+      setModalOpen(true);
+    } catch (err) {
+      if (sequence === detailRequestRef.current) {
+        messageApi.error(errorText(err));
+      }
     } finally {
-
-      setImporting(
-        false
-      );
+      if (sequence === detailRequestRef.current) {
+        setDetailLoadingId(null);
+      }
     }
   }
 
+  function closeForm() {
+    if (savingRef.current) return;
 
-  // ====================================================
-  // TABLE COLUMNS
-  // ====================================================
+    setModalOpen(false);
+    setEditingStaff(null);
+    form.resetFields();
+  }
 
-  const columns = [
+  async function handleSave(values: StaffFormValues) {
+    if (savingRef.current) return;
 
+    savingRef.current = true;
+    setSaving(true);
+
+    try {
+      const payload: Record<string, unknown> = {
+        fullName: text(values.fullName),
+        licenseIssueDate: values.licenseIssueDate || null,
+        departmentCodes: values.departmentCodes ?? [],
+        active: values.active === true,
+      };
+
+      for (const field of OPTIONAL_FIELDS) {
+        payload[field] = text(values[field]) || null;
+      }
+
+      const isEdit = editingStaff !== null;
+
+      const url = editingStaff ? `${API}/${encodeURIComponent(editingStaff.id)}` : API;
+
+      await request(url, {
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
+
+      messageApi.success(isEdit ? "Đã cập nhật nhân viên y tế." : "Đã thêm nhân viên y tế.");
+
+      setModalOpen(false);
+      setEditingStaff(null);
+      form.resetFields();
+
+      if (!isEdit && page !== 1) {
+        setPage(1);
+      } else {
+        await loadMedicalStaff();
+      }
+    } catch (err) {
+      messageApi.error(errorText(err));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  async function disableStaff(record: MedicalStaffItem) {
+    setDisablingId(record.id);
+
+    try {
+      await request(`${API}/${encodeURIComponent(record.id)}`, { method: "DELETE" });
+
+      messageApi.success("Đã ngừng sử dụng nhân viên y tế.");
+
+      await loadMedicalStaff();
+    } catch (err) {
+      messageApi.error(errorText(err));
+    } finally {
+      setDisablingId(null);
+    }
+  }
+
+  function clearImportResult() {
+    setImportResult(null);
+    setImportErrors([]);
+    setImportMessage("");
+  }
+
+  function openImport() {
+    setImportFileList([]);
+    clearImportResult();
+    setImportModalOpen(true);
+  }
+
+  function closeImport() {
+    if (importingRef.current) return;
+
+    setImportModalOpen(false);
+    setImportFileList([]);
+    clearImportResult();
+  }
+
+  async function handleImport() {
+    if (importingRef.current) return;
+
+    const file = importFileList[0]?.originFileObj;
+
+    if (!file) {
+      messageApi.warning("Vui lòng chọn file Excel.");
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      messageApi.error("Chỉ hỗ trợ file Excel .xlsx.");
+      return;
+    }
+
+    importingRef.current = true;
+    setImporting(true);
+    clearImportResult();
+
+    try {
+      const body = new FormData();
+      body.append("file", file);
+
+      const response = await apiFetch(`${API}/import`, {
+        method: "POST",
+        body,
+      });
+
+      const json = await readResponse<ImportResult>(response);
+
+      if (!response.ok || json.success !== true) {
+        const description = json.message || json.error || "Import nhân viên y tế thất bại.";
+
+        setImportMessage(description);
+
+        setImportErrors(Array.isArray(json.errors) ? json.errors : []);
+
+        messageApi.error(description);
+        return;
+      }
+
+      if (!json.data) {
+        throw new Error("Kết quả import không hợp lệ.");
+      }
+
+      setImportResult({
+        totalRows: Number(json.data.totalRows ?? 0),
+        inserted: Number(json.data.inserted ?? 0),
+        updated: Number(json.data.updated ?? 0),
+        skipped: Number(json.data.skipped ?? 0),
+      });
+
+      const description = json.message || "Import nhân viên y tế thành công.";
+
+      setImportMessage(description);
+      messageApi.success(description);
+
+      if (page !== 1) {
+        setPage(1);
+      } else {
+        await loadMedicalStaff();
+      }
+    } catch (err) {
+      const description = errorText(err);
+
+      setImportMessage(description);
+      messageApi.error(description);
+    } finally {
+      importingRef.current = false;
+      setImporting(false);
+    }
+  }
+
+  function renderLongText(value: unknown) {
+    const content = text(value);
+
+    if (!content) return "—";
+
+    return (
+      <Tooltip title={content} placement="topLeft">
+        <div className="ms-clamp">{content}</div>
+      </Tooltip>
+    );
+  }
+
+  function textColumn(
+    title: string,
+    dataIndex: keyof MedicalStaffItem,
+    width: number,
+  ): TableColumnsType<MedicalStaffItem>[number] {
+    return {
+      title,
+      dataIndex,
+      width,
+      render: renderLongText,
+    };
+  }
+
+  const columns: TableColumnsType<MedicalStaffItem> = [
     {
-      title:
-        "",
+      title: "STT",
+      key: "index",
+      width: 56,
+      fixed: "left",
+      align: "center",
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
+    },
+    {
+      title: "Họ tên",
+      dataIndex: "fullName",
+      width: 210,
+      fixed: "left",
+      render: (value: string) => (
+        <div className="ms-person">
+          <div className="ms-avatar">
+            <TeamOutlined />
+          </div>
 
-      key:
-        "action",
-
-      width:
-        46,
-
-      fixed:
-        "left" as const,
-
-      align:
-        "center" as const,
-
-      render:
-        (
-          _:
-            unknown,
-
-          record:
-            MedicalStaffItem
-        ) => (
-
-          <Dropdown
-            trigger={[
-              "click",
-            ]}
-
-            menu={{
-              items: [
-                {
-                  key:
-                    "edit",
-
-                  label:
-                    "Cập nhật",
-                },
-
-                {
-                  key:
-                    "disable",
-
-                  label:
-                    "Ngừng sử dụng",
-
-                  danger:
-                    true,
-
-                  disabled:
-                    !record.active,
-                },
-              ],
-
-              onClick:
-                ({
-                  key,
-                }) => {
-
-                  if (
-                    key ===
-                    "edit"
-                  ) {
-
-                    void openEditModal(
-                      record
-                    );
-                  }
-
-
-                  if (
-                    key ===
-                    "disable"
-                  ) {
-
-                    confirmDisable(
-                      record
-                    );
-                  }
-                },
-            }}
-          >
-
-            <Button
-              type="text"
-
-              size="small"
-
-              icon={
-                <EllipsisOutlined />
-              }
-            />
-
-          </Dropdown>
+          <div className="ms-name">{value}</div>
+        </div>
+      ),
+    },
+    textColumn("Mã BHXH", "socialInsuranceCode", 140),
+    textColumn("Mã CCHN", "licenseNumber", 180),
+    {
+      title: "Mã khoa",
+      key: "departmentCodes",
+      width: 140,
+      render: (_, record) =>
+        renderLongText(record.departments?.map((item) => item.code).join("; ")),
+    },
+    {
+      title: "Khoa",
+      key: "departments",
+      width: 230,
+      render: (_, record) =>
+        record.departments?.length ? (
+          <Space size={[4, 5]} wrap>
+            {record.departments.map((item) => (
+              <Tag key={item.code} color="blue" className="ms-department-tag">
+                {item.name}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          "—"
         ),
     },
-
-
+    textColumn("Giới tính", "gender", 90),
     {
-      title:
-        "STT",
-
-      key:
-        "stt",
-
-      width:
-        58,
-
-      align:
-        "center" as const,
-
-      render:
-        (
-          _:
-            unknown,
-
-          __:
-            MedicalStaffItem,
-
-          index:
-            number
-        ) =>
-          (
-            page -
-            1
-          ) *
-            pageSize +
-          index +
-          1,
+      title: "Ngày cấp CCHN",
+      dataIndex: "licenseIssueDate",
+      width: 130,
+      render: formatDate,
     },
-
-
+    textColumn("Chức danh nghề nghiệp", "professionalTitle", 170),
+    textColumn("Nơi cấp CCHN", "licenseIssuer", 180),
+    textColumn("Phạm vi chuyên môn", "professionalScope", 250),
+    textColumn("Thời gian đăng ký", "registrationTime", 140),
+    textColumn("Thời gian ngày", "dailyTime", 150),
+    textColumn("Thời gian tuần", "weeklyTime", 170),
+    textColumn("Vị trí", "position", 150),
+    textColumn("Ghi chú", "note", 220),
     {
-      title:
-        "Họ tên",
-
-      dataIndex:
-        "fullName",
-
-      width:
-        180,
-
-      ellipsis:
-        true,
+      title: "Trạng thái",
+      dataIndex: "active",
+      width: 115,
+      align: "center",
+      render: (active: boolean) => (
+        <Tag color={active ? "success" : "default"}>
+          {active ? "Đang sử dụng" : "Ngừng sử dụng"}
+        </Tag>
+      ),
     },
-
-
     {
-      title:
-        "Mã BHXH",
-
-      dataIndex:
-        "socialInsuranceCode",
-
-      width:
-        135,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Mã CCHN",
-
-      dataIndex:
-        "licenseNumber",
-
-      width:
-        165,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Mã khoa",
-
-      key:
-        "departmentCodes",
-
-      width:
-        120,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          _:
-            unknown,
-
-          record:
-            MedicalStaffItem
-        ) => {
-
-        if (
-          !Array.isArray(
-            record.departments
-          ) ||
-          record.departments.length ===
-            0
-        ) {
-
-          return "-";
-        }
-
-
-        return record.departments
-          .map(
-            (
-              department
-            ) =>
-              department.code
-          )
-          .join(
-            "; "
-          );
-      },
-    },
-
-
-    {
-      title:
-        "Khoa",
-
-      key:
-        "departmentNames",
-
-      width:
-        190,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          _:
-            unknown,
-
-          record:
-            MedicalStaffItem
-        ) => {
-
-        if (
-          !Array.isArray(
-            record.departments
-          ) ||
-          record.departments.length ===
-            0
-        ) {
-
-          return "-";
-        }
-
-
-        return record.departments
-          .map(
-            (
-              department
-            ) =>
-              department.name
-          )
-          .join(
-            "; "
-          );
-      },
-    },
-
-
-    {
-      title:
-        "Giới tính",
-
-      dataIndex:
-        "gender",
-
-      width:
-        90,
-
-      align:
-        "center" as const,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Ngày cấp CCHN",
-
-      dataIndex:
-        "licenseIssueDate",
-
-      width:
-        125,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          formatDate(
-            value
-          ),
-    },
-
-
-    {
-      title:
-        "Chức danh NN",
-
-      dataIndex:
-        "professionalTitle",
-
-      width:
-        135,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Nơi cấp CCHN",
-
-      dataIndex:
-        "licenseIssuer",
-
-      width:
-        170,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Phạm vi CM",
-
-      dataIndex:
-        "professionalScope",
-
-      width:
-        200,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Thời gian ĐK",
-
-      dataIndex:
-        "registrationTime",
-
-      width:
-        120,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Thời gian ngày",
-
-      dataIndex:
-        "dailyTime",
-
-      width:
-        145,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Thời gian tuần",
-
-      dataIndex:
-        "weeklyTime",
-
-      width:
-        165,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Vị trí",
-
-      dataIndex:
-        "position",
-
-      width:
-        125,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ||
-          "-",
-    },
-
-
-    {
-      title:
-        "Trạng thái",
-
-      dataIndex:
-        "active",
-
-      width:
-        110,
-
-      fixed:
-        "right" as const,
-
-      align:
-        "center" as const,
-
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="success"
-
-                className="medical-staff-status"
-              >
-                Đang dùng
-              </Tag>
-            )
-            : (
-              <Tag
-                className="medical-staff-status"
-              >
-                Ngừng dùng
-              </Tag>
-            ),
+      title: "Thao tác",
+      key: "actions",
+      width: 105,
+      fixed: "right",
+      align: "center",
+      render: (_, record) => (
+        <Space size={2}>
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="text"
+              size="small"
+              aria-label="Chỉnh sửa nhân viên"
+              icon={<EditOutlined />}
+              className="ms-edit"
+              disabled={busy || loading}
+              loading={detailLoadingId === record.id}
+              onClick={() => void openEdit(record)}
+            />
+          </Tooltip>
+
+          <Popconfirm
+            title="Ngừng sử dụng nhân viên?"
+            description={record.fullName}
+            okText="Ngừng sử dụng"
+            cancelText="Hủy"
+            okButtonProps={{
+              danger: true,
+            }}
+            disabled={busy || loading || !record.active}
+            onConfirm={() => disableStaff(record)}
+          >
+            <Button
+              danger
+              type="text"
+              size="small"
+              aria-label="Ngừng sử dụng nhân viên"
+              icon={<StopOutlined />}
+              disabled={busy || loading || !record.active}
+              loading={disablingId === record.id}
+            />
+          </Popconfirm>
+        </Space>
+      ),
     },
   ];
 
-
-  // ====================================================
-  // UI
-  // ====================================================
+  const errorColumns: TableColumnsType<ImportError> = [
+    {
+      title: "Dòng",
+      dataIndex: "row",
+      width: 70,
+      align: "center",
+    },
+    {
+      title: "Cột",
+      dataIndex: "field",
+      width: 180,
+    },
+    {
+      title: "Nội dung lỗi",
+      dataIndex: "message",
+      render: (value) => <div className="ms-wrap">{value}</div>,
+    },
+  ];
 
   return (
-    <>
+    <div className="ms-page">
+      {contextHolder}
 
-      <div
-        className="medical-staff-page"
-      >
-
-        {/* =================================================
-            HEADER
-        ================================================= */}
-
-        <div
-          className="medical-staff-header"
-        >
-
-          <div>
-
-            <div
-              style={{
-                display:
-                  "flex",
-
-                alignItems:
-                  "center",
-
-                gap:
-                  10,
-              }}
-            >
-
-              <TeamOutlined
-                style={{
-                  fontSize:
-                    25,
-
-                  color:
-                    "#1677ff",
-                }}
+      <Breadcrumb
+        items={[
+          {
+            title: (
+              <Button
+                type="link"
+                size="small"
+                className="ms-crumb"
+                aria-label="Trang chủ"
+                icon={<HomeOutlined />}
+                onClick={() => navigate("/")}
               />
+            ),
+          },
+          {
+            title: (
+              <Button type="link" size="small" className="ms-crumb" onClick={backToCatalog}>
+                Danh mục
+              </Button>
+            ),
+          },
+          { title: "Nhân viên y tế" },
+        ]}
+      />
 
-
-              <Title
-                level={
-                  3
-                }
-
-                style={{
-                  margin:
-                    0,
-                }}
-              >
-                Nhân viên y tế
-              </Title>
-
-            </div>
-
-
-            <Text
-              type="secondary"
-
-              className="medical-staff-subtitle"
-            >
-              Quản lý danh mục bác sĩ và nhân viên y tế
-            </Text>
-
-          </div>
-
-
-          <Space
-            size={
-              8
-            }
+      <div className="ms-header">
+        <div>
+          <Title
+            level={3}
+            style={{
+              margin: 0,
+              color: "#172033",
+              fontSize: 21,
+              fontWeight: 800,
+            }}
           >
+            <TeamOutlined
+              style={{
+                marginRight: 9,
+                color: "#1677ff",
+              }}
+            />
+            Nhân viên y tế
+          </Title>
 
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              onClick={
-                openImportModal
-              }
-            >
-              Import Excel
-            </Button>
-
-
-            <Button
-              type="primary"
-
-              icon={
-                <PlusOutlined />
-              }
-
-              onClick={
-                openAddModal
-              }
-            >
-              Thêm mới
-            </Button>
-
-          </Space>
-
+          <Text type="secondary" className="ms-subtitle">
+            Quản lý thông tin hành nghề, chuyên môn và khoa của nhân viên
+          </Text>
         </div>
 
-
-        {/* =================================================
-            FILTER
-        ================================================= */}
-
-        <div
-          className="medical-staff-filters"
-        >
-
-          <div
-            className="medical-staff-filter"
-          >
-
-            <Text
-              strong
-
-              className="medical-staff-filter-label"
-            >
-              Họ tên
-            </Text>
-
-
-            <Input
-              value={
-                searchName
-              }
-
-              placeholder="Họ tên"
-
-              allowClear
-
-              onChange={(
-                event
-              ) => {
-
-                setSearchName(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
-              }}
-            />
-
-          </div>
-
-
-          <div
-            className="medical-staff-filter"
-          >
-
-            <Text
-              strong
-
-              className="medical-staff-filter-label"
-            >
-              Mã CCHN
-            </Text>
-
-
-            <Input
-              value={
-                searchLicense
-              }
-
-              placeholder="Mã CCHN"
-
-              allowClear
-
-              onChange={(
-                event
-              ) => {
-
-                setSearchLicense(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
-              }}
-            />
-
-          </div>
-
-
-          <div
-            className="medical-staff-filter"
-          >
-
-            <Text
-              strong
-
-              className="medical-staff-filter-label"
-            >
-              Mã BHXH
-            </Text>
-
-
-            <Input
-              value={
-                searchBhxh
-              }
-
-              placeholder="Mã BHXH"
-
-              allowClear
-
-              onChange={(
-                event
-              ) => {
-
-                setSearchBhxh(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
-              }}
-            />
-
-          </div>
-
-
-          <div
-            className="medical-staff-filter"
-          >
-
-            <Text
-              strong
-
-              className="medical-staff-filter-label"
-            >
-              Khoa
-            </Text>
-
-
-            <Select
-              value={
-                searchDepartment
-              }
-
-              allowClear
-
-              showSearch
-
-              optionFilterProp="label"
-
-              placeholder="Tất cả khoa"
-
-              style={{
-                width:
-                  "100%",
-              }}
-
-              options={
-                departments.map(
-                  (
-                    item
-                  ) => ({
-                    value:
-                      item.code,
-
-                    label:
-                      `${item.code} - ${item.name}`,
-                  })
-                )
-              }
-
-              onChange={(
-                value
-              ) => {
-
-                setSearchDepartment(
-                  value
-                );
-
-
-                setPage(
-                  1
-                );
-              }}
-            />
-
-          </div>
-
+        <Space size={8} wrap>
+          <Button icon={<UploadOutlined />} disabled={busy || loading} onClick={openImport}>
+            Import Excel
+          </Button>
 
           <Button
             type="primary"
-
-            ghost
-
-            icon={
-              <ReloadOutlined />
-            }
-
-            onClick={
-              handleRefresh
-            }
+            icon={<PlusOutlined />}
+            disabled={busy || loading}
+            onClick={openCreate}
           >
-            Làm mới
+            Thêm mới
           </Button>
-
-        </div>
-
-
-        {/* =================================================
-            TABLE
-        ================================================= */}
-
-        <Table<MedicalStaffItem>
-          className="medical-staff-table"
-
-          rowKey="id"
-
-          size="middle"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            items
-          }
-
-          columns={
-            columns
-          }
-
-          tableLayout="fixed"
-
-          scroll={{
-            x:
-              2350,
-          }}
-
-          pagination={{
-            current:
-              page,
-
-            pageSize,
-
-            total,
-
-            showSizeChanger:
-              true,
-
-            pageSizeOptions: [
-              "10",
-              "50",
-              "100",
-            ],
-
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
-
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
-
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
-
-                  setPageSize(
-                    newPageSize
-                  );
-
-
-                  setPage(
-                    1
-                  );
-
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
-          }}
-
-          locale={{
-            emptyText:
-              "Chưa có dữ liệu nhân viên y tế",
-          }}
-        />
-
+        </Space>
       </div>
 
-
-      {/* =================================================
-          ADD / EDIT MODAL
-      ================================================= */}
-
-      <Modal
-        open={
-          modalOpen
-        }
-
-        title={
-          editingStaff
-            ? "Cập nhật Nhân viên y tế"
-            : "Thêm Nhân viên y tế"
-        }
-
-        width={
-          1050
-        }
-
-        okText={
-          editingStaff
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
-        cancelText="Hủy"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
-        onCancel={() => {
-
-          if (
-            saving
-          ) {
-
-            return;
+      {(error || departmentError) && (
+        <Alert
+          type={error ? "error" : "warning"}
+          showIcon
+          message={error ? "Không thể tải danh sách nhân viên" : "Không thể tải danh mục khoa"}
+          description={error || departmentError}
+          action={
+            <Button size="small" disabled={busy || loading} onClick={refresh}>
+              Thử lại
+            </Button>
           }
+        />
+      )}
 
+      <div className="ms-filters">
+        <div className="ms-filter">
+          <label htmlFor="ms-name-search">Họ tên</label>
 
-          setModalOpen(
-            false
-          );
+          <Input
+            id="ms-name-search"
+            allowClear
+            value={inputs.fullName}
+            placeholder="Nhập họ tên"
+            onChange={(event) =>
+              setInputs((previous) => ({
+                ...previous,
+                fullName: event.target.value,
+              }))
+            }
+            onPressEnter={search}
+          />
+        </div>
 
+        <div className="ms-filter">
+          <label htmlFor="ms-license-search">Mã CCHN</label>
 
-          setEditingStaff(
-            null
-          );
+          <Input
+            id="ms-license-search"
+            allowClear
+            value={inputs.licenseNumber}
+            placeholder="Nhập mã CCHN"
+            onChange={(event) =>
+              setInputs((previous) => ({
+                ...previous,
+                licenseNumber: event.target.value,
+              }))
+            }
+            onPressEnter={search}
+          />
+        </div>
 
+        <div className="ms-filter">
+          <label htmlFor="ms-insurance-search">Mã BHXH</label>
 
-          form.resetFields();
+          <Input
+            id="ms-insurance-search"
+            allowClear
+            value={inputs.socialInsuranceCode}
+            placeholder="Nhập mã BHXH"
+            onChange={(event) =>
+              setInputs((previous) => ({
+                ...previous,
+                socialInsuranceCode: event.target.value,
+              }))
+            }
+            onPressEnter={search}
+          />
+        </div>
+
+        <div className="ms-filter">
+          <label htmlFor="ms-department-search">Khoa</label>
+
+          <Select
+            id="ms-department-search"
+            showSearch
+            allowClear
+            optionFilterProp="label"
+            value={inputs.departmentCode}
+            placeholder="Tất cả khoa"
+            options={departmentOptions}
+            onChange={(value) =>
+              setInputs((previous) => ({
+                ...previous,
+                departmentCode: value,
+              }))
+            }
+          />
+        </div>
+
+        <Space size={8}>
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            disabled={busy || loading}
+            onClick={search}
+          >
+            Tìm kiếm
+          </Button>
+
+          <Button icon={<ReloadOutlined />} disabled={busy} onClick={resetFilters}>
+            Xóa bộ lọc
+          </Button>
+        </Space>
+      </div>
+
+      <Card
+        className="ms-table"
+        styles={{
+          body: { padding: 0 },
         }}
       >
+        <Table<MedicalStaffItem>
+          rowKey="id"
+          columns={columns}
+          dataSource={items}
+          loading={loading}
+          size="middle"
+          tableLayout="fixed"
+          scroll={{
+            x: 2931,
+            y: 440,
+          }}
+          locale={{
+            emptyText: error ? "Chưa tải được dữ liệu." : "Chưa có nhân viên phù hợp.",
+          }}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "20", "50", "100"],
+            showTotal: (value) => `Tổng số: ${value} nhân viên`,
+            onChange: (nextPage, nextSize) => {
+              setPage(nextSize !== pageSize ? 1 : nextPage);
+              setPageSize(nextSize);
+            },
+          }}
+        />
+      </Card>
 
-        <Form
-          form={
-            form
-          }
+      <Text type="secondary" className="ms-legend">
+        Kéo ngang để xem đầy đủ thông tin. Di chuột vào nội dung để xem chi tiết.
+      </Text>
 
+      <Modal
+        open={modalOpen}
+        centered
+        width={960}
+        destroyOnHidden
+        className="ms-modal"
+        title={
+          <div className="ms-modal-heading">
+            <div className="ms-modal-icon">
+              <TeamOutlined />
+            </div>
+
+            <div>
+              <div className="ms-modal-title">
+                {editingStaff ? "Cập nhật nhân viên y tế" : "Thêm nhân viên y tế"}
+              </div>
+
+              <div className="ms-subtitle">Thông tin nhân sự, hành nghề và khoa làm việc</div>
+            </div>
+          </div>
+        }
+        okText={editingStaff ? "Cập nhật" : "Thêm mới"}
+        cancelText="Hủy"
+        confirmLoading={saving}
+        cancelButtonProps={{
+          disabled: saving,
+        }}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
+        onCancel={closeForm}
+        onOk={() => form.submit()}
+        styles={{
+          body: {
+            maxHeight: "68vh",
+            overflowY: "auto",
+            paddingRight: 8,
+          },
+        }}
+      >
+        <Form<StaffFormValues>
+          form={form}
           layout="vertical"
-
-          requiredMark={
-            false
-          }
-
-          className="medical-staff-form"
+          requiredMark={false}
+          preserve={false}
+          disabled={saving}
+          onFinish={handleSave}
+          style={{ marginTop: 18 }}
         >
+          <div className="ms-section-title">Thông tin nhân viên</div>
 
-          <div
-            className="medical-staff-form-grid medical-staff-form-grid-3"
-          >
-
+          <div className="ms-form-grid ms-grid-3">
             <Form.Item
-              label="Họ tên"
-
               name="fullName"
-
+              label="Họ tên"
               rules={[
                 {
-                  required:
-                    true,
-
-                  whitespace:
-                    true,
-
-                  message:
-                    "Vui lòng nhập họ tên.",
+                  required: true,
+                  whitespace: true,
+                  message: "Vui lòng nhập họ tên.",
                 },
               ]}
             >
-
-              <Input
-                placeholder="Họ tên"
-              />
-
+              <Input placeholder="Nhập họ tên" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Mã BHXH"
-
-              name="socialInsuranceCode"
-            >
-
-              <Input
-                placeholder="Mã BHXH"
-              />
-
+            <Form.Item name="socialInsuranceCode" label="Mã BHXH">
+              <Input placeholder="Nhập mã BHXH" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Mã CCHN"
-
-              name="licenseNumber"
-            >
-
-              <Input
-                placeholder="Mã CCHN"
-              />
-
+            <Form.Item name="licenseNumber" label="Mã CCHN">
+              <Input placeholder="Nhập mã CCHN" />
             </Form.Item>
-
           </div>
 
-
-          <div
-            className="medical-staff-form-grid medical-staff-form-grid-3"
-          >
-
-            <Form.Item
-              label="Giới tính"
-
-              name="gender"
-            >
-
+          <div className="ms-form-grid ms-grid-3">
+            <Form.Item name="gender" label="Giới tính">
               <Select
                 allowClear
-
-                placeholder="Giới tính"
-
+                placeholder="Chọn giới tính"
                 options={[
                   {
-                    value:
-                      "Nam",
-
-                    label:
-                      "Nam",
+                    value: "Nam",
+                    label: "Nam",
                   },
-
                   {
-                    value:
-                      "Nữ",
-
-                    label:
-                      "Nữ",
+                    value: "Nữ",
+                    label: "Nữ",
                   },
-
                   {
-                    value:
-                      "Khác",
-
-                    label:
-                      "Khác",
+                    value: "Khác",
+                    label: "Khác",
                   },
                 ]}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="Ngày cấp CCHN"
-
-              name="licenseIssueDate"
-            >
-
-              <Input
-                type="date"
-              />
-
+            <Form.Item name="professionalTitle" label="Chức danh nghề nghiệp">
+              <Input placeholder="Nhập chức danh" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Chức danh nghề nghiệp"
-
-              name="professionalTitle"
-            >
-
-              <Input
-                placeholder="Chức danh nghề nghiệp"
-              />
-
+            <Form.Item name="position" label="Vị trí">
+              <Input placeholder="Nhập vị trí" />
             </Form.Item>
-
           </div>
 
+          <div className="ms-section-title">Thông tin hành nghề</div>
 
-          <div
-            className="medical-staff-form-grid medical-staff-form-grid-2"
-          >
-
-            <Form.Item
-              label="Nơi cấp CCHN"
-
-              name="licenseIssuer"
-            >
-
-              <Input
-                placeholder="Nơi cấp CCHN"
-              />
-
+          <div className="ms-form-grid ms-grid-2">
+            <Form.Item name="licenseIssueDate" label="Ngày cấp CCHN">
+              <Input type="date" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Vị trí"
-
-              name="position"
-            >
-
-              <Input
-                placeholder="Vị trí"
-              />
-
+            <Form.Item name="licenseIssuer" label="Nơi cấp CCHN">
+              <Input placeholder="Nhập nơi cấp CCHN" />
             </Form.Item>
-
           </div>
 
-
-          <Form.Item
-            label="Khoa"
-
-            name="departmentCodes"
-          >
-
+          <Form.Item name="departmentCodes" label="Khoa làm việc">
             <Select
               mode="multiple"
-
               allowClear
-
               showSearch
-
               optionFilterProp="label"
-
+              options={departmentOptions}
               placeholder="Chọn một hoặc nhiều khoa"
-
-              options={
-                departments.map(
-                  (
-                    item
-                  ) => ({
-                    value:
-                      item.code,
-
-                    label:
-                      `${item.code} - ${item.name}`,
-                  })
-                )
-              }
             />
-
           </Form.Item>
 
-
-          <Form.Item
-            label="Phạm vi chuyên môn"
-
-            name="professionalScope"
-          >
-
+          <Form.Item name="professionalScope" label="Phạm vi chuyên môn">
             <Input.TextArea
-              rows={
-                2
-              }
-
-              placeholder="Phạm vi chuyên môn"
+              autoSize={{
+                minRows: 2,
+                maxRows: 5,
+              }}
+              placeholder="Nhập phạm vi chuyên môn"
             />
-
           </Form.Item>
 
+          <div className="ms-section-title">Thời gian đăng ký</div>
 
-          <div
-            className="medical-staff-form-grid medical-staff-form-grid-3"
-          >
-
-            <Form.Item
-              label="Thời gian đăng ký"
-
-              name="registrationTime"
-            >
-
-              <Input
-                placeholder="Ví dụ: 1"
-              />
-
+          <div className="ms-form-grid ms-grid-3">
+            <Form.Item name="registrationTime" label="Thời gian đăng ký">
+              <Input placeholder="Ví dụ: 1" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Thời gian ngày"
-
-              name="dailyTime"
-            >
-
-              <Input
-                placeholder="Ví dụ: 0700-1900"
-              />
-
+            <Form.Item name="dailyTime" label="Thời gian ngày">
+              <Input placeholder="Ví dụ: 0700-1900" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Thời gian tuần"
-
-              name="weeklyTime"
-            >
-
-              <Input
-                placeholder="Ví dụ: T2T3T4T5T6T7"
-              />
-
+            <Form.Item name="weeklyTime" label="Thời gian tuần">
+              <Input placeholder="Ví dụ: T2T3T4T5T6T7" />
             </Form.Item>
-
           </div>
 
-
-          <Form.Item
-            label="Ghi chú"
-
-            name="note"
-          >
-
+          <Form.Item name="note" label="Ghi chú">
             <Input.TextArea
-              rows={
-                2
-              }
-
-              placeholder="Ghi chú"
-            />
-
-          </Form.Item>
-
-
-          <Form.Item
-            label="Đang sử dụng"
-
-            name="active"
-
-            valuePropName="checked"
-          >
-
-            <Switch />
-
-          </Form.Item>
-
-        </Form>
-
-      </Modal>
-
-
-      {/* =================================================
-          IMPORT EXCEL MODAL
-      ================================================= */}
-
-      <Modal
-        open={
-          importModalOpen
-        }
-
-        title="Import Danh mục Nhân viên y tế"
-
-        width={
-          900
-        }
-
-        okText="Import"
-
-        cancelText="Đóng"
-
-        confirmLoading={
-          importing
-        }
-
-        okButtonProps={{
-          disabled:
-            importFileList.length ===
-              0 ||
-            importResult !==
-              null,
-        }}
-
-        onOk={() =>
-          void handleImportExcel()
-        }
-
-        onCancel={
-          closeImportModal
-        }
-      >
-
-        <div
-          style={{
-            marginTop:
-              16,
-          }}
-        >
-
-          <Alert
-            type="info"
-
-            showIcon
-
-            message="Import Nhân viên y tế từ Excel"
-
-            description={
-              <>
-                Hệ thống tự nhận diện sheet có các cột{" "}
-                <b>MA_BHXH</b>,{" "}
-                <b>HO_TEN</b>{" "}
-                và{" "}
-                <b>MACCHN</b>.
-                {" "}
-                MA_KHOA hỗ trợ nhiều khoa,
-                phân cách bằng dấu chấm phẩy.
-                {" "}
-                Nhân viên đã tồn tại sẽ được
-                nhận diện theo MA_BHXH hoặc
-                MACCHN và được cập nhật.
-                {" "}
-                Nếu có mã khoa chưa tồn tại
-                hoặc file có dữ liệu lỗi thì
-                toàn bộ lần import sẽ bị hủy.
-              </>
-            }
-
-            style={{
-              marginBottom:
-                16,
-            }}
-          />
-
-
-          <Upload
-            accept=".xlsx"
-
-            maxCount={
-              1
-            }
-
-            fileList={
-              importFileList
-            }
-
-            beforeUpload={() =>
-              false
-            }
-
-            disabled={
-              importing
-            }
-
-            onRemove={() => {
-
-              setImportFileList(
-                []
-              );
-
-
-              setImportResult(
-                null
-              );
-
-
-              setImportErrors(
-                []
-              );
-
-
-              setImportMessage(
-                ""
-              );
-
-
-              return true;
-            }}
-
-            onChange={(
-              info
-            ) => {
-
-              setImportFileList(
-                info.fileList.slice(
-                  -1
-                )
-              );
-
-
-              setImportResult(
-                null
-              );
-
-
-              setImportErrors(
-                []
-              );
-
-
-              setImportMessage(
-                ""
-              );
-            }}
-          >
-
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              disabled={
-                importing
-              }
-            >
-              Chọn file Excel
-            </Button>
-
-          </Upload>
-
-
-          {importResult && (
-
-            <Alert
-              type="success"
-
-              showIcon
-
-              className="medical-staff-import-alert"
-
-              message={
-                importMessage ||
-                "Import nhân viên y tế thành công."
-              }
-
-              description={
-                <div
-                  className="medical-staff-import-summary"
-                >
-
-                  <div>
-                    <span>
-                      Tổng số nhân viên
-                    </span>
-
-                    <b>
-                      {
-                        importResult.totalRows
-                      }
-                    </b>
-                  </div>
-
-
-                  <div>
-                    <span>
-                      Thêm mới
-                    </span>
-
-                    <b>
-                      {
-                        importResult.inserted
-                      }
-                    </b>
-                  </div>
-
-
-                  <div>
-                    <span>
-                      Cập nhật
-                    </span>
-
-                    <b>
-                      {
-                        importResult.updated
-                      }
-                    </b>
-                  </div>
-
-
-                  <div>
-                    <span>
-                      Bỏ qua
-                    </span>
-
-                    <b>
-                      {
-                        importResult.skipped
-                      }
-                    </b>
-                  </div>
-
-                </div>
-              }
-            />
-
-          )}
-
-
-          {!importResult &&
-            importMessage &&
-            importErrors.length ===
-              0 && (
-
-              <Alert
-                type="error"
-
-                showIcon
-
-                message={
-                  importMessage
-                }
-
-                style={{
-                  marginTop:
-                    20,
-                }}
-              />
-
-            )}
-
-
-          {importErrors.length >
-            0 && (
-
-            <div
-              style={{
-                marginTop:
-                  20,
+              autoSize={{
+                minRows: 2,
+                maxRows: 5,
               }}
-            >
+              placeholder="Nhập ghi chú nếu có"
+            />
+          </Form.Item>
 
-              <Alert
-                type="error"
+          <div className="ms-active">
+            <div>
+              <Text strong>Trạng thái sử dụng</Text>
 
-                showIcon
-
-                message={
-                  importMessage ||
-                  `File có ${importErrors.length} lỗi.`
-                }
-
-                description="Không có nhân viên nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
-                style={{
-                  marginBottom:
-                    12,
-                }}
-              />
-
-
-              <Table<MedicalStaffImportError>
-                className="medical-staff-import-table"
-
-                size="small"
-
-                rowKey={(
-                  record,
-                  index
-                ) =>
-                  `${record.row}-${record.field}-${index}`
-                }
-
-                dataSource={
-                  importErrors
-                }
-
-                pagination={{
-                  pageSize:
-                    10,
-
-                  showSizeChanger:
-                    false,
-
-                  showTotal:
-                    (
-                      value
-                    ) =>
-                      `Tổng lỗi: ${value}`,
-                }}
-
-                scroll={{
-                  y:
-                    320,
-                }}
-
-                columns={[
-                  {
-                    title:
-                      "Dòng",
-
-                    dataIndex:
-                      "row",
-
-                    width:
-                      80,
-
-                    align:
-                      "center",
-                  },
-
-                  {
-                    title:
-                      "Cột",
-
-                    dataIndex:
-                      "field",
-
-                    width:
-                      180,
-                  },
-
-                  {
-                    title:
-                      "Lỗi",
-
-                    dataIndex:
-                      "message",
-                  },
-                ]}
-              />
-
+              <Text type="secondary" className="ms-subtitle">
+                Bật để sử dụng nhân viên trong hệ thống
+              </Text>
             </div>
 
-          )}
-
-        </div>
-
+            <Form.Item name="active" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
+        </Form>
       </Modal>
 
+      <Modal
+        open={importModalOpen}
+        centered
+        width={940}
+        destroyOnHidden
+        className="ms-import-modal"
+        title={
+          <div className="ms-modal-heading">
+            <div className="ms-modal-icon">
+              <UploadOutlined />
+            </div>
 
-      {/* =================================================
-          STYLE
-      ================================================= */}
+            <div>
+              <div className="ms-modal-title">Import nhân viên y tế</div>
+
+              <div className="ms-subtitle">Nhập danh sách nhân viên từ file Excel</div>
+            </div>
+          </div>
+        }
+        okText="Import"
+        cancelText="Đóng"
+        confirmLoading={importing}
+        okButtonProps={{
+          disabled: importFileList.length === 0 || importResult !== null,
+        }}
+        cancelButtonProps={{
+          disabled: importing,
+        }}
+        closable={!importing}
+        maskClosable={!importing}
+        keyboard={!importing}
+        onCancel={closeImport}
+        onOk={() => void handleImport()}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+          message="Cấu trúc file Excel"
+          description={
+            <div className="ms-import-help">
+              Hệ thống nhận diện sheet có các cột <b>MA_BHXH</b>, <b>HO_TEN</b>, <b>MACCHN</b>. Cột{" "}
+              <b>MA_KHOA</b> hỗ trợ nhiều khoa, phân cách bằng dấu chấm phẩy. Nhân viên đã tồn tại
+              được nhận diện theo MA_BHXH hoặc MACCHN để cập nhật. Nếu có mã khoa chưa tồn tại hoặc
+              dữ liệu lỗi, toàn bộ lần import sẽ bị hủy.
+            </div>
+          }
+        />
+
+        <div className="ms-upload-area">
+          <Upload
+            accept=".xlsx"
+            maxCount={1}
+            fileList={importFileList}
+            disabled={importing}
+            beforeUpload={(file) => {
+              if (!file.name.toLowerCase().endsWith(".xlsx")) {
+                messageApi.error("Chỉ hỗ trợ file Excel .xlsx.");
+
+                return Upload.LIST_IGNORE;
+              }
+
+              setImportFileList([
+                {
+                  uid: file.uid,
+                  name: file.name,
+                  status: "done",
+                  originFileObj: file,
+                },
+              ]);
+
+              clearImportResult();
+              return false;
+            }}
+            onRemove={() => {
+              if (importingRef.current) {
+                return false;
+              }
+
+              setImportFileList([]);
+              clearImportResult();
+              return true;
+            }}
+          >
+            <Button icon={<UploadOutlined />} disabled={importing}>
+              Chọn file Excel
+            </Button>
+          </Upload>
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Định dạng hỗ trợ: .xlsx
+          </Text>
+        </div>
+
+        {importResult && (
+          <>
+            <Alert
+              type="success"
+              showIcon
+              style={{ marginTop: 16 }}
+              message={importMessage || "Import thành công."}
+            />
+
+            <div className="ms-import-summary">
+              {[
+                {
+                  label: "Tổng số nhân viên",
+                  value: importResult.totalRows,
+                  className: "",
+                },
+                {
+                  label: "Thêm mới",
+                  value: importResult.inserted,
+                  className: "ms-summary-success",
+                },
+                {
+                  label: "Cập nhật",
+                  value: importResult.updated,
+                  className: "ms-summary-info",
+                },
+                {
+                  label: "Bỏ qua",
+                  value: importResult.skipped,
+                  className: "ms-summary-warning",
+                },
+              ].map((item) => (
+                <div key={item.label} className={`ms-summary-item ${item.className}`}>
+                  <div className="ms-summary-label">{item.label}</div>
+
+                  <div className="ms-summary-value">{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {!importResult && importMessage && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginTop: 16 }}
+            message={importMessage}
+            description={
+              importErrors.length > 0
+                ? "Không có nhân viên nào được import. Hãy sửa các dòng lỗi rồi import lại."
+                : undefined
+            }
+          />
+        )}
+
+        {importErrors.length > 0 && (
+          <div className="ms-import-errors">
+            <Table<ImportError>
+              rowKey={(record, index) => `${record.row}-${record.field}-${index}`}
+              columns={errorColumns}
+              dataSource={importErrors}
+              size="small"
+              tableLayout="fixed"
+              scroll={{
+                x: 650,
+                y: 280,
+              }}
+              pagination={{
+                defaultPageSize: 10,
+                showSizeChanger: false,
+                showTotal: (value) => `Tổng lỗi: ${value}`,
+              }}
+            />
+          </div>
+        )}
+      </Modal>
 
       <style>
         {`
-          .medical-staff-page {
+          .ms-page {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
             width: 100%;
+            min-width: 0;
           }
 
-          .medical-staff-header {
+          .ms-page .ant-breadcrumb {
+            font-size: 12px;
+          }
+
+          .ms-crumb.ant-btn {
+            height: auto;
+            padding: 0;
+            font-size: 12px;
+            line-height: inherit;
+          }
+
+          .ms-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
-            margin-bottom: 16px;
           }
 
-          .medical-staff-header h3 {
-            color: #172033 !important;
-            font-size: 22px !important;
-            font-weight: 800 !important;
+          .ms-header .ant-btn {
+            height: 36px;
+            border-radius: 8px;
+            font-weight: 600;
           }
 
-          .medical-staff-subtitle {
+          .ms-subtitle {
             display: block;
-            margin-top: 3px;
+            margin-top: 4px;
+            color: #64748b;
             font-size: 12px;
+            font-weight: 400;
+            line-height: 1.6;
           }
 
-          .medical-staff-filters {
+          .ms-filters {
             display: grid;
             grid-template-columns:
-              minmax(220px, 1.4fr)
-              minmax(170px, 1fr)
-              minmax(170px, 1fr)
-              minmax(220px, 1.2fr)
+              minmax(0, 1.2fr)
+              minmax(0, 1fr)
+              minmax(0, 1fr)
+              minmax(0, 1.2fr)
               auto;
-            gap: 10px;
             align-items: end;
-            margin-bottom: 14px;
+            gap: 10px;
           }
 
-          .medical-staff-filter {
+          .ms-filter {
+            display: flex;
+            flex-direction: column;
             min-width: 0;
+            gap: 6px;
           }
 
-          .medical-staff-filter-label {
-            display: block;
-            margin-bottom: 6px;
+          .ms-filter > label {
             color: #172033;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 600;
           }
 
-          .medical-staff-table {
-            border: 1px solid #e6ebf1;
-            border-radius: 8px;
+          .ms-filter .ant-select {
+            width: 100%;
+          }
+
+          .ms-filters .ant-btn {
+            height: 32px;
+            border-radius: 7px;
+            font-weight: 600;
+          }
+
+          .ms-table,
+          .ms-import-errors {
+            min-width: 0;
             overflow: hidden;
-          }
-
-          .medical-staff-table
-          .ant-table {
+            border: 1px solid #dfe6ee;
             border-radius: 8px;
+            box-shadow:
+              0 2px 8px rgba(15, 23, 42, .03);
           }
 
-          .medical-staff-table
-          .ant-table-container {
-            border-start-start-radius: 8px;
-            border-start-end-radius: 8px;
-          }
-
-          .medical-staff-table
-          .ant-table-thead
-          > tr
-          > th {
-            background: #f3f6f9 !important;
-            color: #172033;
+          .ms-table
+          .ant-table-thead > tr > th,
+          .ms-import-errors
+          .ant-table-thead > tr > th {
+            background: #f2f5f8 !important;
+            color: #334155;
             font-size: 12px;
             font-weight: 700;
-            padding: 11px 10px !important;
-            border-bottom: 1px solid #e5eaf0 !important;
+            border-bottom: 1px solid #d8e0e8;
           }
 
-          .medical-staff-table
-          .ant-table-tbody
-          > tr
-          > td {
-            padding: 11px 10px !important;
-            color: #202a3b;
+          .ms-table
+          .ant-table-tbody > tr > td,
+          .ms-import-errors
+          .ant-table-tbody > tr > td {
+            padding: 11px 12px;
+            color: #334155;
             font-size: 12px;
             vertical-align: middle;
-            border-bottom: 1px solid #edf0f5 !important;
+            overflow-wrap: anywhere;
           }
 
-          .medical-staff-table
-          .ant-table-tbody
-          > tr:hover
-          > td {
+          .ms-table
+          .ant-table-tbody > tr:hover > td {
             background: #f7fbff !important;
           }
 
-          .medical-staff-table
-          .ant-table-cell-fix-left,
-          .medical-staff-table
-          .ant-table-cell-fix-right {
-            background: #ffffff;
-          }
-
-          .medical-staff-table
-          .ant-table-thead
-          .ant-table-cell-fix-left,
-          .medical-staff-table
-          .ant-table-thead
-          .ant-table-cell-fix-right {
-            background: #f3f6f9 !important;
-          }
-
-          .medical-staff-table
-          .ant-pagination {
-            margin: 14px 8px 6px;
-          }
-
-          .medical-staff-status {
+          .ms-table .ant-tag {
             margin: 0;
-            border-radius: 6px;
+            border-radius: 999px;
             font-size: 11px;
           }
 
-          .medical-staff-form {
-            margin-top: 18px;
+          .ms-department-tag {
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
           }
 
-          .medical-staff-form-grid {
+          .ms-table .ant-pagination {
+            margin: 12px !important;
+          }
+
+          .ms-person {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+          }
+
+          .ms-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 31px;
+            height: 31px;
+            border-radius: 9px;
+            color: #1677ff;
+            background: #e6f4ff;
+          }
+
+          .ms-name {
+            color: #172033;
+            font-weight: 600;
+            line-height: 1.7;
+            overflow-wrap: anywhere;
+          }
+
+          .ms-edit {
+            color: #1677ff;
+          }
+
+          .ms-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            max-height: 40px;
+            overflow: hidden;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 20px;
+          }
+
+          .ms-wrap {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 1.7;
+          }
+
+          .ms-legend {
+            margin-top: -5px;
+            font-size: 11px;
+            line-height: 1.7;
+          }
+
+          .ms-modal .ant-modal-content,
+          .ms-import-modal .ant-modal-content {
+            border-radius: 14px;
+          }
+
+          .ms-modal-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 8px;
+          }
+
+          .ms-modal-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #e6f4ff;
+            color: #1677ff;
+            font-size: 21px;
+          }
+
+          .ms-modal-title {
+            color: #172033;
+            font-size: 18px;
+            font-weight: 800;
+          }
+
+          .ms-section-title {
+            margin: 0 0 15px;
+            padding: 8px 11px;
+            border-radius: 7px;
+            color: #334155;
+            background: #f2f5f8;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .ms-form-grid {
             display: grid;
-            gap: 16px;
+            column-gap: 16px;
           }
 
-          .medical-staff-form-grid-3 {
+          .ms-grid-3 {
             grid-template-columns:
               repeat(3, minmax(0, 1fr));
           }
 
-          .medical-staff-form-grid-2 {
+          .ms-grid-2 {
             grid-template-columns:
               repeat(2, minmax(0, 1fr));
           }
 
-          .medical-staff-import-alert {
-            margin-top: 20px;
+          .ms-modal
+          .ant-form-item-label > label {
+            font-size: 12px;
+            font-weight: 600;
           }
 
-          .medical-staff-import-summary {
+          .ms-modal .ant-input,
+          .ms-modal .ant-select-selector {
+            border-radius: 8px;
+          }
+
+          .ms-modal input.ant-input {
+            min-height: 36px;
+          }
+
+          .ms-active {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 9px;
+            background: #fafcff;
+          }
+
+          .ms-modal
+          .ant-modal-footer .ant-btn,
+          .ms-import-modal
+          .ant-modal-footer .ant-btn {
+            border-radius: 8px;
+          }
+
+          .ms-import-help {
+            font-size: 12px;
+            line-height: 1.8;
+          }
+
+          .ms-upload-area {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 14px 16px;
+            border: 1px dashed #d9e2ec;
+            border-radius: 10px;
+            background: #fafcff;
+          }
+
+          .ms-import-summary {
             display: grid;
             grid-template-columns:
               repeat(4, minmax(0, 1fr));
             gap: 10px;
-            margin-top: 8px;
+            margin-top: 16px;
           }
 
-          .medical-staff-import-summary > div {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            padding: 10px 12px;
-            background: rgba(255, 255, 255, 0.65);
-            border-radius: 7px;
+          .ms-summary-item {
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
           }
 
-          .medical-staff-import-summary span {
+          .ms-summary-label {
+            color: #64748b;
             font-size: 12px;
-            color: #667085;
+            font-weight: 600;
           }
 
-          .medical-staff-import-summary b {
-            font-size: 18px;
+          .ms-summary-value {
+            margin-top: 3px;
             color: #172033;
+            font-size: 23px;
+            font-weight: 800;
           }
 
-          .medical-staff-import-table {
-            border: 1px solid #e6ebf1;
-            border-radius: 8px;
-            overflow: hidden;
+          .ms-summary-success {
+            border-color: #d9f7be;
+            background: #f6ffed;
           }
 
-          @media (max-width: 1100px) {
-            .medical-staff-filters {
-              grid-template-columns:
-                repeat(2, minmax(0, 1fr));
+          .ms-summary-info {
+            border-color: #bae0ff;
+            background: #e6f4ff;
+          }
+
+          .ms-summary-warning {
+            border-color: #ffe58f;
+            background: #fffbe6;
+          }
+
+          .ms-import-errors {
+            margin-top: 14px;
+          }
+
+          @media (max-width: 1200px) {
+            .ms-header {
+              flex-direction: column;
             }
 
-            .medical-staff-form-grid-3 {
+            .ms-filters {
               grid-template-columns:
                 repeat(2, minmax(0, 1fr));
             }
           }
 
           @media (max-width: 720px) {
-            .medical-staff-header {
-              flex-direction: column;
-            }
-
-            .medical-staff-filters {
-              grid-template-columns: 1fr;
-            }
-
-            .medical-staff-form-grid-3,
-            .medical-staff-form-grid-2 {
-              grid-template-columns: 1fr;
-            }
-
-            .medical-staff-import-summary {
+            .ms-grid-3 {
               grid-template-columns:
                 repeat(2, minmax(0, 1fr));
             }
           }
+
+          @media (max-width: 600px) {
+            .ms-filters,
+            .ms-grid-2,
+            .ms-grid-3 {
+              grid-template-columns: 1fr;
+            }
+
+            .ms-import-summary {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+
+            .ms-upload-area {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+
+            .ms-modal-title {
+              font-size: 16px;
+            }
+          }
         `}
       </style>
-
-    </>
+    </div>
   );
 }

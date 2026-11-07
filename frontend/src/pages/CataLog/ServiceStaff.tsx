@@ -1,4 +1,32 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useNavigate } from "react-router-dom";
+
 import {
+  Alert,
+  Breadcrumb,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  Upload,
+  message,
+} from "antd";
+
+import type { UploadFile } from "antd";
+import type { ColumnsType } from "antd/es/table";
+
+import {
+  ArrowLeftOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
@@ -9,52 +37,11 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 
-import {
-  Alert,
-  Breadcrumb,
-  Button,
-  Card,
-  Form,
-  Input,
-  message,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Switch,
-  Table,
-  Tag,
-  Typography,
-  Upload,
-} from "antd";
+import { apiFetch } from "../../api/apiClient";
 
-import type {
-  UploadFile,
-} from "antd";
+const { Title, Text } = Typography;
 
-import type {
-  ColumnsType,
-} from "antd/es/table";
-
-import {
-  useEffect,
-  useRef,
-  useMemo,
-  useState,
-} from "react";
-
-import {
-  useNavigate,
-} from "react-router-dom";
-
-import {
-  apiFetch,
-} from "../../api/apiClient";
-
-const {
-  Title,
-  Text,
-} = Typography;
+const API = "/catalog/service-staff";
 
 interface ServiceItem {
   code: string;
@@ -70,2794 +57,1229 @@ interface MedicalStaff {
   active?: boolean;
 }
 
-interface ServiceStaffRow {
-  id: string;
-
+interface FormValues {
   service_code: string;
-
   staff_code: string;
-
   specialty_code?: string | null;
-
   activity_type: string;
-
-  allowed: boolean;
-
   active: boolean;
-
   note?: string | null;
+}
 
+interface RuleRow extends FormValues {
+  id: string;
+  allowed: boolean;
   created_at?: string;
 }
 
-interface FormValues {
-  service_code: string;
-
-  staff_code: string;
-
-  specialty_code?: string;
-
-  activity_type: string;
-
-  allowed: boolean;
-
-  active: boolean;
-
-  note?: string;
-}
-
-interface ServiceListResponse {
-  success?: boolean;
-
-  message?: string;
-
-  data?: {
-    items?: ServiceItem[];
-
-    total?: number;
-  };
-}
-
-interface ServiceStaffImportPreviewRow {
+interface PreviewRow {
   row: number;
-
-  status:
-    | "VALID"
-    | "ERROR"
-    | "DUPLICATE";
-
+  status: "VALID" | "ERROR" | "DUPLICATE";
   serviceCode: string;
-
   staffCode: string;
-
   activityType: string;
-
   message: string;
 }
 
-interface ServiceStaffImportPreviewData {
+interface PreviewData {
   totalRows: number;
-
   valid: number;
-
   invalid: number;
-
   duplicate: number;
-
-  rows: ServiceStaffImportPreviewRow[];
+  rows: PreviewRow[];
 }
+
+interface ImportResult {
+  inserted?: number;
+  updated?: number;
+  skipped?: number;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+type ListData<T> = T[] | { items: T[] };
 
 const ACTIVITY_OPTIONS = [
   {
-    value:
-      "CONGKHAM",
-
-    label:
-      "CONGKHAM - Công khám",
+    value: "CONGKHAM",
+    label: "CONGKHAM - Công khám",
   },
-
   {
-    value:
-      "THUCHIEN_CDHA",
-
-    label:
-      "THUCHIEN_CDHA - Thực hiện CĐHA",
+    value: "THUCHIEN_CDHA",
+    label: "THUCHIEN_CDHA - Thực hiện CĐHA",
   },
-
   {
-    value:
-      "KETQUA_CDHA",
-
-    label:
-      "KETQUA_CDHA - Kết quả CĐHA",
+    value: "KETQUA_CDHA",
+    label: "KETQUA_CDHA - Kết quả CĐHA",
   },
-
   {
-    value:
-      "THUCHIEN_PTTT",
-
-    label:
-      "THUCHIEN_PTTT - Thực hiện thủ thuật/Phẫu thuật",
+    value: "THUCHIEN_PTTT",
+    label: "THUCHIEN_PTTT - Thực hiện thủ thuật/Phẫu thuật",
   },
-
   {
-    value:
-      "THUCHIEN_XN",
-
-    label:
-      "THUCHIEN_XN - Thực hiện Xét nghiệm",
+    value: "THUCHIEN_XN",
+    label: "THUCHIEN_XN - Thực hiện Xét nghiệm",
   },
-
   {
-    value:
-      "KETQUAXN",
-
-    label:
-      "KETQUAXN - Kết quả Xét nghiệm",
+    value: "KETQUAXN",
+    label: "KETQUAXN - Kết quả Xét nghiệm",
   },
 ];
 
-function getActivityLabel(
-  value: string
-) {
-  return (
-    ACTIVITY_OPTIONS.find(
-      (item) =>
-        item.value ===
-        value
-    )?.label ??
-    value
-  );
+const text = (value: unknown): string => String(value ?? "").trim();
+
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message : "Không thể thực hiện yêu cầu.";
+
+function getActivityLabel(value: string): string {
+  return ACTIVITY_OPTIONS.find((item) => item.value === value)?.label ?? value;
+}
+
+function extractItems<T>(data: ListData<T> | undefined): T[] {
+  if (Array.isArray(data)) return data;
+
+  if (data && Array.isArray(data.items)) {
+    return data.items;
+  }
+
+  throw new Error("Danh sách dữ liệu không hợp lệ.");
+}
+
+async function request<T>(url: string, init?: RequestInit): Promise<T | undefined> {
+  const headers = new Headers(init?.headers);
+
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const headerObject: Record<string, string> = {};
+
+  headers.forEach((value, key) => {
+    headerObject[key] = value;
+  });
+
+  const response = await apiFetch(url, {
+    ...init,
+    headers: headerObject,
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(`API không trả về JSON (HTTP ${response.status}).`);
+  }
+
+  const json = (await response.json()) as ApiResponse<T>;
+
+  if (!response.ok || json.success !== true) {
+    throw new Error(json.message || json.error || `Lỗi HTTP ${response.status}`);
+  }
+
+  return json.data;
 }
 
 export default function ServiceStaff() {
-  // Chiều cao vùng cuộn được tính theo không gian còn lại của màn hình.
-  // Chỉ cuộn nội dung bảng, không thay đổi dữ liệu hoặc phân trang.
+  const navigate = useNavigate();
+
+  const [messageApi, contextHolder] = message.useMessage();
+
+  const [form] = Form.useForm<FormValues>();
+
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const ruleRequestRef = useRef(0);
+  const serviceRequestRef = useRef(0);
+  const previewRequestRef = useRef(0);
+
+  const savingRef = useRef(false);
+  const importingRef = useRef(false);
+
   const [tableScrollHeight, setTableScrollHeight] = useState(320);
 
-  // Phân trang được kiểm soát bằng state: đổi 10/20/50/100 sẽ không bị
-  // reset về 10 khi React render lại.
+  const [rows, setRows] = useState<RuleRow[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+
+  const [serviceCache, setServiceCache] = useState<Record<string, ServiceItem>>({});
+
+  const [staffList, setStaffList] = useState<MedicalStaff[]>([]);
+
+  const [loading, setLoading] = useState(false);
+
+  const [serviceLoading, setServiceLoading] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [error, setError] = useState("");
+
+  const [referenceError, setReferenceError] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const [editing, setEditing] = useState<RuleRow | null>(null);
+
+  const [filterServiceCode, setFilterServiceCode] = useState<string | undefined>();
+
+  const [filterStaffCode, setFilterStaffCode] = useState<string | undefined>();
+
+  const [filterActivityType, setFilterActivityType] = useState<string | undefined>();
+
   const [currentPage, setCurrentPage] = useState(1);
+
   const [pageSize, setPageSize] = useState(10);
 
+  const [importOpen, setImportOpen] = useState(false);
+
+  const [importing, setImporting] = useState(false);
+
+  const [previewing, setPreviewing] = useState(false);
+
+  const [importFileList, setImportFileList] = useState<UploadFile[]>([]);
+
+  const [importPreview, setImportPreview] = useState<PreviewData | null>(null);
+
+  const [downloading, setDownloading] = useState(false);
+
+  const busy = saving || deletingId !== null || importing || previewing;
+
+  const loadRules = useCallback(async () => {
+    const sequence = ++ruleRequestRef.current;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await request<ListData<RuleRow>>(API);
+
+      if (sequence === ruleRequestRef.current) {
+        setRows(extractItems(data));
+      }
+    } catch (err) {
+      if (sequence === ruleRequestRef.current) {
+        setError(errorText(err));
+      }
+    } finally {
+      if (sequence === ruleRequestRef.current) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  const loadServices = useCallback(
+    async (keyword = "") => {
+      const sequence = ++serviceRequestRef.current;
+
+      setServiceLoading(true);
+
+      try {
+        const search = keyword.trim();
+
+        const fetchServices = async (filter?: "name" | "code") => {
+          const params = new URLSearchParams({
+            page: "1",
+            pageSize: "50",
+            active: "true",
+          });
+
+          if (search && filter) {
+            params.set(filter, search);
+          }
+
+          const data = await request<ListData<ServiceItem>>(
+            `/catalog/services?${params.toString()}`,
+          );
+
+          return extractItems(data);
+        };
+
+        const results = search
+          ? await Promise.all([fetchServices("name"), fetchServices("code")])
+          : [await fetchServices()];
+
+        const map = new Map<string, ServiceItem>();
+
+        for (const item of results.flat()) {
+          map.set(item.code, item);
+        }
+
+        const items = Array.from(map.values()).sort(
+          (a, b) => text(a.name).localeCompare(text(b.name), "vi") || a.code.localeCompare(b.code),
+        );
+
+        if (sequence !== serviceRequestRef.current) {
+          return;
+        }
+
+        setServices(items);
+
+        setServiceCache((previous) => {
+          const next = { ...previous };
+
+          for (const item of items) {
+            next[item.code] = item;
+          }
+
+          return next;
+        });
+      } catch (err) {
+        if (sequence === serviceRequestRef.current) {
+          messageApi.error(errorText(err));
+        }
+      } finally {
+        if (sequence === serviceRequestRef.current) {
+          setServiceLoading(false);
+        }
+      }
+    },
+    [messageApi],
+  );
+
+  const loadStaff = useCallback(async () => {
+    setReferenceError("");
+
+    try {
+      const data = await request<ListData<MedicalStaff>>(
+        "/catalog/medical-staff?page=1&pageSize=1000&active=true",
+      );
+
+      setStaffList(extractItems(data));
+    } catch (err) {
+      setReferenceError(`Không thể tải danh mục nhân viên: ${errorText(err)}`);
+    }
+  }, []);
 
   useEffect(() => {
-    const updateHeight = () => {
-      const element = tableContainerRef.current;
-      if (!element) return;
-
-      // Tính theo CHIỀU CAO THỰC của vùng bảng, không theo khoảng cách
-      // tới đáy cửa sổ. Trừ header bảng (~40px), pagination (~66px)
-      // và khoảng đệm. Nếu không trừ, pagination sẽ bị cắt.
-      const available = element.getBoundingClientRect().height - 130;
-      setTableScrollHeight(Math.max(80, Math.floor(available)));
-    };
-
-    const raf = window.requestAnimationFrame(updateHeight);
-    window.addEventListener("resize", updateHeight);
-
-    const observer = new ResizeObserver(updateHeight);
-    if (tableContainerRef.current) {
-      observer.observe(tableContainerRef.current);
-    }
+    void loadRules();
+    void loadServices();
+    void loadStaff();
 
     return () => {
-      window.cancelAnimationFrame(raf);
+      ruleRequestRef.current++;
+      serviceRequestRef.current++;
+      previewRequestRef.current++;
+    };
+  }, [loadRules, loadServices, loadStaff]);
+
+  useEffect(() => {
+    const element = tableContainerRef.current;
+
+    if (!element) return;
+
+    const updateHeight = () => {
+      const available = element.getBoundingClientRect().height - 130;
+
+      setTableScrollHeight(Math.max(160, Math.floor(available)));
+    };
+
+    const frame = window.requestAnimationFrame(updateHeight);
+
+    const observer = new ResizeObserver(updateHeight);
+
+    observer.observe(element);
+
+    window.addEventListener("resize", updateHeight);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+
       window.removeEventListener("resize", updateHeight);
+
       observer.disconnect();
     };
   }, []);
 
-  const navigate =
-    useNavigate();
+  const serviceOptions = useMemo(() => {
+    const map = new Map(services.map((item) => [item.code, item]));
 
-  const [
-    form,
-  ] =
-    Form.useForm<FormValues>();
-
-  const [
-    rows,
-    setRows,
-  ] =
-    useState<
-      ServiceStaffRow[]
-    >([]);
-
-  const [
-    services,
-    setServices,
-  ] =
-    useState<
-      ServiceItem[]
-    >([]);
-
-  const [
-    staffList,
-    setStaffList,
-  ] =
-    useState<
-      MedicalStaff[]
-    >([]);
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    serviceLoading,
-    setServiceLoading,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    saving,
-    setSaving,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    modalOpen,
-    setModalOpen,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    editing,
-    setEditing,
-  ] =
-    useState<
-      ServiceStaffRow |
-      null
-    >(
-      null
-    );
-
-  const [
-    filterServiceCode,
-    setFilterServiceCode,
-  ] =
-    useState<
-      string |
-      undefined
-    >();
-
-  const [
-    filterStaffCode,
-    setFilterStaffCode,
-  ] =
-    useState<
-      string |
-      undefined
-    >();
-
-  const [
-    filterActivityType,
-    setFilterActivityType,
-  ] =
-    useState<
-      string |
-      undefined
-    >();
-
-  const [
-    importOpen,
-    setImportOpen,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    importing,
-    setImporting,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    previewing,
-    setPreviewing,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    importFileList,
-    setImportFileList,
-  ] =
-    useState<
-      UploadFile[]
-    >([]);
-
-  const [
-    importPreview,
-    setImportPreview,
-  ] =
-    useState<
-      ServiceStaffImportPreviewData |
-      null
-    >(
-      null
-    );
-
-  async function loadRules() {
-    try {
-      setLoading(
-        true
-      );
-
-      const response =
-        await apiFetch(
-          "/catalog/service-staff",
-          {
-            method:
-              "GET",
-          }
-        );
-
-      let json:
-        any =
-        null;
-
-      try {
-        json =
-          await response.json();
-      } catch {
-        json =
-          null;
-      }
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể tải cấu hình DVKT - Nhân viên."
-        );
-      }
-
-      const data =
-        Array.isArray(
-          json?.data
-        )
-          ? json.data
-          : Array.isArray(
-              json?.data?.items
-            )
-            ? json.data.items
-            : [];
-
-      setRows(
-        data
-      );
-    } catch (
-      error
-    ) {
-      console.error(
-        "Load service staff error:",
-        error
-      );
-
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải cấu hình DVKT - Nhân viên."
-      );
-    } finally {
-      setLoading(
-        false
-      );
-    }
-  }
-
-  async function requestServices(
-    params:
-      URLSearchParams
-  ) {
-    const response =
-      await apiFetch(
-        `/catalog/services?${params.toString()}`,
-        {
-          method:
-            "GET",
-        }
-      );
-
-    const json:
-      ServiceListResponse =
-      await response.json();
-
-    if (
-      !response.ok ||
-      json.success !==
-        true
-    ) {
-      throw new Error(
-        json.message ||
-        "Không thể tải danh mục DVKT."
-      );
-    }
-
-    return Array.isArray(
-      json.data?.items
-    )
-      ? json.data.items
-      : [];
-  }
-
-  async function loadServices(
-    keyword =
-      ""
-  ) {
-    try {
-      setServiceLoading(
-        true
-      );
-
-      const search =
-        keyword
-          .trim();
-
-      if (
-        !search
-      ) {
-        const params =
-          new URLSearchParams({
-            page:
-              "1",
-
-            pageSize:
-              "50",
-
-            active:
-              "true",
-          });
-
-        const items =
-          await requestServices(
-            params
-          );
-
-        setServices(
-          items
-        );
-
-        return;
-      }
-
-      const nameParams =
-        new URLSearchParams({
-          page:
-            "1",
-
-          pageSize:
-            "50",
-
-          active:
-            "true",
-
-          name:
-            search,
-        });
-
-      const codeParams =
-        new URLSearchParams({
-          page:
-            "1",
-
-          pageSize:
-            "50",
-
-          active:
-            "true",
-
-          code:
-            search,
-        });
-
-      const [
-        byName,
-        byCode,
-      ] =
-        await Promise.all([
-          requestServices(
-            nameParams
-          ),
-
-          requestServices(
-            codeParams
-          ),
-        ]);
-
-      const map =
-        new Map<
-          string,
-          ServiceItem
-        >();
-
-      for (
-        const item
-        of [
-          ...byName,
-          ...byCode,
-        ]
-      ) {
+    for (const code of [filterServiceCode, editing?.service_code]) {
+      if (code && !map.has(code)) {
         map.set(
-          item.code,
-          item
+          code,
+          serviceCache[code] ?? {
+            code,
+            name: "",
+          },
         );
       }
-
-      const result =
-        Array.from(
-          map.values()
-        );
-
-      result.sort(
-        (
-          a,
-          b
-        ) => {
-          const nameCompare =
-            String(
-              a.name ??
-              ""
-            ).localeCompare(
-              String(
-                b.name ??
-                ""
-              ),
-              "vi"
-            );
-
-          if (
-            nameCompare !==
-            0
-          ) {
-            return nameCompare;
-          }
-
-          return a.code.localeCompare(
-            b.code
-          );
-        }
-      );
-
-      setServices(
-        result
-      );
-    } catch (
-      error
-    ) {
-      console.error(
-        "Load services error:",
-        error
-      );
-
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải danh mục DVKT."
-      );
-    } finally {
-      setServiceLoading(
-        false
-      );
     }
-  }
 
-  async function loadStaff() {
-    try {
-      const response =
-        await apiFetch(
-          "/catalog/medical-staff?page=1&pageSize=1000&active=true",
-          {
-            method:
-              "GET",
-          }
-        );
+    return Array.from(map.values()).map((item) => ({
+      value: item.code,
+      label: item.name ? `${item.code} - ${item.name}` : item.code,
+    }));
+  }, [services, serviceCache, filterServiceCode, editing]);
 
-      const json =
-        await response.json();
+  const staffMap = useMemo(() => {
+    const map = new Map<string, MedicalStaff>();
 
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể tải danh mục nhân viên."
-        );
+    for (const staff of staffList) {
+      const license = text(staff.licenseNumber);
+
+      const insurance = text(staff.socialInsuranceCode);
+
+      if (license) {
+        map.set(license, staff);
       }
 
-      setStaffList(
-        Array.isArray(
-          json?.data?.items
-        )
-          ? json.data.items
-          : Array.isArray(
-              json?.data
-            )
-            ? json.data
-            : []
-      );
-    } catch (
-      error
-    ) {
-      console.error(
-        "Load staff error:",
-        error
-      );
-
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải danh mục nhân viên."
-      );
+      if (insurance) {
+        map.set(insurance, staff);
+      }
     }
-  }
 
-  useEffect(
-    () => {
-      void Promise.all([
-        loadRules(),
-        loadServices(),
-        loadStaff(),
-      ]);
-    },
-    []
+    return map;
+  }, [staffList]);
+
+  const staffOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const staff of staffList) {
+      const code = text(staff.licenseNumber) || text(staff.socialInsuranceCode);
+
+      if (code && !map.has(code)) {
+        map.set(code, `${staff.fullName} - ${code}`);
+      }
+    }
+
+    for (const code of [filterStaffCode, editing?.staff_code]) {
+      if (code && !map.has(code)) {
+        const staff = staffMap.get(code);
+
+        map.set(code, staff ? `${staff.fullName} - ${code}` : code);
+      }
+    }
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({
+        value,
+        label,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "vi"));
+  }, [staffList, staffMap, filterStaffCode, editing]);
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          (!filterServiceCode || row.service_code === filterServiceCode) &&
+          (!filterStaffCode || row.staff_code === filterStaffCode) &&
+          (!filterActivityType || row.activity_type === filterActivityType),
+      ),
+    [rows, filterServiceCode, filterStaffCode, filterActivityType],
   );
 
-  const serviceOptions =
-    useMemo(
-      () =>
-        services.map(
-          (
-            item
-          ) => ({
-            value:
-              item.code,
+  const safePage = Math.min(currentPage, Math.max(1, Math.ceil(filteredRows.length / pageSize)));
 
-            label:
-              `${item.code} - ${item.name}`,
-          })
-        ),
-      [
-        services,
-      ]
-    );
+  function backToCatalog() {
+    sessionStorage.setItem("catalog-active-tab", "rules");
 
-  const staffOptions =
-    useMemo(
-      () => {
-        const options:
-          Array<{
-            value:
-              string;
-
-            label:
-              string;
-          }> =
-          [];
-
-        const seen =
-          new Set<
-            string
-          >();
-
-        for (
-          const staff
-          of staffList
-        ) {
-          const license =
-            String(
-              staff.licenseNumber ??
-              ""
-            ).trim();
-
-          const socialInsurance =
-            String(
-              staff.socialInsuranceCode ??
-              ""
-            ).trim();
-
-          const code =
-            license ||
-            socialInsurance;
-
-          if (
-            !code ||
-            seen.has(
-              code
-            )
-          ) {
-            continue;
-          }
-
-          seen.add(
-            code
-          );
-
-          options.push({
-            value:
-              code,
-
-            label:
-              `${staff.fullName} - ${code}`,
-          });
-        }
-
-        options.sort(
-          (
-            a,
-            b
-          ) =>
-            a.label.localeCompare(
-              b.label,
-              "vi"
-            )
-        );
-
-        return options;
-      },
-      [
-        staffList,
-      ]
-    );
-
-  const serviceMap =
-    useMemo(
-      () =>
-        new Map(
-          services.map(
-            (
-              item
-            ) => [
-              item.code,
-              item,
-            ]
-          )
-        ),
-      [
-        services,
-      ]
-    );
-
-  const staffMap =
-    useMemo(
-      () => {
-        const map =
-          new Map<
-            string,
-            MedicalStaff
-          >();
-
-        for (
-          const staff
-          of staffList
-        ) {
-          const license =
-            String(
-              staff.licenseNumber ??
-              ""
-            ).trim();
-
-          const socialInsurance =
-            String(
-              staff.socialInsuranceCode ??
-              ""
-            ).trim();
-
-          if (
-            license
-          ) {
-            map.set(
-              license,
-              staff
-            );
-          }
-
-          if (
-            socialInsurance
-          ) {
-            map.set(
-              socialInsurance,
-              staff
-            );
-          }
-        }
-
-        return map;
-      },
-      [
-        staffList,
-      ]
-    );
-
-  const filteredRows =
-    useMemo(
-      () =>
-        rows.filter(
-          (
-            item
-          ) => {
-            if (
-              filterServiceCode &&
-              item.service_code !==
-                filterServiceCode
-            ) {
-              return false;
-            }
-
-            if (
-              filterStaffCode &&
-              item.staff_code !==
-                filterStaffCode
-            ) {
-              return false;
-            }
-
-            if (
-              filterActivityType &&
-              item.activity_type !==
-                filterActivityType
-            ) {
-              return false;
-            }
-
-            return true;
-          }
-        ),
-      [
-        rows,
-        filterServiceCode,
-        filterStaffCode,
-        filterActivityType,
-      ]
-    );
-
-  // Khi thay đổi bộ lọc, quay về trang đầu để không bị rỗng bảng.
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterServiceCode, filterStaffCode, filterActivityType]);
-
-  // Khi số bản ghi giảm (xóa/import/lọc), đảm bảo currentPage vẫn hợp lệ.
-  useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-    setCurrentPage((page) => Math.min(page, maxPage));
-  }, [filteredRows.length, pageSize]);
-
-  function resetFilters() {
-    setFilterServiceCode(
-      undefined
-    );
-
-    setFilterStaffCode(
-      undefined
-    );
-
-    setFilterActivityType(
-      undefined
-    );
-
-    void loadServices();
-
-    void loadRules();
+    navigate("/catalog");
   }
 
-  function openCreate() {
-    setEditing(
-      null
-    );
+  function resetFilters() {
+    setFilterServiceCode(undefined);
+    setFilterStaffCode(undefined);
+    setFilterActivityType(undefined);
+    setCurrentPage(1);
+
+    void loadServices();
+  }
+
+  function refresh() {
+    void loadRules();
+    void loadServices();
+    void loadStaff();
+  }
+
+  function openForm(record?: RuleRow) {
+    setEditing(record ?? null);
 
     form.resetFields();
 
     form.setFieldsValue({
-      service_code:
-        filterServiceCode ??
-        "",
-
-      staff_code:
-        filterStaffCode ??
-        "",
-
-      activity_type:
-        filterActivityType ??
-        "THUCHIEN_CDHA",
-
-      specialty_code:
-        "",
-
-      allowed:
-        true,
-
-      active:
-        true,
-
-      note:
-        "",
+      service_code: record?.service_code ?? filterServiceCode ?? "",
+      staff_code: record?.staff_code ?? filterStaffCode ?? "",
+      specialty_code: record?.specialty_code ?? "",
+      activity_type: record?.activity_type ?? filterActivityType ?? "THUCHIEN_CDHA",
+      active: record ? record.active === true : true,
+      note: record?.note ?? "",
     });
 
-    setModalOpen(
-      true
-    );
+    setModalOpen(true);
 
-    if (
-      services.length ===
-      0
-    ) {
+    if (services.length === 0) {
       void loadServices();
     }
   }
 
-  function openEdit(
-    record:
-      ServiceStaffRow
-  ) {
-    setEditing(
-      record
-    );
+  function closeForm() {
+    if (savingRef.current) return;
 
-    form.resetFields();
-
-    form.setFieldsValue({
-      service_code:
-        record.service_code,
-
-      staff_code:
-        record.staff_code,
-
-      specialty_code:
-        record.specialty_code ??
-        "",
-
-      activity_type:
-        record.activity_type,
-
-      allowed:
-        record.allowed,
-
-      active:
-        record.active,
-
-      note:
-        record.note ??
-        "",
-    });
-
-    setModalOpen(
-      true
-    );
-
-    const existingService =
-      services.some(
-        (
-          item
-        ) =>
-          item.code ===
-          record.service_code
-      );
-
-    if (
-      !existingService
-    ) {
-      void loadServices(
-        record.service_code
-      );
-    }
+    setModalOpen(false);
   }
 
-  async function handleSave() {
+  async function handleSave(values: FormValues) {
+    if (savingRef.current) return;
+
+    savingRef.current = true;
+    setSaving(true);
+
     try {
-      const values =
-        await form
-          .validateFields();
+      const path = editing ? `/${encodeURIComponent(editing.id)}` : "";
 
-      setSaving(
-        true
-      );
+      await request(`${API}${path}`, {
+        method: editing ? "PUT" : "POST",
+        body: JSON.stringify({
+          service_code: text(values.service_code),
+          staff_code: text(values.staff_code),
+          specialty_code: text(values.specialty_code) || null,
+          activity_type: values.activity_type,
 
-      const url =
-        editing
-          ? `/catalog/service-staff/${editing.id}`
-          : "/catalog/service-staff";
+          // Trang này quản lý danh sách
+          // nhân viên được phép thực hiện.
+          allowed: true,
 
-      const response =
-        await apiFetch(
-          url,
-          {
-            method:
-              editing
-                ? "PUT"
-                : "POST",
+          // Chỉ có một công tắc bật/tắt.
+          active: values.active === true,
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          note: text(values.note) || null,
+        }),
+      });
 
-            body:
-              JSON.stringify({
-                service_code:
-                  values.service_code,
+      messageApi.success(editing ? "Đã cập nhật cấu hình." : "Đã thêm cấu hình.");
 
-                staff_code:
-                  values.staff_code,
-
-                specialty_code:
-                  values.specialty_code
-                    ?.trim() ||
-                  null,
-
-                activity_type:
-                  values.activity_type,
-
-                allowed:
-                  values.allowed,
-
-                active:
-                  values.active,
-
-                note:
-                  values.note
-                    ?.trim() ||
-                  null,
-              }),
-          }
-        );
-
-      let json:
-        any =
-        null;
-
-      try {
-        json =
-          await response.json();
-      } catch {
-        json =
-          null;
-      }
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể lưu cấu hình."
-        );
-      }
-
-      message.success(
-        editing
-          ? "Cập nhật cấu hình thành công."
-          : "Thêm cấu hình thành công."
-      );
-
-      setModalOpen(
-        false
-      );
-
-      setEditing(
-        null
-      );
-
-      form.resetFields();
+      setModalOpen(false);
 
       await loadRules();
-    } catch (
-      error
-    ) {
-      if (
-        error instanceof Error
-      ) {
-        message.error(
-          error.message
-        );
-      }
+    } catch (err) {
+      messageApi.error(errorText(err));
     } finally {
-      setSaving(
-        false
-      );
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
-  async function handleDelete(
-    id:
-      string
-  ) {
+  async function handleDelete(record: RuleRow) {
+    setDeletingId(record.id);
+
     try {
-      const response =
-        await apiFetch(
-          `/catalog/service-staff/${id}`,
-          {
-            method:
-              "DELETE",
-          }
-        );
+      await request(`${API}/${encodeURIComponent(record.id)}`, { method: "DELETE" });
 
-      let json:
-        any =
-        null;
-
-      try {
-        json =
-          await response.json();
-      } catch {
-        json =
-          null;
-      }
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể xóa cấu hình."
-        );
-      }
-
-      message.success(
-        "Đã xóa cấu hình."
-      );
+      messageApi.success("Đã xóa cấu hình.");
 
       await loadRules();
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể xóa cấu hình."
-      );
+    } catch (err) {
+      messageApi.error(errorText(err));
+    } finally {
+      setDeletingId(null);
     }
   }
 
   async function downloadTemplate() {
+    setDownloading(true);
+
     try {
-      const response =
-        await apiFetch(
-          "/catalog/service-staff/template",
-          {
-            method:
-              "GET",
-          }
-        );
+      const response = await apiFetch(`${API}/template`, { method: "GET" });
 
-      if (
-        !response.ok
-      ) {
-        let json:
-          any =
-          null;
-
-        try {
-          json =
-            await response.json();
-        } catch {
-          json =
-            null;
-        }
-
-        throw new Error(
-          json?.message ||
-          "Không thể tải file mẫu."
-        );
+      if (!response.ok) {
+        throw new Error(`Không thể tải file mẫu (HTTP ${response.status}).`);
       }
 
-      const blob =
-        await response.blob();
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
 
-      const url =
-        window.URL
-          .createObjectURL(
-            blob
-          );
+      const anchor = document.createElement("a");
 
-      const anchor =
-        document.createElement(
-          "a"
-        );
+      anchor.href = url;
+      anchor.download = "service_staff_template.xlsx";
 
-      anchor.href =
-        url;
-
-      anchor.download =
-        "service_staff_template.xlsx";
-
-      document.body
-        .appendChild(
-          anchor
-        );
-
+      document.body.appendChild(anchor);
       anchor.click();
-
       anchor.remove();
 
-      window.URL
-        .revokeObjectURL(
-          url
-        );
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải file mẫu."
-      );
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      messageApi.error(errorText(err));
+    } finally {
+      setDownloading(false);
     }
   }
 
   function openImportModal() {
-    setImportFileList(
-      []
-    );
-
-    setImportPreview(
-      null
-    );
-
-    setImportOpen(
-      true
-    );
+    previewRequestRef.current++;
+    setImportFileList([]);
+    setImportPreview(null);
+    setImportOpen(true);
   }
 
   function closeImportModal() {
-    if (
-      importing ||
-      previewing
-    ) {
+    if (importingRef.current || previewing) {
       return;
     }
 
-    setImportOpen(
-      false
-    );
-
-    setImportFileList(
-      []
-    );
-
-    setImportPreview(
-      null
-    );
+    previewRequestRef.current++;
+    setImportOpen(false);
+    setImportFileList([]);
+    setImportPreview(null);
   }
 
-  async function previewExcel(
-    file:
-      File
-  ) {
+  async function previewExcel(file: File) {
+    const sequence = ++previewRequestRef.current;
+
+    setPreviewing(true);
+    setImportPreview(null);
+
     try {
-      setPreviewing(
-        true
-      );
+      const body = new FormData();
+      body.append("file", file);
 
-      setImportPreview(
-        null
-      );
+      const data = await request<PreviewData>(`${API}/import/preview`, {
+        method: "POST",
+        body,
+      });
 
-      const formData =
-        new FormData();
-
-      formData.append(
-        "file",
-        file
-      );
-
-      const response =
-        await apiFetch(
-          "/catalog/service-staff/import/preview",
-          {
-            method:
-              "POST",
-
-            body:
-              formData,
-          }
-        );
-
-      let json:
-        any =
-        null;
-
-      try {
-        json =
-          await response.json();
-      } catch {
-        json =
-          null;
+      if (!data || !Array.isArray(data.rows)) {
+        throw new Error("Dữ liệu kiểm tra Excel không hợp lệ.");
       }
 
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể kiểm tra file Excel."
-        );
+      if (sequence !== previewRequestRef.current) {
+        return;
       }
 
-      const data:
-        ServiceStaffImportPreviewData =
-        {
-          totalRows:
-            Number(
-              json?.data
-                ?.totalRows ??
-              0
-            ),
-
-          valid:
-            Number(
-              json?.data
-                ?.valid ??
-              0
-            ),
-
-          invalid:
-            Number(
-              json?.data
-                ?.invalid ??
-              0
-            ),
-
-          duplicate:
-            Number(
-              json?.data
-                ?.duplicate ??
-              0
-            ),
-
-          rows:
-            Array.isArray(
-              json?.data?.rows
-            )
-              ? json.data.rows
-              : [],
-        };
-
-      setImportPreview(
-        data
-      );
-
-      if (
-        data.invalid >
-        0
-      ) {
-        message.warning(
-          `File có ${data.invalid} dòng lỗi.`
-        );
-      } else {
-        message.success(
-          "Đã kiểm tra file Excel."
-        );
+      setImportPreview({
+        totalRows: Number(data.totalRows ?? 0),
+        valid: Number(data.valid ?? 0),
+        invalid: Number(data.invalid ?? 0),
+        duplicate: Number(data.duplicate ?? 0),
+        rows: data.rows,
+      });
+    } catch (err) {
+      if (sequence === previewRequestRef.current) {
+        messageApi.error(errorText(err));
       }
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể kiểm tra file Excel."
-      );
     } finally {
-      setPreviewing(
-        false
-      );
+      if (sequence === previewRequestRef.current) {
+        setPreviewing(false);
+      }
     }
   }
 
   async function handleImportExcel() {
-    const file =
-      importFileList[0]
-        ?.originFileObj;
+    if (importingRef.current) return;
 
-    if (
-      !file
-    ) {
-      message.warning(
-        "Vui lòng chọn file Excel."
-      );
+    const file = importFileList[0]?.originFileObj;
 
+    if (!file || !importPreview || importPreview.valid <= 0 || previewing) {
+      messageApi.warning("Vui lòng chọn file có dữ liệu hợp lệ trước khi import.");
       return;
     }
 
-    if (
-      !importPreview
-    ) {
-      message.warning(
-        "Vui lòng kiểm tra file trước khi import."
-      );
-
-      return;
-    }
-
-    if (
-      importPreview.valid <=
-      0
-    ) {
-      message.warning(
-        "Không có dòng hợp lệ để import."
-      );
-
-      return;
-    }
+    importingRef.current = true;
+    setImporting(true);
 
     try {
-      setImporting(
-        true
+      const body = new FormData();
+      body.append("file", file);
+
+      const data = await request<ImportResult>(`${API}/import`, {
+        method: "POST",
+        body,
+      });
+
+      messageApi.success(
+        `Import thành công: ` +
+          `${Number(data?.inserted ?? 0)} thêm mới, ` +
+          `${Number(data?.updated ?? 0)} cập nhật, ` +
+          `${Number(data?.skipped ?? 0)} bỏ qua.`,
       );
 
-      const formData =
-        new FormData();
-
-      formData.append(
-        "file",
-        file
-      );
-
-      const response =
-        await apiFetch(
-          "/catalog/service-staff/import",
-          {
-            method:
-              "POST",
-
-            body:
-              formData,
-          }
-        );
-
-      let json:
-        any =
-        null;
-
-      try {
-        json =
-          await response.json();
-      } catch {
-        json =
-          null;
-      }
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Import thất bại."
-        );
-      }
-
-      const inserted =
-        Number(
-          json?.data
-            ?.inserted ??
-          0
-        );
-
-      const updated =
-        Number(
-          json?.data
-            ?.updated ??
-          0
-        );
-
-      const skipped =
-        Number(
-          json?.data
-            ?.skipped ??
-          0
-        );
-
-      message.success(
-        `Import thành công: ${inserted} thêm mới, ${updated} cập nhật, ${skipped} bỏ qua.`
-      );
-
-      setImportOpen(
-        false
-      );
-
-      setImportFileList(
-        []
-      );
-
-      setImportPreview(
-        null
-      );
+      setImportOpen(false);
+      setImportFileList([]);
+      setImportPreview(null);
 
       await loadRules();
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Import thất bại."
-      );
+    } catch (err) {
+      messageApi.error(errorText(err));
     } finally {
-      setImporting(
-        false
-      );
+      importingRef.current = false;
+      setImporting(false);
     }
   }
 
-  const columns:
-    ColumnsType<
-      ServiceStaffRow
-    > = [
-      
-{
-  title: "STT",
-  key: "stt",
-  width: 65,
-  align: "center" as const,
-  render: (
-    _value: unknown,
-    _record: ServiceStaffRow,
-    index: number
-  ) => (
-    <span style={{ fontWeight: 600 }}>
-      {(currentPage - 1) * pageSize + index + 1}
-    </span>
-  ),
-},
+  const columns: ColumnsType<RuleRow> = [
+    {
+      title: "STT",
+      key: "index",
+      width: 60,
+      align: "center",
+      render: (_, __, index) => (safePage - 1) * pageSize + index + 1,
+    },
+    {
+      title: "Dịch vụ kỹ thuật",
+      dataIndex: "service_code",
+      width: 320,
+      render: (code: string) => {
+        const name = serviceCache[code]?.name;
 
-      {
-        title:
-          "DVKT",
+        return (
+          <div className="ss-cell">
+            <Text strong>{name || code}</Text>
 
-        dataIndex:
-          "service_code",
+            {name && (
+              <Text type="secondary" className="ss-secondary">
+                {code}
+              </Text>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Nhân viên",
+      dataIndex: "staff_code",
+      width: 280,
+      render: (code: string) => {
+        const name = staffMap.get(code)?.fullName;
 
-        key:
-          "service_code",
+        return (
+          <div className="ss-person">
+            <div className="ss-avatar">
+              <TeamOutlined />
+            </div>
 
-        width:
-          300,
+            <div className="ss-cell">
+              <Text strong>{name || code}</Text>
 
-        render:
-          (
-            value:
-              string
-          ) => {
-            const service =
-              serviceMap.get(
-                value
-              );
-
-            return (
-              <div
-                className="service-staff-service"
-              >
-                <Text
-                  strong
-                >
-                  {value}
+              {name && (
+                <Text type="secondary" className="ss-secondary">
+                  {code}
                 </Text>
-
-                {service?.name && (
-                  <Text
-                    type="secondary"
-                  >
-                    {
-                      service.name
-                    }
-                  </Text>
-                )}
-              </div>
-            );
-          },
+              )}
+            </div>
+          </div>
+        );
       },
-
-      {
-        title:
-          "Nhân viên",
-
-        dataIndex:
-          "staff_code",
-
-        key:
-          "staff_code",
-
-        width:
-          300,
-
-        render:
-          (
-            value:
-              string
-          ) => {
-            const staff =
-              staffMap.get(
-                value
-              );
-
-            return (
-              <div
-                className="service-staff-person"
-              >
-                <div
-                  className="service-staff-avatar"
-                >
-                  <TeamOutlined />
-                </div>
-
-                <div>
-                  <Text
-                    strong
-                  >
-                    {
-                      staff?.fullName ??
-                      value
-                    }
-                  </Text>
-
-                  <Text
-                    type="secondary"
-
-                    style={{
-                      display:
-                        "block",
-
-                      fontSize:
-                        11,
-                    }}
-                  >
-                    {value}
-                  </Text>
-                </div>
-              </div>
-            );
-          },
-      },
-
-      {
-        title:
-          "Loại",
-
-        dataIndex:
-          "activity_type",
-
-        key:
-          "activity_type",
-
-        width:
-          300,
-
-        render:
-          (
-            value:
-              string
-          ) => (
-            <Tag
-              color="blue"
-
-              className="service-staff-type-tag"
-            >
-              {
-                getActivityLabel(
-                  value
-                )
-              }
-            </Tag>
-          ),
-      },
-
-      {
-        title:
-          "Cho phép",
-
-        dataIndex:
-          "allowed",
-
-        key:
-          "allowed",
-
-        width:
-          120,
-
-        align:
-          "center",
-
-        render:
-          (
-            value:
-              boolean
-          ) =>
-            value
-              ? (
-                <Tag
-                  color="success"
-
-                  className="service-staff-status-tag"
-                >
-                  Cho phép
-                </Tag>
-              )
-              : (
-                <Tag
-                  color="error"
-
-                  className="service-staff-status-tag"
-                >
-                  Không cho phép
-                </Tag>
-              ),
-      },
-
-      {
-        title:
-          "Trạng thái",
-
-        dataIndex:
-          "active",
-
-        key:
-          "active",
-
-        width:
-          110,
-
-        align:
-          "center",
-
-        render:
-          (
-            value:
-              boolean
-          ) =>
-            value
-              ? (
-                <Tag
-                  color="success"
-
-                  className="service-staff-status-tag"
-                >
-                  Hoạt động
-                </Tag>
-              )
-              : (
-                <Tag
-                  className="service-staff-status-tag"
-                >
-                  Tắt
-                </Tag>
-              ),
-      },
-
-      {
-        title:
-          "Thao tác",
-
-        key:
-          "actions",
-
-        width:
-          110,
-
-        fixed:
-          "right",
-
-        align:
-          "center",
-
-        render:
-          (
-            _:
-              unknown,
-
-            record:
-              ServiceStaffRow
-          ) => (
-            <Space
-              size={
-                4
-              }
-            >
-              <Button
-                type="text"
-
-                icon={
-                  <EditOutlined />
-                }
-
-                className="service-staff-edit"
-
-                onClick={() =>
-                  openEdit(
-                    record
-                  )
-                }
-              />
-
-              <Popconfirm
-                title="Xóa cấu hình?"
-
-                description="Bạn có chắc muốn xóa quyền thực hiện này?"
-
-                okText="Xóa"
-
-                cancelText="Hủy"
-
-                okButtonProps={{
-                  danger:
-                    true,
-                }}
-
-                onConfirm={() =>
-                  void handleDelete(
-                    record.id
-                  )
-                }
-              >
-                <Button
-                  type="text"
-
-                  danger
-
-                  icon={
-                    <DeleteOutlined />
-                  }
-
-                  className="service-staff-delete"
-                />
-              </Popconfirm>
-            </Space>
-          ),
-      },
-    ];
-
-  const importColumns:
-    ColumnsType<
-      ServiceStaffImportPreviewRow
-    > = [
-      {
-        title:
-          "Trạng thái",
-
-        dataIndex:
-          "status",
-
-        key:
-          "status",
-
-        width:
-          115,
-
-        render:
-          (
-            value:
-              ServiceStaffImportPreviewRow["status"]
-          ) => {
-            if (
-              value ===
-              "VALID"
-            ) {
-              return (
-                <Tag
-                  color="success"
-                  className="import-status-tag"
-                >
-                  Hợp lệ
-                </Tag>
-              );
-            }
-
-            if (
-              value ===
-              "DUPLICATE"
-            ) {
-              return (
-                <Tag
-                  color="warning"
-                  className="import-status-tag"
-                >
-                  Trùng
-                </Tag>
-              );
-            }
-
-            return (
-              <Tag
-                color="error"
-                className="import-status-tag"
-              >
-                Lỗi
-              </Tag>
-            );
-          },
-      },
-
-      {
-        title:
-          "STT",
-
-        dataIndex:
-          "row",
-
-        key:
-          "row",
-
-        width:
-          70,
-
-        align:
-          "center",
-      },
-
-      {
-        title:
-          "Mã DVKT",
-
-        dataIndex:
-          "serviceCode",
-
-        key:
-          "serviceCode",
-
-        width:
-          170,
-      },
-
-      {
-        title:
-          "Mã bác sĩ",
-
-        dataIndex:
-          "staffCode",
-
-        key:
-          "staffCode",
-
-        width:
-          210,
-      },
-
-      {
-        title:
-          "Loại",
-
-        dataIndex:
-          "activityType",
-
-        key:
-          "activityType",
-
-        width:
-          210,
-
-        render:
-          (
-            value:
-              string
-          ) => (
-            <Tag
-              color="blue"
-              className="import-type-tag"
-            >
-              {
-                value
-              }
-            </Tag>
-          ),
-      },
-
-      {
-        title:
-          "Ghi chú",
-
-        dataIndex:
-          "message",
-
-        key:
-          "message",
-
-        render:
-          (
-            value:
-              string,
-
-            record:
-              ServiceStaffImportPreviewRow
-          ) => (
-            <span
-              style={{
-                color:
-                  record.status ===
-                  "ERROR"
-                    ? "#ff4d4f"
-                    : record.status ===
-                        "DUPLICATE"
-                      ? "#d48806"
-                      : "#64748b",
-              }}
-            >
-              {value}
-            </span>
-          ),
-      },
-    ];
+    },
+    {
+      title: "Loại thực hiện",
+      dataIndex: "activity_type",
+      width: 280,
+      render: (value: string) => (
+        <Tag color="blue" className="ss-wrap-tag">
+          {getActivityLabel(value)}
+        </Tag>
+      ),
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "active",
+      width: 110,
+      align: "center",
+      render: (active: boolean) => (
+        <Tag color={active ? "success" : "default"}>{active ? "Đang bật" : "Đã tắt"}</Tag>
+      ),
+    },
+    {
+      title: "Thao tác",
+      key: "actions",
+      width: 100,
+      fixed: "right",
+      align: "center",
+      render: (_, record) => (
+        <Space size={2}>
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="text"
+              size="small"
+              aria-label="Chỉnh sửa cấu hình"
+              icon={<EditOutlined />}
+              className="ss-edit"
+              disabled={busy || loading}
+              onClick={() => openForm(record)}
+            />
+          </Tooltip>
+
+          <Popconfirm
+            title="Xóa cấu hình?"
+            description="Bạn có chắc muốn xóa quyền thực hiện này?"
+            okText="Xóa"
+            cancelText="Hủy"
+            okButtonProps={{
+              danger: true,
+            }}
+            disabled={busy || loading}
+            onConfirm={() => handleDelete(record)}
+          >
+            <Button
+              danger
+              type="text"
+              size="small"
+              aria-label="Xóa cấu hình"
+              icon={<DeleteOutlined />}
+              disabled={busy || loading}
+              loading={deletingId === record.id}
+            />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const importColumns: ColumnsType<PreviewRow> = [
+    {
+      title: "Dòng",
+      dataIndex: "row",
+      width: 65,
+      align: "center",
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      width: 110,
+      render: (value: PreviewRow["status"]) => (
+        <Tag color={value === "VALID" ? "success" : value === "ERROR" ? "error" : "warning"}>
+          {value === "VALID" ? "Hợp lệ" : value === "ERROR" ? "Lỗi" : "Trùng"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Mã DVKT",
+      dataIndex: "serviceCode",
+      width: 160,
+    },
+    {
+      title: "Mã nhân viên",
+      dataIndex: "staffCode",
+      width: 180,
+    },
+    {
+      title: "Loại thực hiện",
+      dataIndex: "activityType",
+      width: 180,
+    },
+    {
+      title: "Ghi chú",
+      dataIndex: "message",
+      width: 240,
+    },
+  ];
 
   return (
-    <div
-      className="service-staff-page"
-    >
+    <div className="ss-page">
+      {contextHolder}
+
       <Breadcrumb
         items={[
           {
             title: (
-              <HomeOutlined
-                onClick={() =>
-                  navigate(
-                    "/"
-                  )
-                }
-
-                style={{
-                  cursor:
-                    "pointer",
-                }}
+              <Button
+                type="link"
+                size="small"
+                className="ss-crumb"
+                aria-label="Trang chủ"
+                icon={<HomeOutlined />}
+                onClick={() => navigate("/")}
               />
             ),
           },
-
           {
             title: (
-              <span
-                onClick={() =>
-                  navigate(
-                    "/catalog"
-                  )
-                }
-
-                style={{
-                  cursor:
-                    "pointer",
-                }}
-              >
+              <Button type="link" size="small" className="ss-crumb" onClick={backToCatalog}>
                 Danh mục
-              </span>
+              </Button>
             ),
           },
-
           {
-            title:
-              "DVKT - Nhân viên",
+            title: "DVKT - Nhân viên",
           },
         ]}
       />
 
-      <div
-        className="service-staff-header"
-      >
+      <div className="ss-header">
         <div>
           <Title
             level={3}
-
             style={{
-              margin:
-                0,
-
-              color:
-                "#172033",
-
-              fontWeight:
-                800,
+              margin: 0,
+              color: "#172033",
+              fontSize: 21,
+              fontWeight: 800,
             }}
           >
             <TeamOutlined
               style={{
-                marginRight:
-                  9,
-
-                color:
-                  "#1677ff",
+                marginRight: 9,
+                color: "#1677ff",
               }}
             />
-
             DVKT - Nhân viên
           </Title>
 
-          <Text
-            type="secondary"
-          >
+          <Text type="secondary" className="ss-subtitle">
             Cấu hình bác sĩ và nhân viên được phép thực hiện từng DVKT
           </Text>
         </div>
 
-        <Space
-          wrap
-        >
+        <Space size={8} wrap>
           <Button
-            icon={
-              <DownloadOutlined />
-            }
-
-            onClick={() =>
-              void downloadTemplate()
-            }
+            icon={<DownloadOutlined />}
+            loading={downloading}
+            onClick={() => void downloadTemplate()}
           >
-            File mẫu Import
+            File mẫu
           </Button>
 
-          <Button
-            icon={
-              <UploadOutlined />
-            }
-
-            onClick={
-              openImportModal
-            }
-          >
-            Import
+          <Button icon={<UploadOutlined />} disabled={busy || loading} onClick={openImportModal}>
+            Import Excel
           </Button>
 
           <Button
             type="primary"
-
-            icon={
-              <PlusOutlined />
-            }
-
-            onClick={
-              openCreate
-            }
+            icon={<PlusOutlined />}
+            disabled={busy || loading}
+            onClick={() => openForm()}
           >
             Thêm mới
           </Button>
         </Space>
       </div>
 
-      <div
-        className="service-staff-filter"
-      >
-        <div>
-          <Text
-            className="service-staff-filter-label"
-          >
-            DVKT
-          </Text>
+      {(error || referenceError) && (
+        <Alert
+          type={error ? "error" : "warning"}
+          showIcon
+          message={error ? "Không thể tải cấu hình" : "Không thể tải đủ danh mục"}
+          description={error || referenceError}
+          action={
+            <Button size="small" disabled={busy || loading} onClick={refresh}>
+              Thử lại
+            </Button>
+          }
+        />
+      )}
+
+      <div className="ss-filters">
+        <div className="ss-filter">
+          <label htmlFor="ss-service">Dịch vụ kỹ thuật</label>
 
           <Select
+            id="ss-service"
             showSearch
-
             allowClear
-
-            value={
-              filterServiceCode
-            }
-
+            filterOption={false}
+            value={filterServiceCode}
             placeholder="Nhập mã hoặc tên DVKT"
+            options={serviceOptions}
+            loading={serviceLoading}
+            onSearch={(value) => void loadServices(value)}
+            onChange={(value) => {
+              setFilterServiceCode(value);
+              setCurrentPage(1);
 
-            filterOption={
-              false
-            }
-
-            loading={
-              serviceLoading
-            }
-
-            options={
-              serviceOptions
-            }
-
-            notFoundContent={
-              serviceLoading
-                ? "Đang tìm..."
-                : "Không tìm thấy DVKT"
-            }
-
-            onFocus={() => {
-              if (
-                services.length ===
-                0
-              ) {
-                void loadServices();
-              }
-            }}
-
-            onSearch={(
-              value
-            ) => {
-              void loadServices(
-                value
-              );
-            }}
-
-            onChange={(
-              value
-            ) => {
-              setFilterServiceCode(
-                value
-              );
-
-              if (
-                !value
-              ) {
+              if (!value) {
                 void loadServices();
               }
             }}
           />
         </div>
 
-        <div>
-          <Text
-            className="service-staff-filter-label"
-          >
-            Nhân viên
-          </Text>
+        <div className="ss-filter">
+          <label htmlFor="ss-staff">Nhân viên</label>
 
           <Select
+            id="ss-staff"
             showSearch
-
             allowClear
-
-            value={
-              filterStaffCode
-            }
-
-            placeholder="Chọn nhân viên"
-
             optionFilterProp="label"
-
-            options={
-              staffOptions
-            }
-
-            onChange={
-              setFilterStaffCode
-            }
+            value={filterStaffCode}
+            placeholder="Tất cả nhân viên"
+            options={staffOptions}
+            onChange={(value) => {
+              setFilterStaffCode(value);
+              setCurrentPage(1);
+            }}
           />
         </div>
 
-        <div>
-          <Text
-            className="service-staff-filter-label"
-          >
-            Loại
-          </Text>
+        <div className="ss-filter">
+          <label htmlFor="ss-activity">Loại thực hiện</label>
 
           <Select
+            id="ss-activity"
             allowClear
-
-            value={
-              filterActivityType
-            }
-
-            placeholder="Tất cả"
-
-            options={
-              ACTIVITY_OPTIONS
-            }
-
-            onChange={
-              setFilterActivityType
-            }
+            value={filterActivityType}
+            placeholder="Tất cả loại"
+            options={ACTIVITY_OPTIONS}
+            onChange={(value) => {
+              setFilterActivityType(value);
+              setCurrentPage(1);
+            }}
           />
         </div>
 
-        <Button
-          type="primary"
-
-          icon={
-            <ReloadOutlined />
-          }
-
-          loading={
-            loading
-          }
-
-          onClick={
-            resetFilters
-          }
-        >
-          Làm mới
+        <Button icon={<ReloadOutlined />} disabled={busy} onClick={resetFilters}>
+          Xóa bộ lọc
         </Button>
       </div>
 
-      <div className="service-staff-table-wrap" ref={tableContainerRef}>
-      <Card
-        className="service-staff-table-card"
-
-        styles={{
-          body: {
-            padding:
-              0,
-          },
-        }}
-      >
-        <Table<
-          ServiceStaffRow
+      <div className="ss-table-wrap" ref={tableContainerRef}>
+        <Card
+          className="ss-table"
+          styles={{
+            body: { padding: 0 },
+          }}
         >
-          rowKey="id"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            filteredRows
-          }
-
-          columns={
-            columns
-          }
-
-          size="middle"
-
-          scroll={{
-            x: 1250,
-            y: tableScrollHeight,
-          }}
-
-          pagination={{
-            current: currentPage,
-            pageSize,
-            showSizeChanger: true,
-            pageSizeOptions: ["10", "20", "50", "100"],
-            onChange: (nextPage, nextPageSize) => {
-              // Khi chọn pageSize, Ant Design gọi onChange cùng pageSize mới.
-              // Chuyển về trang 1 để tránh trạng thái trang không còn tồn tại.
-              if (nextPageSize !== pageSize) {
-                setPageSize(nextPageSize);
-                setCurrentPage(1);
-              } else {
-                setCurrentPage(nextPage);
-              }
-            },
-            showTotal: (total, range) =>
-              `Hiển thị ${range[0]}-${range[1]} / Tổng số: ${total}`,
-          }}
-
-          locale={{
-            emptyText:
-              "Chưa có cấu hình DVKT - Nhân viên",
-          }}
-        />
-      </Card>
+          <Table<RuleRow>
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredRows}
+            loading={loading}
+            tableLayout="fixed"
+            size="middle"
+            scroll={{
+              x: 1150,
+              y: tableScrollHeight,
+            }}
+            locale={{
+              emptyText: error
+                ? "Chưa tải được dữ liệu."
+                : rows.length === 0
+                  ? "Chưa có cấu hình DVKT - Nhân viên."
+                  : "Không có cấu hình phù hợp bộ lọc.",
+            }}
+            pagination={{
+              current: safePage,
+              pageSize,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "20", "50", "100"],
+              showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / Tổng số: ${total}`,
+              onChange: (nextPage, nextSize) => {
+                setCurrentPage(nextSize !== pageSize ? 1 : nextPage);
+                setPageSize(nextSize);
+              },
+            }}
+          />
+        </Card>
       </div>
 
+      <Text type="secondary" className="ss-legend">
+        Cấu hình đang bật được áp dụng khi chạy lại kiểm tra hồ sơ.
+      </Text>
+
       <Modal
-        className="service-staff-modal"
-
-        open={
-          modalOpen
-        }
-
+        open={modalOpen}
+        forceRender
+        centered
+        width={760}
+        className="ss-modal"
         title={
-          <div>
-            <div
-              className="service-staff-modal-title"
-            >
-              {
-                editing
-                  ? "Cập nhật DVKT - Nhân viên"
-                  : "Thêm DVKT - Nhân viên"
-              }
+          <div className="ss-modal-heading">
+            <div className="ss-modal-icon">
+              <TeamOutlined />
             </div>
 
-            <div
-              className="service-staff-modal-description"
-            >
-              Cấu hình quyền thực hiện DVKT cho nhân viên
+            <div>
+              <div className="ss-modal-title">
+                {editing ? "Cập nhật DVKT - Nhân viên" : "Thêm DVKT - Nhân viên"}
+              </div>
+
+              <div className="ss-subtitle">Cấu hình quyền thực hiện DVKT cho nhân viên</div>
             </div>
           </div>
         }
-
-        width={
-          680
-        }
-
-        okText={
-          editing
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
+        okText={editing ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
-        onCancel={() => {
-          if (
-            saving
-          ) {
-            return;
-          }
-
-          setModalOpen(
-            false
-          );
-
-          setEditing(
-            null
-          );
-
-          form.resetFields();
+        confirmLoading={saving}
+        cancelButtonProps={{
+          disabled: saving,
         }}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
+        onCancel={closeForm}
+        onOk={() => form.submit()}
       >
-        <Form
-          form={
-            form
-          }
-
+        <Form<FormValues>
+          form={form}
           layout="vertical"
-
-          requiredMark={
-            false
-          }
-
-          style={{
-            marginTop:
-              18,
-          }}
+          requiredMark={false}
+          disabled={saving}
+          onFinish={handleSave}
+          style={{ marginTop: 18 }}
         >
           <Form.Item
             name="service_code"
-
-            label="DVKT"
-
+            label="Dịch vụ kỹ thuật"
             rules={[
               {
-                required:
-                  true,
-
-                message:
-                  "Vui lòng chọn DVKT.",
+                required: true,
+                message: "Vui lòng chọn DVKT.",
               },
             ]}
           >
             <Select
               showSearch
-
               allowClear
-
+              filterOption={false}
+              loading={serviceLoading}
+              options={serviceOptions}
               placeholder="Nhập mã hoặc tên DVKT"
-
-              filterOption={
-                false
-              }
-
-              loading={
-                serviceLoading
-              }
-
-              options={
-                serviceOptions
-              }
-
-              notFoundContent={
-                serviceLoading
-                  ? "Đang tìm DVKT..."
-                  : "Không tìm thấy DVKT"
-              }
-
-              onFocus={() => {
-                if (
-                  services.length ===
-                  0
-                ) {
-                  void loadServices();
-                }
-              }}
-
-              onSearch={(
-                value
-              ) => {
-                void loadServices(
-                  value
-                );
-              }}
-
-              onClear={() => {
-                void loadServices();
-              }}
+              notFoundContent={serviceLoading ? "Đang tìm..." : "Không tìm thấy DVKT"}
+              onSearch={(value) => void loadServices(value)}
+              onClear={() => void loadServices()}
             />
           </Form.Item>
 
           <Form.Item
             name="staff_code"
-
             label="Nhân viên"
-
             rules={[
               {
-                required:
-                  true,
-
-                message:
-                  "Vui lòng chọn nhân viên.",
+                required: true,
+                message: "Vui lòng chọn nhân viên.",
               },
             ]}
           >
             <Select
               showSearch
-
-              placeholder="Chọn nhân viên"
-
               optionFilterProp="label"
-
-              options={
-                staffOptions
-              }
-
+              options={staffOptions}
+              placeholder="Chọn nhân viên"
               notFoundContent="Không tìm thấy nhân viên"
             />
           </Form.Item>
 
-          <Form.Item
-            name="activity_type"
-
-            label="Loại thực hiện"
-
-            rules={[
-              {
-                required:
-                  true,
-
-                message:
-                  "Vui lòng chọn loại thực hiện.",
-              },
-            ]}
-          >
-            <Select
-              options={
-                ACTIVITY_OPTIONS
-              }
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="specialty_code"
-
-            label="Mã chuyên khoa"
-          >
-            <Input
-              placeholder="Không bắt buộc"
-            />
-          </Form.Item>
-
-          <div
-            className="service-staff-switch-grid"
-          >
+          <div className="ss-form-grid">
             <Form.Item
-              name="allowed"
-
-              label="Cho phép"
-
-              valuePropName="checked"
+              name="activity_type"
+              label="Loại thực hiện"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng chọn loại thực hiện.",
+                },
+              ]}
             >
-              <Switch
-                checkedChildren="Cho phép"
-
-                unCheckedChildren="Không"
-              />
+              <Select options={ACTIVITY_OPTIONS} />
             </Form.Item>
 
-            <Form.Item
-              name="active"
-
-              label="Hoạt động"
-
-              valuePropName="checked"
-            >
-              <Switch
-                checkedChildren="Bật"
-
-                unCheckedChildren="Tắt"
-              />
+            <Form.Item name="specialty_code" label="Mã chuyên khoa">
+              <Input placeholder="Không bắt buộc" />
             </Form.Item>
           </div>
 
-          <Form.Item
-            name="note"
-
-            label="Ghi chú"
-          >
+          <Form.Item name="note" label="Ghi chú">
             <Input.TextArea
-              rows={
-                3
-              }
-
-              placeholder="Ghi chú nếu có"
+              autoSize={{
+                minRows: 3,
+                maxRows: 6,
+              }}
+              placeholder="Nhập ghi chú nếu có"
             />
           </Form.Item>
+
+          <div className="ss-switch-box">
+            <div>
+              <Text strong>Kích hoạt cấu hình</Text>
+
+              <Text className="ss-subtitle">
+                Bật để áp dụng quyền thực hiện DVKT cho nhân viên này
+              </Text>
+            </div>
+
+            <Form.Item name="active" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
 
       <Modal
-        className="service-staff-import-modal"
-
-        open={
-          importOpen
-        }
-
+        open={importOpen}
+        centered
+        width={1050}
+        destroyOnHidden
+        className="ss-import-modal"
         title={
-          <div>
-            <div
-              className="service-staff-modal-title"
-            >
-              Import DVKT - Nhân viên
+          <div className="ss-modal-heading">
+            <div className="ss-modal-icon">
+              <UploadOutlined />
             </div>
 
-            <div
-              className="service-staff-modal-description"
-            >
-              Chọn file Excel theo đúng mẫu để kiểm tra trước khi import
+            <div>
+              <div className="ss-modal-title">Import DVKT - Nhân viên</div>
+
+              <div className="ss-subtitle">Kiểm tra dữ liệu Excel trước khi nhập vào danh mục</div>
             </div>
           </div>
         }
-
-        width={
-          1000
-        }
-
-        centered
-
-        destroyOnClose
-
-        maskClosable={
-          !importing &&
-          !previewing
-        }
-
-        onCancel={
-          closeImportModal
-        }
-
+        closable={!importing && !previewing}
+        maskClosable={!importing && !previewing}
+        keyboard={!importing && !previewing}
+        onCancel={closeImportModal}
         footer={[
-          <Button
-            key="cancel"
-
-            disabled={
-              importing ||
-              previewing
-            }
-
-            onClick={
-              closeImportModal
-            }
-          >
+          <Button key="cancel" disabled={importing || previewing} onClick={closeImportModal}>
             Hủy
           </Button>,
-
           <Button
             key="import"
-
             type="primary"
-
-            icon={
-              <UploadOutlined />
-            }
-
-            loading={
-              importing
-            }
-
-            disabled={
-              !importPreview ||
-              importPreview.valid <=
-                0 ||
-              previewing
-            }
-
-            onClick={() =>
-              void handleImportExcel()
-            }
+            icon={<UploadOutlined />}
+            loading={importing}
+            disabled={previewing || !importPreview || importPreview.valid <= 0}
+            onClick={() => void handleImportExcel()}
           >
             Import
           </Button>,
         ]}
       >
-        <div
-          className="import-upload-area"
-        >
+        <div className="ss-upload-area">
           <Upload
             accept=".xlsx"
+            maxCount={1}
+            disabled={importing || previewing}
+            fileList={importFileList}
+            beforeUpload={(file) => {
+              if (!file.name.toLowerCase().endsWith(".xlsx")) {
+                messageApi.error("Vui lòng chọn file Excel .xlsx.");
 
-            maxCount={
-              1
-            }
+                return Upload.LIST_IGNORE;
+              }
 
-            fileList={
-              importFileList
-            }
-
-            beforeUpload={(
-              file
-            ) => {
-              const uploadFile:
-                UploadFile =
+              setImportFileList([
                 {
-                  uid:
-                    file.uid,
+                  uid: file.uid,
+                  name: file.name,
+                  status: "done",
+                  originFileObj: file,
+                },
+              ]);
 
-                  name:
-                    file.name,
-
-                  status:
-                    "done",
-
-                  originFileObj:
-                    file,
-                };
-
-              setImportFileList(
-                [
-                  uploadFile,
-                ]
-              );
-
-              void previewExcel(
-                file
-              );
+              void previewExcel(file);
 
               return false;
             }}
-
             onRemove={() => {
-              if (
-                importing ||
-                previewing
-              ) {
+              if (importing || previewing) {
                 return false;
               }
 
-              setImportFileList(
-                []
-              );
-
-              setImportPreview(
-                null
-              );
+              previewRequestRef.current++;
+              setImportFileList([]);
+              setImportPreview(null);
 
               return true;
             }}
           >
             <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              loading={
-                previewing
-              }
-
-              disabled={
-                importing
-              }
+              icon={<UploadOutlined />}
+              loading={previewing}
+              disabled={importing || previewing}
             >
               Chọn file Excel
             </Button>
@@ -2865,14 +1287,9 @@ export default function ServiceStaff() {
 
           <Button
             type="link"
-
-            icon={
-              <DownloadOutlined />
-            }
-
-            onClick={() =>
-              void downloadTemplate()
-            }
+            icon={<DownloadOutlined />}
+            loading={downloading}
+            onClick={() => void downloadTemplate()}
           >
             Tải file mẫu
           </Button>
@@ -2881,604 +1298,451 @@ export default function ServiceStaff() {
         {previewing && (
           <Alert
             type="info"
-
             showIcon
-
             message="Đang kiểm tra dữ liệu Excel..."
-
-            style={{
-              marginTop:
-                16,
-            }}
+            style={{ marginTop: 16 }}
           />
         )}
 
-        {
-          importPreview &&
-          !previewing &&
-          (
-            <>
-              <div
-                className="import-summary"
-              >
-                <div
-                  className="import-summary-item"
-                >
-                  <div
-                    className="import-summary-label"
-                  >
-                    Tổng số
-                  </div>
+        {importPreview && !previewing && (
+          <>
+            <div className="ss-import-summary">
+              {[
+                {
+                  label: "Tổng số",
+                  value: importPreview.totalRows,
+                  className: "",
+                },
+                {
+                  label: "Hợp lệ",
+                  value: importPreview.valid,
+                  className: "ss-summary-success",
+                },
+                {
+                  label: "Lỗi",
+                  value: importPreview.invalid,
+                  className: "ss-summary-error",
+                },
+                {
+                  label: "Trùng",
+                  value: importPreview.duplicate,
+                  className: "ss-summary-warning",
+                },
+              ].map((item) => (
+                <div key={item.label} className={`ss-summary-item ${item.className}`}>
+                  <div className="ss-summary-label">{item.label}</div>
 
-                  <div
-                    className="import-summary-value"
-                  >
-                    {
-                      importPreview.totalRows
-                    }
-                  </div>
+                  <div className="ss-summary-value">{item.value}</div>
                 </div>
+              ))}
+            </div>
 
-                <div
-                  className="import-summary-item import-summary-success"
-                >
-                  <div
-                    className="import-summary-label"
-                  >
-                    Hợp lệ
-                  </div>
+            {importPreview.invalid > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                message="File có dòng lỗi"
+                description="Các dòng lỗi sẽ không được import. Xem chi tiết trong cột Ghi chú."
+                style={{
+                  marginBottom: 12,
+                }}
+              />
+            )}
 
-                  <div
-                    className="import-summary-value"
-                  >
-                    {
-                      importPreview.valid
-                    }
-                  </div>
-                </div>
-
-                <div
-                  className="import-summary-item import-summary-error"
-                >
-                  <div
-                    className="import-summary-label"
-                  >
-                    Lỗi
-                  </div>
-
-                  <div
-                    className="import-summary-value"
-                  >
-                    {
-                      importPreview.invalid
-                    }
-                  </div>
-                </div>
-
-                <div
-                  className="import-summary-item import-summary-warning"
-                >
-                  <div
-                    className="import-summary-label"
-                  >
-                    Trùng
-                  </div>
-
-                  <div
-                    className="import-summary-value"
-                  >
-                    {
-                      importPreview.duplicate
-                    }
-                  </div>
-                </div>
-              </div>
-
-              {
-                importPreview.invalid >
-                0 &&
-                (
-                  <Alert
-                    type="warning"
-
-                    showIcon
-
-                    message="File có dòng lỗi"
-
-                    description="Các dòng lỗi sẽ không được import. Bạn có thể xem chi tiết trong cột Ghi chú."
-
-                    style={{
-                      marginBottom:
-                        12,
-                    }}
-                  />
-                )
-              }
-
-              <div
-                className="import-preview-table"
-              >
-                <Table<
-                  ServiceStaffImportPreviewRow
-                >
-                  size="small"
-
-                  rowKey={(
-                    record
-                  ) =>
-                    `${record.row}-${record.serviceCode}-${record.staffCode}-${record.activityType}`
-                  }
-
-                  dataSource={
-                    importPreview.rows
-                  }
-
-                  columns={
-                    importColumns
-                  }
-
-                  pagination={{
-                    pageSize:
-                      10,
-
-                    showSizeChanger:
-                      false,
-
-                    showTotal:
-                      (
-                        total
-                      ) =>
-                        `Tổng số: ${total}`,
-                  }}
-
-                  scroll={{
-                    x:
-                      950,
-
-                    y:
-                      350,
-                  }}
-                />
-              </div>
-            </>
-          )
-        }
+            <div className="ss-preview-table">
+              <Table<PreviewRow>
+                rowKey={(record) =>
+                  `${record.row}-${record.serviceCode}-${record.staffCode}-${record.activityType}`
+                }
+                columns={importColumns}
+                dataSource={importPreview.rows}
+                size="small"
+                tableLayout="fixed"
+                scroll={{
+                  x: 1035,
+                  y: 320,
+                }}
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: false,
+                  showTotal: (total) => `Tổng số: ${total}`,
+                }}
+              />
+            </div>
+          </>
+        )}
       </Modal>
 
       <style>
         {`
-          /* Chỉ áp dụng khi mở trang DVKT - Nhân viên */
-          body:has(.service-staff-page) {
-            overflow: hidden !important;
-          }
-
-          .service-staff-page {
+          .ss-page {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
             width: 100%;
             min-width: 0;
             height: calc(100dvh - 165px);
-            min-height: 0;
-            overflow: hidden;
+            min-height: 480px;
           }
 
-          .service-staff-page > .ant-breadcrumb,
-          .service-staff-page > .service-staff-header,
-          .service-staff-page > .service-staff-filter {
+          .ss-page > .ant-breadcrumb,
+          .ss-header,
+          .ss-filters,
+          .ss-page > .ant-alert,
+          .ss-legend {
             flex-shrink: 0;
           }
 
-          .service-staff-table-wrap {
-            flex: 1 1 auto;
-            min-height: 0;
-            min-width: 0;
-            overflow: hidden;
+          .ss-page .ant-breadcrumb {
+            font-size: 12px;
           }
 
-          .service-staff-table-wrap .ant-table-body {
-            overflow-y: auto !important;
+          .ss-crumb.ant-btn {
+            height: auto;
+            padding: 0;
+            font-size: 12px;
+            line-height: inherit;
           }
 
-          @media (max-height: 650px), (max-width: 700px) {
-            body:has(.service-staff-page) {
-              overflow-y: auto !important;
-            }
-            .service-staff-page {
-              height: auto;
-              overflow: visible;
-            }
-            .service-staff-table-wrap {
-              overflow: visible;
-            }
-          }
-
-          .service-staff-header {
+          .ss-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
           }
 
-          .service-staff-header .ant-btn {
+          .ss-header .ant-btn {
             height: 36px;
             border-radius: 8px;
             font-weight: 600;
           }
 
-          .service-staff-filter {
-            display: grid;
-            grid-template-columns:
-              minmax(260px, 1.3fr)
-              minmax(260px, 1.3fr)
-              minmax(230px, 1fr)
-              110px;
-            gap: 10px;
-            align-items: end;
+          .ss-subtitle {
+            display: block;
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.6;
           }
 
-          .service-staff-filter
-          .ant-select {
+          .ss-filters {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1.3fr)
+              minmax(0, 1.1fr)
+              minmax(0, 1fr)
+              auto;
+            align-items: end;
+            gap: 10px;
+          }
+
+          .ss-filter {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            gap: 6px;
+          }
+
+          .ss-filter > label {
+            color: #172033;
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .ss-filter .ant-select {
             width: 100%;
           }
 
-          .service-staff-filter
-          .ant-btn {
+          .ss-filters > .ant-btn {
             height: 32px;
             border-radius: 7px;
             font-weight: 600;
           }
 
-          .service-staff-filter-label {
-            display: block;
-            margin-bottom: 6px;
-            color: #172033;
-            font-size: 12px;
-            font-weight: 700;
+          .ss-table-wrap {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 290px;
           }
 
-          .service-staff-table-card {
+          .ss-table,
+          .ss-preview-table {
+            min-width: 0;
             overflow: hidden;
-            border:
-              1px solid
-              #dfe6ee;
+            border: 1px solid #dfe6ee;
             border-radius: 8px;
             box-shadow:
-              0
-              2px
-              8px
-              rgba(
-                15,
-                23,
-                42,
-                0.03
-              );
+              0 2px 8px rgba(15, 23, 42, .03);
           }
 
-          .service-staff-table-card
-          .ant-table-thead
-          > tr
-          > th {
-            background:
-              #f2f5f8 !important;
-            color:
-              #334155 !important;
+          .ss-table
+          .ant-table-thead > tr > th,
+          .ss-preview-table
+          .ant-table-thead > tr > th {
+            background: #f2f5f8 !important;
+            color: #334155;
             font-size: 12px;
-            font-weight: 700 !important;
+            font-weight: 700;
+            border-bottom: 1px solid #d8e0e8;
           }
 
-          .service-staff-table-card
-          .ant-table-tbody
-          > tr
-          > td {
-            padding:
-              11px
-              12px !important;
-            color:
-              #334155;
+          .ss-table
+          .ant-table-tbody > tr > td,
+          .ss-preview-table
+          .ant-table-tbody > tr > td {
+            padding: 11px 12px;
+            color: #334155;
             font-size: 12px;
+            vertical-align: middle;
+            overflow-wrap: anywhere;
           }
 
-          .service-staff-table-card
-          .ant-table-tbody
-          > tr:hover
-          > td {
-            background:
-              #f7fbff !important;
+          .ss-table
+          .ant-table-tbody > tr:hover > td {
+            background: #f7fbff !important;
           }
 
-          .service-staff-service {
+          .ss-cell {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 3px;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            line-height: 1.65;
           }
 
-          .service-staff-person {
+          .ss-cell .ant-typography {
+            font-size: 12px;
+          }
+
+          .ss-secondary {
+            display: block;
+            font-size: 11px !important;
+          }
+
+          .ss-person {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 9px;
           }
 
-          .service-staff-avatar {
-            width: 29px;
-            height: 29px;
+          .ss-avatar {
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            border-radius: 8px;
-            color:
-              #1677ff;
-            background:
-              #e6f4ff;
+            width: 31px;
+            height: 31px;
+            border-radius: 9px;
+            color: #1677ff;
+            background: #e6f4ff;
           }
 
-          .service-staff-type-tag {
+          .ss-table .ant-tag,
+          .ss-preview-table .ant-tag {
             margin: 0;
-            padding:
-              2px
-              8px;
-            border-radius:
-              999px;
-            font-size:
-              11px;
-            font-weight:
-              600;
+            border-radius: 999px;
+            font-size: 11px;
           }
 
-          .service-staff-status-tag {
-            margin: 0;
-            padding:
-              2px
-              8px;
-            border-radius:
-              999px;
-            font-size:
-              11px;
-            font-weight:
-              700;
+          .ss-wrap-tag {
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            line-height: 1.7;
           }
 
-          .service-staff-edit,
-          .service-staff-delete {
-            width: 30px;
-            height: 30px;
-            border-radius: 7px;
+          .ss-edit {
+            color: #1677ff;
           }
 
-          .service-staff-edit {
-            color:
-              #1677ff;
+          .ss-table .ant-pagination {
+            margin: 12px !important;
           }
 
-          .service-staff-edit:hover {
-            color:
-              #1677ff !important;
-            background:
-              #e6f4ff !important;
+          .ss-legend {
+            margin-top: -5px;
+            font-size: 11px;
+            line-height: 1.7;
           }
 
-          .service-staff-delete:hover {
-            background:
-              #fff1f0 !important;
-          }
-
-          .service-staff-table-card
-          .ant-pagination {
-            margin: 10px 12px 8px !important;
-            padding: 0;
-          }
-
-          .service-staff-modal
-          .ant-modal-content,
-          .service-staff-import-modal
-          .ant-modal-content {
+          .ss-modal .ant-modal-content,
+          .ss-import-modal .ant-modal-content {
             border-radius: 14px;
-            overflow: hidden;
           }
 
-          .service-staff-modal-title {
-            color:
-              #172033;
+          .ss-modal-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 8px;
+          }
+
+          .ss-modal-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #e6f4ff;
+            color: #1677ff;
+            font-size: 21px;
+          }
+
+          .ss-modal-title {
+            color: #172033;
             font-size: 18px;
             font-weight: 800;
           }
 
-          .service-staff-modal-description {
-            margin-top: 3px;
-            color:
-              #64748b;
-            font-size: 12px;
-            font-weight: 400;
-          }
-
-          .service-staff-switch-grid {
+          .ss-form-grid {
             display: grid;
             grid-template-columns:
-              1fr
-              1fr;
-            gap: 16px;
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+            column-gap: 16px;
           }
 
-          .import-upload-area {
+          .ss-modal
+          .ant-form-item-label > label {
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .ss-modal .ant-input,
+          .ss-modal .ant-select-selector {
+            border-radius: 8px;
+          }
+
+          .ss-modal input.ant-input {
+            min-height: 36px;
+          }
+
+          .ss-switch-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            width: 100%;
+            padding: 13px 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 9px;
+            background: #fafcff;
+          }
+
+          .ss-switch-box .ant-typography {
+            font-size: 12px;
+          }
+
+          .ss-switch-box .ant-switch {
+            flex-shrink: 0;
+          }
+
+          .ss-upload-area {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding:
-              14px
-              16px;
-            border:
-              1px dashed
-              #d9e2ec;
-            border-radius:
-              10px;
-            background:
-              #fafcff;
+            margin-top: 16px;
+            padding: 14px 16px;
+            border: 1px dashed #d9e2ec;
+            border-radius: 10px;
+            background: #fafcff;
           }
 
-          .import-summary {
+          .ss-import-summary {
             display: grid;
             grid-template-columns:
-              repeat(
-                4,
-                minmax(
-                  120px,
-                  1fr
-                )
-              );
+              repeat(4, minmax(0, 1fr));
             gap: 10px;
-            margin:
-              16px
-              0
-              12px;
+            margin: 16px 0 12px;
           }
 
-          .import-summary-item {
-            padding:
-              10px
-              12px;
-            border:
-              1px solid
-              #e5e7eb;
-            border-radius:
-              10px;
-            background:
-              #ffffff;
+          .ss-summary-item {
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
           }
 
-          .import-summary-label {
-            color:
-              #64748b;
-            font-size:
-              11px;
-            font-weight:
-              600;
+          .ss-summary-label {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
           }
 
-          .import-summary-value {
-            margin-top:
-              2px;
-            color:
-              #172033;
-            font-size:
-              19px;
-            font-weight:
-              800;
+          .ss-summary-value {
+            margin-top: 3px;
+            color: #172033;
+            font-size: 23px;
+            font-weight: 800;
           }
 
-          .import-summary-success {
-            background:
-              #f6ffed;
-            border-color:
-              #d9f7be;
+          .ss-summary-success {
+            border-color: #d9f7be;
+            background: #f6ffed;
           }
 
-          .import-summary-error {
-            background:
-              #fff2f0;
-            border-color:
-              #ffccc7;
+          .ss-summary-error {
+            border-color: #ffccc7;
+            background: #fff2f0;
           }
 
-          .import-summary-warning {
-            background:
-              #fffbe6;
-            border-color:
-              #ffe58f;
+          .ss-summary-warning {
+            border-color: #ffe58f;
+            background: #fffbe6;
           }
 
-          .import-preview-table {
-            overflow:
-              hidden;
-            border:
-              1px solid
-              #e5e7eb;
-            border-radius:
-              8px;
+          .ss-modal
+          .ant-modal-footer .ant-btn,
+          .ss-import-modal
+          .ant-modal-footer .ant-btn {
+            border-radius: 8px;
           }
 
-          .import-preview-table
-          .ant-table-thead
-          > tr
-          > th {
-            background:
-              #f2f5f8 !important;
-            color:
-              #334155;
-            font-size:
-              12px;
-            font-weight:
-              700;
-          }
+          @media (max-width: 1200px) {
+            .ss-header {
+              flex-direction: column;
+            }
 
-          .import-preview-table
-          .ant-table-tbody
-          > tr
-          > td {
-            font-size:
-              12px;
-          }
-
-          .import-status-tag,
-          .import-type-tag {
-            margin: 0;
-            border-radius:
-              999px;
-            font-size:
-              11px;
-            font-weight:
-              600;
-          }
-
-          @media
-          (
-            max-width:
-              1000px
-          ) {
-            .service-staff-filter {
+            .ss-filters {
               grid-template-columns:
-                1fr
-                1fr;
-            }
-
-            .import-summary {
-              grid-template-columns:
-                1fr
-                1fr;
+                repeat(2, minmax(0, 1fr));
             }
           }
 
-          @media
-          (
-            max-width:
-              700px
-          ) {
-            .service-staff-header {
-              flex-direction:
-                column;
+          @media (max-width: 600px) {
+            .ss-page {
+              height: auto;
+              min-height: 0;
             }
 
-            .service-staff-filter {
+            .ss-table-wrap {
+              flex: none;
+              height: 480px;
+            }
+
+            .ss-filters,
+            .ss-form-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .ss-import-summary {
               grid-template-columns:
-                1fr;
+                repeat(2, minmax(0, 1fr));
             }
 
-            .service-staff-switch-grid {
-              grid-template-columns:
-                1fr;
+            .ss-upload-area {
+              align-items: flex-start;
+              flex-direction: column;
             }
 
-            .import-summary {
-              grid-template-columns:
-                1fr;
-            }
-
-            .import-upload-area {
-              align-items:
-                flex-start;
-              flex-direction:
-                column;
+            .ss-modal-title {
+              font-size: 16px;
             }
           }
         `}

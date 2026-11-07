@@ -1,10 +1,16 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useNavigate } from "react-router-dom";
+
 import {
   Alert,
   Breadcrumb,
   Button,
+  Card,
   Form,
   Input,
   Modal,
+  Popconfirm,
   Space,
   Switch,
   Table,
@@ -15,12 +21,10 @@ import {
   message,
 } from "antd";
 
-import type {
-  TableColumnsType,
-  UploadFile,
-} from "antd";
+import type { TableColumnsType, UploadFile } from "antd";
 
 import {
+  ArrowLeftOutlined,
   CheckCircleOutlined,
   EditOutlined,
   HomeOutlined,
@@ -32,159 +36,269 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { apiFetch } from "../../api/apiClient";
 
-import {
-  apiFetch,
-} from "../../api/apiClient";
+const { Title, Text } = Typography;
 
-
-const {
-  Title,
-  Text,
-} = Typography;
-
-
-// ======================================================
-// TYPES
-// ======================================================
+const API = "/catalog/icd-warnings";
 
 interface IcdWarningItem {
   id: string;
-
   icdCode: string;
-
   errorCode: string;
-
-  diseaseName:
-    | string
-    | null;
-
-  errorMessage:
-    | string
-    | null;
-
+  diseaseName: string | null;
+  errorMessage: string | null;
   active: boolean;
-
-  note:
-    | string
-    | null;
-
-  createdAt?:
-    | string
-    | null;
-
-  updatedAt?:
-    | string
-    | null;
+  note: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
-
-interface IcdWarningFormValues {
+interface FormValues {
   icdCode: string;
-
   errorCode: string;
-
-  diseaseName?: string;
-
+  diseaseName?: string | null;
   errorMessage: string;
-
   active: boolean;
-
-  note?: string;
+  note?: string | null;
 }
 
-
-interface IcdWarningImportError {
-  row: number;
-
-  field: string;
-
-  message: string;
-}
-
-
-interface IcdWarningImportResult {
-  totalRows: number;
-
-  inserted: number;
-
-  updated: number;
-
-  skipped: number;
-}
-
-
-interface IcdWarningFilters {
+interface Filters {
   icdCode: string;
-
   errorCode: string;
-
   diseaseName: string;
 }
 
+interface ListData {
+  items: IcdWarningItem[];
+  total: number;
+}
 
-// ======================================================
-// COMPONENT
-// ======================================================
+interface ImportError {
+  row: number;
+  field: string;
+  message: string;
+}
+
+interface ImportResult {
+  totalRows: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  errors?: ImportError[];
+}
+
+const EMPTY_FILTERS: Filters = {
+  icdCode: "",
+  errorCode: "",
+  diseaseName: "",
+};
+
+const text = (value: unknown): string => String(value ?? "").trim();
+
+const getError = (error: unknown): string =>
+  error instanceof Error ? error.message : "Không thể thực hiện yêu cầu.";
+
+async function readResponse<T>(response: Response): Promise<ApiResponse<T>> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(`API không trả về JSON (HTTP ${response.status}).`);
+  }
+
+  return (await response.json()) as ApiResponse<T>;
+}
+
+async function request<T>(path = "", init?: RequestInit): Promise<T | undefined> {
+  const headers = new Headers(init?.headers);
+
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const headerObject: Record<string, string> = {};
+
+  headers.forEach((value, key) => {
+    headerObject[key] = value;
+  });
+
+  const response = await apiFetch(`${API}${path}`, {
+    ...init,
+    headers: headerObject,
+  });
+
+  const json = await readResponse<T>(response);
+
+  if (!response.ok || json.success !== true) {
+    throw new Error(json.message || json.error || `Lỗi HTTP ${response.status}`);
+  }
+
+  return json.data;
+}
 
 export default function IcdWarnings() {
+  const navigate = useNavigate();
 
-  // Đo chiều cao khả dụng dựa trên vị trí thực tế của trang.
-  // Table chỉ cuộn nội bộ; pagination luôn nằm ngoài vùng cuộn.
+  const [messageApi, contextHolder] = message.useMessage();
+
+  const [form] = Form.useForm<FormValues>();
+
   const pageRef = useRef<HTMLDivElement>(null);
   const tableRegionRef = useRef<HTMLDivElement>(null);
+
+  const requestSequence = useRef(0);
+  const savingRef = useRef(false);
+  const importingRef = useRef(false);
+
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  const [tableScrollY, setTableScrollY] = useState(300);
+
+  const [tableScrollY, setTableScrollY] = useState(320);
+
+  const [items, setItems] = useState<IcdWarningItem[]>([]);
+
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [inputs, setInputs] = useState<Filters>({ ...EMPTY_FILTERS });
+
+  const [filters, setFilters] = useState<Filters>({ ...EMPTY_FILTERS });
+
+  const [formModalOpen, setFormModalOpen] = useState(false);
+
+  const [editingItem, setEditingItem] = useState<IcdWarningItem | null>(null);
+
+  const [saving, setSaving] = useState(false);
+
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
+  const [importFileList, setImportFileList] = useState<UploadFile[]>([]);
+
+  const [importing, setImporting] = useState(false);
+
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  const [importErrors, setImportErrors] = useState<ImportError[]>([]);
+
+  const [importMessage, setImportMessage] = useState("");
+
+  const busy = saving || importing || togglingId !== null;
+
+  const loadIcdWarnings = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+
+      for (const [key, value] of Object.entries(filters)) {
+        if (value.trim()) {
+          params.set(key, value.trim());
+        }
+      }
+
+      const data = await request<ListData>(`?${params.toString()}`);
+
+      if (!data || !Array.isArray(data.items)) {
+        throw new Error("Danh sách ICD cảnh báo không hợp lệ.");
+      }
+
+      if (sequence !== requestSequence.current) {
+        return;
+      }
+
+      const nextTotal = Number(data.total ?? 0);
+      const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize));
+
+      if (page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
+
+      setItems(data.items);
+      setTotal(nextTotal);
+    } catch (err) {
+      if (sequence === requestSequence.current) {
+        setError(getError(err));
+      }
+    } finally {
+      if (sequence === requestSequence.current) {
+        setLoading(false);
+      }
+    }
+  }, [page, pageSize, filters]);
+
+  useEffect(() => {
+    void loadIcdWarnings();
+
+    return () => {
+      requestSequence.current++;
+    };
+  }, [loadIcdWarnings]);
 
   useEffect(() => {
     let frame = 0;
 
     const measure = () => {
       window.cancelAnimationFrame(frame);
+
       frame = window.requestAnimationFrame(() => {
         const pageElement = pageRef.current;
         const tableElement = tableRegionRef.current;
-        if (!pageElement || !tableElement) return;
 
-        const isCompact = window.matchMedia(
-          "(max-width: 900px), (max-height: 650px)"
-        ).matches;
+        if (!pageElement || !tableElement) {
+          return;
+        }
 
-        if (isCompact) {
+        const compact = window.matchMedia("(max-width: 900px), (max-height: 650px)").matches;
+
+        if (compact) {
           setViewportHeight(null);
           setTableScrollY(320);
           return;
         }
 
-        const pageTop = pageElement.getBoundingClientRect().top;
-        const availablePageHeight = Math.max(
-          320,
-          Math.floor(window.innerHeight - pageTop - 18)
-        );
-        setViewportHeight((previous) =>
-          previous === availablePageHeight
-            ? previous
-            : availablePageHeight
-        );
+        const top = pageElement.getBoundingClientRect().top;
 
-        // Ant Design: ~44px tiêu đề bảng + ~64px phân trang/đệm.
+        const height = Math.max(400, Math.floor(window.innerHeight - top - 18));
+
+        setViewportHeight((previous) => (previous === height ? previous : height));
+
         const regionHeight = tableElement.getBoundingClientRect().height;
-        const nextY = Math.max(90, Math.floor(regionHeight - 115));
-        setTableScrollY((previous) =>
-          previous === nextY ? previous : nextY
-        );
+
+        const nextY = Math.max(140, Math.floor(regionHeight - 125));
+
+        setTableScrollY((previous) => (previous === nextY ? previous : nextY));
       });
     };
 
     const observer = new ResizeObserver(measure);
-    if (pageRef.current) observer.observe(pageRef.current);
-    if (tableRegionRef.current) observer.observe(tableRegionRef.current);
+
+    if (pageRef.current) {
+      observer.observe(pageRef.current);
+    }
+
+    if (tableRegionRef.current) {
+      observer.observe(tableRegionRef.current);
+    }
+
     window.addEventListener("resize", measure);
     measure();
 
@@ -195,2681 +309,1182 @@ export default function IcdWarnings() {
     };
   }, []);
 
-  // ====================================================
-  // FORM
-  // ====================================================
-
-  const [
-    form,
-  ] =
-    Form.useForm<
-      IcdWarningFormValues
-    >();
-
-
-  // ====================================================
-  // LIST
-  // ====================================================
-
-  const [
-    items,
-    setItems,
-  ] = useState<
-    IcdWarningItem[]
-  >(
-    []
-  );
-
-
-  const [
-    total,
-    setTotal,
-  ] = useState(
-    0
-  );
-
-
-  const [
-    page,
-    setPage,
-  ] = useState(
-    1
-  );
-
-
-  const [
-    pageSize,
-    setPageSize,
-  ] = useState(
-    10
-  );
-
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(
-    false
-  );
-
-
-  // ====================================================
-  // SEARCH
-  // ====================================================
-
-  const [
-    icdInput,
-    setIcdInput,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    errorCodeInput,
-    setErrorCodeInput,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    diseaseNameInput,
-    setDiseaseNameInput,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    filters,
-    setFilters,
-  ] = useState<
-    IcdWarningFilters
-  >({
-    icdCode:
-      "",
-
-    errorCode:
-      "",
-
-    diseaseName:
-      "",
-  });
-
-
-  // ====================================================
-  // CREATE / EDIT
-  // ====================================================
-
-  const [
-    formModalOpen,
-    setFormModalOpen,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    editingItem,
-    setEditingItem,
-  ] = useState<
-    IcdWarningItem |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    saving,
-    setSaving,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    togglingId,
-    setTogglingId,
-  ] = useState<
-    string |
-    null
-  >(
-    null
-  );
-
-
-  // ====================================================
-  // IMPORT
-  // ====================================================
-
-  const [
-    importModalOpen,
-    setImportModalOpen,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    importFileList,
-    setImportFileList,
-  ] = useState<
-    UploadFile[]
-  >(
-    []
-  );
-
-
-  const [
-    importing,
-    setImporting,
-  ] = useState(
-    false
-  );
-
-
-  const [
-    importResult,
-    setImportResult,
-  ] = useState<
-    IcdWarningImportResult |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    importErrors,
-    setImportErrors,
-  ] = useState<
-    IcdWarningImportError[]
-  >(
-    []
-  );
-
-
-  const [
-    importMessage,
-    setImportMessage,
-  ] = useState(
-    ""
-  );
-
-
-  // ====================================================
-  // LOAD LIST
-  // ====================================================
-
-  const loadIcdWarnings =
-    useCallback(
-      async () => {
-
-        try {
-
-          setLoading(
-            true
-          );
-
-
-          const params =
-            new URLSearchParams();
-
-
-          params.set(
-            "page",
-            String(
-              page
-            )
-          );
-
-
-          params.set(
-            "pageSize",
-            String(
-              pageSize
-            )
-          );
-
-
-          if (
-            filters.icdCode
-              .trim()
-          ) {
-
-            params.set(
-              "icdCode",
-              filters.icdCode
-                .trim()
-            );
-          }
-
-
-          if (
-            filters.errorCode
-              .trim()
-          ) {
-
-            params.set(
-              "errorCode",
-              filters.errorCode
-                .trim()
-            );
-          }
-
-
-          if (
-            filters.diseaseName
-              .trim()
-          ) {
-
-            params.set(
-              "diseaseName",
-              filters.diseaseName
-                .trim()
-            );
-          }
-
-
-          const response =
-            await apiFetch(
-              `/catalog/icd-warnings?${params.toString()}`,
-              {
-                method:
-                  "GET",
-              }
-            );
-
-
-          let json:
-            any =
-            null;
-
-
-          try {
-
-            json =
-              await response.json();
-
-          } catch {
-
-            // backend không trả JSON
-          }
-
-
-          if (
-            !response.ok ||
-            json?.success !==
-              true
-          ) {
-
-            throw new Error(
-              json?.message ||
-              "Không thể tải danh mục ICD cảnh báo."
-            );
-          }
-
-
-          setItems(
-            Array.isArray(
-              json?.data
-                ?.items
-            )
-              ? json.data.items
-              : []
-          );
-
-
-          setTotal(
-            Number(
-              json?.data
-                ?.total ??
-              0
-            )
-          );
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Load ICD warnings error:",
-            error
-          );
-
-
-          setItems(
-            []
-          );
-
-
-          setTotal(
-            0
-          );
-
-
-          message.error(
-            error instanceof
-            Error
-              ? error.message
-              : "Không thể tải danh mục ICD cảnh báo."
-          );
-
-        } finally {
-
-          setLoading(
-            false
-          );
-        }
-      },
-      [
-        page,
-        pageSize,
-        filters,
-      ]
-    );
-
-
-  useEffect(
-    () => {
-
-      void loadIcdWarnings();
-
-    },
-    [
-      loadIcdWarnings,
-    ]
-  );
-
-
-  // ====================================================
-  // SEARCH
-  // ====================================================
+  function backToCatalog() {
+    sessionStorage.setItem("catalog-active-tab", "rules");
+
+    navigate("/catalog");
+  }
 
   function handleSearch() {
-
-    setPage(
-      1
-    );
-
+    setPage(1);
 
     setFilters({
-      icdCode:
-        icdInput.trim(),
-
-      errorCode:
-        errorCodeInput.trim(),
-
-      diseaseName:
-        diseaseNameInput.trim(),
+      icdCode: inputs.icdCode.trim(),
+      errorCode: inputs.errorCode.trim(),
+      diseaseName: inputs.diseaseName.trim(),
     });
   }
 
-
-  function handleResetSearch() {
-
-    setIcdInput(
-      ""
-    );
-
-
-    setErrorCodeInput(
-      ""
-    );
-
-
-    setDiseaseNameInput(
-      ""
-    );
-
-
-    setPage(
-      1
-    );
-
-
-    setFilters({
-      icdCode:
-        "",
-
-      errorCode:
-        "",
-
-      diseaseName:
-        "",
-    });
+  function resetFilters() {
+    setInputs({ ...EMPTY_FILTERS });
+    setFilters({ ...EMPTY_FILTERS });
+    setPage(1);
   }
 
-
-  // ====================================================
-  // CREATE
-  // ====================================================
-
-  function openCreateModal() {
-
-    setEditingItem(
-      null
-    );
-
-
+  function openForm(item?: IcdWarningItem) {
+    setEditingItem(item ?? null);
     form.resetFields();
 
-
     form.setFieldsValue({
-      icdCode:
-        "",
-
-      errorCode:
-        "",
-
-      diseaseName:
-        "",
-
-      errorMessage:
-        "",
-
-      active:
-        true,
-
-      note:
-        "",
+      icdCode: text(item?.icdCode),
+      errorCode: text(item?.errorCode),
+      diseaseName: text(item?.diseaseName),
+      errorMessage: text(item?.errorMessage),
+      active: item ? item.active : true,
+      note: text(item?.note),
     });
 
-
-    setFormModalOpen(
-      true
-    );
+    setFormModalOpen(true);
   }
 
+  function closeForm() {
+    if (savingRef.current) return;
 
-  // ====================================================
-  // EDIT
-  // ====================================================
-
-  function openEditModal(
-    item:
-      IcdWarningItem
-  ) {
-
-    setEditingItem(
-      item
-    );
-
-
-    form.setFieldsValue({
-      icdCode:
-        item.icdCode,
-
-      errorCode:
-        item.errorCode,
-
-      diseaseName:
-        item.diseaseName ??
-        "",
-
-      errorMessage:
-        item.errorMessage ??
-        "",
-
-      active:
-        item.active,
-
-      note:
-        item.note ??
-        "",
-    });
-
-
-    setFormModalOpen(
-      true
-    );
-  }
-
-
-  function closeFormModal() {
-
-    if (
-      saving
-    ) {
-
-      return;
-    }
-
-
-    setFormModalOpen(
-      false
-    );
-
-
-    setEditingItem(
-      null
-    );
-
-
+    setFormModalOpen(false);
+    setEditingItem(null);
     form.resetFields();
   }
 
+  async function handleSave(values: FormValues) {
+    if (savingRef.current) return;
 
-  // ====================================================
-  // SAVE
-  // ====================================================
-
-  async function handleSave() {
+    savingRef.current = true;
+    setSaving(true);
 
     try {
+      const isEdit = Boolean(editingItem);
 
-      const values =
-        await form.validateFields();
+      const path = editingItem ? `/${encodeURIComponent(editingItem.id)}` : "";
 
+      await request(path, {
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify({
+          icdCode: text(values.icdCode),
+          errorCode: text(values.errorCode),
+          diseaseName: text(values.diseaseName) || null,
+          errorMessage: text(values.errorMessage),
+          active: values.active === true,
+          note: text(values.note) || null,
+        }),
+      });
 
-      setSaving(
-        true
-      );
+      messageApi.success(isEdit ? "Đã cập nhật ICD cảnh báo." : "Đã thêm ICD cảnh báo.");
 
-
-      const isEdit =
-        Boolean(
-          editingItem
-        );
-
-
-      const endpoint =
-        isEdit
-          ? `/catalog/icd-warnings/${editingItem!.id}`
-          : "/catalog/icd-warnings";
-
-
-      const response =
-        await apiFetch(
-          endpoint,
-          {
-            method:
-              isEdit
-                ? "PUT"
-                : "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                icdCode:
-                  values.icdCode
-                    .trim(),
-
-                errorCode:
-                  values.errorCode
-                    .trim(),
-
-                diseaseName:
-                  values.diseaseName
-                    ?.trim() ||
-                  null,
-
-                errorMessage:
-                  values.errorMessage
-                    .trim(),
-
-                active:
-                  values.active,
-
-                note:
-                  values.note
-                    ?.trim() ||
-                  null,
-              }),
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
-
-      try {
-
-        json =
-          await response.json();
-
-      } catch {
-
-        // backend không trả JSON
-      }
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-
-        throw new Error(
-          json?.message ||
-          (
-            isEdit
-              ? "Cập nhật ICD cảnh báo thất bại."
-              : "Thêm ICD cảnh báo thất bại."
-          )
-        );
-      }
-
-
-      message.success(
-        json?.message ||
-        (
-          isEdit
-            ? "Cập nhật ICD cảnh báo thành công."
-            : "Thêm ICD cảnh báo thành công."
-        )
-      );
-
-
-      setFormModalOpen(
-        false
-      );
-
-
-      setEditingItem(
-        null
-      );
-
-
+      setFormModalOpen(false);
+      setEditingItem(null);
       form.resetFields();
 
-
-      if (
-        !isEdit &&
-        page !==
-          1
-      ) {
-
-        setPage(
-          1
-        );
-
+      if (!isEdit && page !== 1) {
+        setPage(1);
       } else {
-
         await loadIcdWarnings();
       }
-
-    } catch (
-      error:
-        any
-    ) {
-
-      if (
-        error?.errorFields
-      ) {
-
-        return;
-      }
-
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể lưu ICD cảnh báo."
-      );
-
+    } catch (err) {
+      messageApi.error(getError(err));
     } finally {
-
-      setSaving(
-        false
-      );
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
-
-  // ====================================================
-  // TOGGLE ACTIVE
-  // ====================================================
-
-  function confirmToggleActive(
-    item:
-      IcdWarningItem
-  ) {
-
-    Modal.confirm({
-      title:
-        item.active
-          ? "Ngừng sử dụng ICD cảnh báo?"
-          : "Kích hoạt lại ICD cảnh báo?",
-
-      content:
-        item.active
-          ? `Mã ${item.icdCode} sẽ không còn được Rule Engine dùng để cảnh báo.`
-          : `Mã ${item.icdCode} sẽ được Rule Engine sử dụng lại.`,
-
-      okText:
-        item.active
-          ? "Ngừng sử dụng"
-          : "Kích hoạt",
-
-      cancelText:
-        "Hủy",
-
-      okButtonProps: {
-        danger:
-          item.active,
-      },
-
-      onOk:
-        async () => {
-
-          try {
-
-            setTogglingId(
-              item.id
-            );
-
-
-            const response =
-              await apiFetch(
-                `/catalog/icd-warnings/${item.id}/toggle-active`,
-                {
-                  method:
-                    "PATCH",
-                }
-              );
-
-
-            let json:
-              any =
-              null;
-
-
-            try {
-
-              json =
-                await response.json();
-
-            } catch {
-
-              // backend không trả JSON
-            }
-
-
-            if (
-              !response.ok ||
-              json?.success !==
-                true
-            ) {
-
-              throw new Error(
-                json?.message ||
-                "Không thể thay đổi trạng thái."
-              );
-            }
-
-
-            message.success(
-              json?.message ||
-              "Đã cập nhật trạng thái."
-            );
-
-
-            await loadIcdWarnings();
-
-          } catch (
-            error
-          ) {
-
-            message.error(
-              error instanceof
-              Error
-                ? error.message
-                : "Không thể thay đổi trạng thái."
-            );
-
-          } finally {
-
-            setTogglingId(
-              null
-            );
-          }
-        },
-    });
-  }
-
-
-  // ====================================================
-  // IMPORT
-  // ====================================================
-
-  function openImportModal() {
-
-    setImportFileList(
-      []
-    );
-
-
-    setImportResult(
-      null
-    );
-
-
-    setImportErrors(
-      []
-    );
-
-
-    setImportMessage(
-      ""
-    );
-
-
-    setImportModalOpen(
-      true
-    );
-  }
-
-
-  function closeImportModal() {
-
-    if (
-      importing
-    ) {
-
-      return;
-    }
-
-
-    setImportModalOpen(
-      false
-    );
-
-
-    setImportFileList(
-      []
-    );
-
-
-    setImportResult(
-      null
-    );
-
-
-    setImportErrors(
-      []
-    );
-
-
-    setImportMessage(
-      ""
-    );
-  }
-
-
-  async function handleImportExcel() {
-
-    const file =
-      importFileList[0]
-        ?.originFileObj;
-
-
-    if (
-      !file
-    ) {
-
-      message.warning(
-        "Vui lòng chọn file Excel."
-      );
-
-      return;
-    }
-
-
-    if (
-      !file.name
-        .toLowerCase()
-        .endsWith(
-          ".xlsx"
-        )
-    ) {
-
-      message.error(
-        "Chỉ hỗ trợ file Excel .xlsx."
-      );
-
-      return;
-    }
-
+  async function toggleActive(item: IcdWarningItem) {
+    setTogglingId(item.id);
 
     try {
+      await request(`/${encodeURIComponent(item.id)}/toggle-active`, { method: "PATCH" });
 
-      setImporting(
-        true
-      );
-
-
-      setImportResult(
-        null
-      );
-
-
-      setImportErrors(
-        []
-      );
-
-
-      setImportMessage(
-        ""
-      );
-
-
-      const formData =
-        new FormData();
-
-
-      formData.append(
-        "file",
-        file
-      );
-
-
-      const response =
-        await apiFetch(
-          "/catalog/icd-warnings/import",
-          {
-            method:
-              "POST",
-
-            body:
-              formData,
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
-
-      try {
-
-        json =
-          await response.json();
-
-      } catch {
-
-        // backend không trả JSON
-      }
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-
-        const errors =
-          Array.isArray(
-            json?.errors
-          )
-            ? json.errors
-            : [];
-
-
-        setImportErrors(
-          errors
-        );
-
-
-        setImportMessage(
-          json?.message ||
-          "Import ICD cảnh báo thất bại."
-        );
-
-
-        message.error(
-          json?.message ||
-          "Import ICD cảnh báo thất bại."
-        );
-
-
-        return;
-      }
-
-
-      const result:
-        IcdWarningImportResult = {
-
-        totalRows:
-          Number(
-            json?.data
-              ?.totalRows ??
-            0
-          ),
-
-        inserted:
-          Number(
-            json?.data
-              ?.inserted ??
-            0
-          ),
-
-        updated:
-          Number(
-            json?.data
-              ?.updated ??
-            0
-          ),
-
-        skipped:
-          Number(
-            json?.data
-              ?.skipped ??
-            0
-          ),
-      };
-
-
-      setImportResult(
-        result
-      );
-
-
-      setImportMessage(
-        json?.message ||
-        "Import ICD cảnh báo thành công."
-      );
-
-
-      message.success(
-        json?.message ||
-        "Import ICD cảnh báo thành công."
-      );
-
+      messageApi.success("Đã cập nhật trạng thái.");
 
       await loadIcdWarnings();
-
-    } catch (
-      error
-    ) {
-
-      const text =
-        error instanceof
-        Error
-          ? error.message
-          : "Import ICD cảnh báo thất bại.";
-
-
-      setImportMessage(
-        text
-      );
-
-
-      message.error(
-        text
-      );
-
+    } catch (err) {
+      messageApi.error(getError(err));
     } finally {
-
-      setImporting(
-        false
-      );
+      setTogglingId(null);
     }
   }
 
+  function clearImportResult() {
+    setImportResult(null);
+    setImportErrors([]);
+    setImportMessage("");
+  }
 
-  // ====================================================
-  // TEXT CLAMP
-  // ====================================================
+  function openImportModal() {
+    setImportFileList([]);
+    clearImportResult();
+    setImportModalOpen(true);
+  }
 
-  function renderClampText(
-    value:
-      string |
-      null |
-      undefined,
+  function closeImportModal() {
+    if (importingRef.current) return;
 
-    lines =
-      2
-  ) {
+    setImportModalOpen(false);
+    setImportFileList([]);
+    clearImportResult();
+  }
 
-    const text =
-      value?.trim() ||
-      "-";
+  async function handleImportExcel() {
+    if (importingRef.current) return;
 
+    const file = importFileList[0]?.originFileObj;
 
-    if (
-      text ===
-      "-"
-    ) {
-
-      return "-";
+    if (!file) {
+      messageApi.warning("Vui lòng chọn file Excel.");
+      return;
     }
 
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      messageApi.error("Chỉ hỗ trợ file Excel .xlsx.");
+      return;
+    }
+
+    importingRef.current = true;
+    setImporting(true);
+    clearImportResult();
+
+    try {
+      const body = new FormData();
+      body.append("file", file);
+
+      const response = await apiFetch(`${API}/import`, {
+        method: "POST",
+        body,
+      });
+
+      const json = await readResponse<ImportResult>(response);
+
+      if (!response.ok || json.success !== true) {
+        const errors = Array.isArray(json.errors) ? json.errors : [];
+
+        const description = json.message || json.error || "Import ICD cảnh báo thất bại.";
+
+        setImportErrors(errors);
+        setImportMessage(description);
+        messageApi.error(description);
+        return;
+      }
+
+      if (!json.data) {
+        throw new Error("Kết quả import không hợp lệ.");
+      }
+
+      setImportResult({
+        totalRows: Number(json.data.totalRows ?? 0),
+        inserted: Number(json.data.inserted ?? 0),
+        updated: Number(json.data.updated ?? 0),
+        skipped: Number(json.data.skipped ?? 0),
+      });
+
+      const description = json.message || "Import ICD cảnh báo thành công.";
+
+      setImportMessage(description);
+      messageApi.success(description);
+
+      await loadIcdWarnings();
+    } catch (err) {
+      const description = getError(err);
+
+      setImportMessage(description);
+      messageApi.error(description);
+    } finally {
+      importingRef.current = false;
+      setImporting(false);
+    }
+  }
+
+  function renderLongText(value: unknown) {
+    const content = text(value);
+
+    if (!content) return "—";
 
     return (
-      <Tooltip
-        title={
-          text
-        }
-
-        placement="topLeft"
-
-        mouseEnterDelay={
-          0.3
-        }
-      >
-        <div
-          style={{
-            display:
-              "-webkit-box",
-
-            WebkitBoxOrient:
-              "vertical",
-
-            WebkitLineClamp:
-              lines,
-
-            overflow:
-              "hidden",
-
-            textOverflow:
-              "ellipsis",
-
-            lineHeight:
-              "20px",
-
-            maxHeight:
-              `${lines * 20}px`,
-          }}
-        >
-          {
-            text
-          }
-        </div>
+      <Tooltip title={content} placement="topLeft">
+        <div className="iw-clamp">{content}</div>
       </Tooltip>
     );
   }
 
-
-  // ====================================================
-  // COLUMNS
-  // ====================================================
-
-  const columns:
-    TableColumnsType<
-      IcdWarningItem
-    > = [
-
+  const columns: TableColumnsType<IcdWarningItem> = [
     {
-      title:
-        "STT",
-
-      key:
-        "stt",
-
-      width:
-        55,
-
-      align:
-        "center",
-
-      render:
-        (
-          _,
-          __,
-          index
-        ) =>
-          (
-            page -
-            1
-          ) *
-            pageSize +
-          index +
-          1,
+      title: "STT",
+      key: "index",
+      width: 56,
+      align: "center",
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
-
     {
-      title:
-        "ICD",
+      title: "Mã ICD",
+      dataIndex: "icdCode",
+      width: 100,
+      render: (value: string) => (
+        <Text
+          strong
+          style={{
+            color: "#1677ff",
+            fontSize: 12,
+          }}
+        >
+          {value || "—"}
+        </Text>
+      ),
+    },
+    {
+      title: "Mã lỗi",
+      dataIndex: "errorCode",
+      width: 110,
+      render: (value: string) => (
+        <Tag color="error" className="iw-code-tag">
+          {value || "—"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Tên bệnh",
+      dataIndex: "diseaseName",
+      width: 220,
+      render: renderLongText,
+    },
+    {
+      title: "Nội dung cảnh báo",
+      dataIndex: "errorMessage",
+      width: 340,
+      render: renderLongText,
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "active",
+      width: 110,
+      align: "center",
+      render: (active: boolean) => (
+        <Tag color={active ? "success" : "default"}>{active ? "Đang bật" : "Đã tắt"}</Tag>
+      ),
+    },
+    {
+      title: "Ghi chú",
+      dataIndex: "note",
+      width: 200,
+      render: renderLongText,
+    },
+    {
+      title: "Thao tác",
+      key: "actions",
+      width: 105,
+      fixed: "right",
+      align: "center",
+      render: (_, record) => (
+        <Space size={2}>
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="text"
+              size="small"
+              aria-label="Chỉnh sửa ICD cảnh báo"
+              icon={<EditOutlined />}
+              style={{
+                color: "#1677ff",
+              }}
+              disabled={busy || loading}
+              onClick={() => openForm(record)}
+            />
+          </Tooltip>
 
-      dataIndex:
-        "icdCode",
-
-      key:
-        "icdCode",
-
-      width:
-        90,
-
-      render:
-        (
-          value:
-            string
-        ) => (
-          <Text
-            strong
-          >
-            {
-              value ||
-              "-"
+          <Popconfirm
+            title={record.active ? "Ngừng sử dụng ICD cảnh báo?" : "Kích hoạt ICD cảnh báo?"}
+            description={
+              record.active
+                ? `Mã ${record.icdCode} sẽ không được áp dụng khi kiểm tra hồ sơ.`
+                : `Mã ${record.icdCode} sẽ được áp dụng lại khi kiểm tra hồ sơ.`
             }
-          </Text>
-        ),
-    },
-
-    {
-      title:
-        "Mã lỗi",
-
-      dataIndex:
-        "errorCode",
-
-      key:
-        "errorCode",
-
-      width:
-        95,
-
-      align:
-        "center",
-
-      render:
-        (
-          value:
-            string
-        ) => (
-          <Tag
-            color="error"
-
-            style={{
-              margin:
-                0,
+            okText={record.active ? "Ngừng sử dụng" : "Kích hoạt"}
+            cancelText="Hủy"
+            okButtonProps={{
+              danger: record.active,
             }}
+            disabled={busy || loading}
+            onConfirm={() => toggleActive(record)}
           >
-            {
-              value ||
-              "-"
-            }
-          </Tag>
-        ),
-    },
-
-    {
-      title:
-        "Tên bệnh",
-
-      dataIndex:
-        "diseaseName",
-
-      key:
-        "diseaseName",
-
-      width:
-        190,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          renderClampText(
-            value,
-            2
-          ),
-    },
-
-    {
-      title:
-        "Nội dung cảnh báo",
-
-      dataIndex:
-        "errorMessage",
-
-      key:
-        "errorMessage",
-
-      width:
-        360,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          renderClampText(
-            value,
-            2
-          ),
-    },
-
-    {
-      title:
-        "Trạng thái",
-
-      dataIndex:
-        "active",
-
-      key:
-        "active",
-
-      width:
-        105,
-
-      align:
-        "center",
-
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="success"
-
-                style={{
-                  margin:
-                    0,
-                }}
-              >
-                Hoạt động
-              </Tag>
-            )
-            : (
-              <Tag
-                style={{
-                  margin:
-                    0,
-                }}
-              >
-                Ngừng
-              </Tag>
-            ),
-    },
-
-    {
-      title:
-        "Ghi chú",
-
-      dataIndex:
-        "note",
-
-      key:
-        "note",
-
-      width:
-        200,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          renderClampText(
-            value,
-            2
-          ),
-    },
-
-    {
-      title:
-        "Thao tác",
-
-      key:
-        "actions",
-
-      width:
-        105,
-
-      align:
-        "center",
-
-      fixed:
-        "right",
-
-      render:
-        (
-          _,
-          record
-        ) => (
-
-          <Space
-            size={
-              12
-            }
-          >
-
-            <Tooltip
-              title="Sửa"
-            >
-              <Button
-                type="text"
-
-                size="small"
-
-                icon={
-                  <EditOutlined
-                    style={{
-                      color:
-                        "#1677ff",
-                    }}
-                  />
-                }
-
-                onClick={() =>
-                  openEditModal(
-                    record
-                  )
-                }
-              />
-            </Tooltip>
-
-
-            <Tooltip
-              title={
-                record.active
-                  ? "Ngừng sử dụng"
-                  : "Kích hoạt lại"
-              }
-            >
-              <Button
-                type="text"
-
-                size="small"
-
-                loading={
-                  togglingId ===
-                  record.id
-                }
-
-                icon={
-                  record.active
-                    ? (
-                      <StopOutlined
-                        style={{
-                          color:
-                            "#ff4d4f",
-                        }}
-                      />
-                    )
-                    : (
-                      <CheckCircleOutlined
-                        style={{
-                          color:
-                            "#52c41a",
-                        }}
-                      />
-                    )
-                }
-
-                onClick={() =>
-                  confirmToggleActive(
-                    record
-                  )
-                }
-              />
-            </Tooltip>
-
-          </Space>
-        ),
+            <Button
+              type="text"
+              size="small"
+              aria-label={record.active ? "Ngừng sử dụng" : "Kích hoạt"}
+              icon={record.active ? <StopOutlined /> : <CheckCircleOutlined />}
+              style={{
+                color: record.active ? "#ff4d4f" : "#52c41a",
+              }}
+              disabled={busy || loading}
+              loading={togglingId === record.id}
+            />
+          </Popconfirm>
+        </Space>
+      ),
     },
   ];
 
-
-  // ====================================================
-  // UI
-  // ====================================================
+  const importErrorColumns: TableColumnsType<ImportError> = [
+    {
+      title: "Dòng",
+      dataIndex: "row",
+      width: 70,
+      align: "center",
+    },
+    {
+      title: "Cột",
+      dataIndex: "field",
+      width: 170,
+    },
+    {
+      title: "Nội dung lỗi",
+      dataIndex: "message",
+      render: (value) => <div className="iw-wrap">{value}</div>,
+    },
+  ];
 
   return (
-    <>
+    <div
+      className="iw-page"
+      ref={pageRef}
+      style={viewportHeight !== null ? { height: viewportHeight } : undefined}
+    >
+      {contextHolder}
 
-      <div
-        ref={pageRef}
-        className="icd-warning-page"
-        style={viewportHeight ? { height: viewportHeight } : undefined}
-      >
-
-        {/* ===============================================
-            BREADCRUMB
-        =============================================== */}
-
-        <Breadcrumb
-          className="icd-breadcrumb"
-
-          items={[
-            {
-              title: (
-                <HomeOutlined />
-              ),
-            },
-
-            {
-              title:
-                "Danh mục",
-            },
-
-            {
-              title:
-                "ICD - Cảnh báo",
-            },
-          ]}
-        />
-
-
-        {/* ===============================================
-            HEADER
-        =============================================== */}
-
-        <div
-          className="icd-header"
-        >
-
-          <div>
-
-            <div
-              className="icd-title-row"
-            >
-
-              <SafetyCertificateOutlined
-                className="icd-title-icon"
+      <Breadcrumb
+        items={[
+          {
+            title: (
+              <Button
+                type="link"
+                size="small"
+                className="iw-crumb"
+                aria-label="Trang chủ"
+                icon={<HomeOutlined />}
+                onClick={() => navigate("/")}
               />
+            ),
+          },
+          {
+            title: (
+              <Button type="link" size="small" className="iw-crumb" onClick={backToCatalog}>
+                Danh mục
+              </Button>
+            ),
+          },
+          { title: "ICD Cảnh báo" },
+        ]}
+      />
 
-
-              <Title
-                level={
-                  3
-                }
-
-                style={{
-                  margin:
-                    0,
-                }}
-              >
-                ICD - Cảnh báo
-              </Title>
-
-            </div>
-
-
-            <Text
-              type="secondary"
-
-              className="icd-subtitle"
-            >
-              Cấu hình các mã ICD cần cảnh báo khi kiểm tra hồ sơ BHYT
-            </Text>
-
-          </div>
-
-
-          <Space
-            size={
-              8
-            }
+      <div className="iw-header">
+        <div>
+          <Title
+            level={3}
+            style={{
+              margin: 0,
+              color: "#172033",
+              fontSize: 21,
+              fontWeight: 800,
+            }}
           >
+            <SafetyCertificateOutlined
+              style={{
+                marginRight: 9,
+                color: "#1677ff",
+              }}
+            />
+            ICD Cảnh báo
+          </Title>
 
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              onClick={
-                openImportModal
-              }
-            >
-              Import
-            </Button>
-
-
-            <Button
-              type="primary"
-
-              icon={
-                <PlusOutlined />
-              }
-
-              onClick={
-                openCreateModal
-              }
-            >
-              Thêm mới
-            </Button>
-
-          </Space>
-
+          <Text type="secondary" className="iw-subtitle">
+            Quản lý mã ICD và nội dung cảnh báo khi kiểm tra hồ sơ
+          </Text>
         </div>
 
+        <Space size={8} wrap>
+          <Button icon={<UploadOutlined />} disabled={busy || loading} onClick={openImportModal}>
+            Import Excel
+          </Button>
 
-        {/* ===============================================
-            FILTER
-        =============================================== */}
-
-        <div
-          className="icd-filter-grid"
-        >
-
-          <div
-            className="icd-filter-item"
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            disabled={busy || loading}
+            onClick={() => openForm()}
           >
-
-            <Text
-              strong
-
-              className="icd-filter-label"
-            >
-              Mã ICD
-            </Text>
-
-
-            <Input
-              value={
-                icdInput
-              }
-
-              placeholder="Nhập mã ICD"
-
-              allowClear
-
-              onChange={(
-                event
-              ) => {
-
-                setIcdInput(
-                  event.target.value
-                );
-              }}
-
-              onPressEnter={
-                handleSearch
-              }
-            />
-
-          </div>
-
-
-          <div
-            className="icd-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="icd-filter-label"
-            >
-              Mã lỗi
-            </Text>
-
-
-            <Input
-              value={
-                errorCodeInput
-              }
-
-              placeholder="Nhập mã lỗi"
-
-              allowClear
-
-              onChange={(
-                event
-              ) => {
-
-                setErrorCodeInput(
-                  event.target.value
-                );
-              }}
-
-              onPressEnter={
-                handleSearch
-              }
-            />
-
-          </div>
-
-
-          <div
-            className="icd-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="icd-filter-label"
-            >
-              Tên bệnh
-            </Text>
-
-
-            <Input
-              value={
-                diseaseNameInput
-              }
-
-              placeholder="Nhập tên bệnh"
-
-              allowClear
-
-              onChange={(
-                event
-              ) => {
-
-                setDiseaseNameInput(
-                  event.target.value
-                );
-              }}
-
-              onPressEnter={
-                handleSearch
-              }
-            />
-
-          </div>
-
-
-          <div
-            className="icd-filter-actions"
-          >
-
-            <Button
-              type="primary"
-
-              icon={
-                <SearchOutlined />
-              }
-
-              onClick={
-                handleSearch
-              }
-            >
-              Tìm kiếm
-            </Button>
-
-
-            <Button
-              icon={
-                <ReloadOutlined />
-              }
-
-              onClick={
-                handleResetSearch
-              }
-            >
-              Làm mới
-            </Button>
-
-          </div>
-
-        </div>
-
-
-        {/* ===============================================
-            TABLE
-        =============================================== */}
-
-        <div className="icd-table-region" ref={tableRegionRef}>
-        <Table<IcdWarningItem>
-          className="medguard-icd-table"
-
-          rowKey="id"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            items
-          }
-
-          columns={
-            columns
-          }
-
-          size="middle"
-
-          tableLayout="fixed"
-
-          scroll={{
-            x: 1200,
-            y: tableScrollY,
-          }}
-
-          pagination={{
-            current:
-              page,
-
-            pageSize,
-
-            total,
-
-            showSizeChanger:
-              true,
-
-            pageSizeOptions: [
-              "10",
-              "20",
-              "50",
-              "100",
-            ],
-
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
-
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
-
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
-
-                  setPageSize(
-                    newPageSize
-                  );
-
-
-                  setPage(
-                    1
-                  );
-
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
-          }}
-
-          locale={{
-            emptyText:
-              "Chưa có dữ liệu ICD cảnh báo",
-          }}
-        />
-        </div>
-
+            Thêm mới
+          </Button>
+        </Space>
       </div>
 
-
-      {/* ==================================================
-          CREATE / EDIT MODAL
-      ================================================== */}
-
-      <Modal
-        open={
-          formModalOpen
-        }
-
-        title={
-          editingItem
-            ? "Cập nhật ICD Cảnh báo"
-            : "Thêm ICD Cảnh báo"
-        }
-
-        width={
-          760
-        }
-
-        okText={
-          editingItem
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
-        cancelText="Đóng"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
-        onCancel={
-          closeFormModal
-        }
-
-        destroyOnHidden
-      >
-
-        <Form
-          form={
-            form
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Không thể tải danh mục ICD cảnh báo"
+          description={error}
+          action={
+            <Button size="small" disabled={busy || loading} onClick={() => void loadIcdWarnings()}>
+              Thử lại
+            </Button>
           }
+        />
+      )}
 
-          layout="vertical"
+      <div className="iw-filters">
+        <div className="iw-filter">
+          <label htmlFor="iw-icd">Mã ICD</label>
 
-          style={{
-            marginTop:
-              18,
+          <Input
+            id="iw-icd"
+            allowClear
+            value={inputs.icdCode}
+            placeholder="Nhập mã ICD"
+            onChange={(event) =>
+              setInputs((previous) => ({
+                ...previous,
+                icdCode: event.target.value,
+              }))
+            }
+            onPressEnter={handleSearch}
+          />
+        </div>
+
+        <div className="iw-filter">
+          <label htmlFor="iw-error">Mã lỗi</label>
+
+          <Input
+            id="iw-error"
+            allowClear
+            value={inputs.errorCode}
+            placeholder="Nhập mã lỗi"
+            onChange={(event) =>
+              setInputs((previous) => ({
+                ...previous,
+                errorCode: event.target.value,
+              }))
+            }
+            onPressEnter={handleSearch}
+          />
+        </div>
+
+        <div className="iw-filter">
+          <label htmlFor="iw-disease">Tên bệnh</label>
+
+          <Input
+            id="iw-disease"
+            allowClear
+            value={inputs.diseaseName}
+            placeholder="Nhập tên bệnh cần tìm"
+            onChange={(event) =>
+              setInputs((previous) => ({
+                ...previous,
+                diseaseName: event.target.value,
+              }))
+            }
+            onPressEnter={handleSearch}
+          />
+        </div>
+
+        <Space size={8}>
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            disabled={busy || loading}
+            onClick={handleSearch}
+          >
+            Tìm kiếm
+          </Button>
+
+          <Button icon={<ReloadOutlined />} disabled={busy} onClick={resetFilters}>
+            Xóa bộ lọc
+          </Button>
+        </Space>
+      </div>
+
+      <div className="iw-table-region" ref={tableRegionRef}>
+        <Card
+          className="iw-table"
+          styles={{
+            body: { padding: 0 },
           }}
         >
+          <Table<IcdWarningItem>
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            loading={loading}
+            size="middle"
+            tableLayout="fixed"
+            scroll={{
+              x: 1241,
+              y: tableScrollY,
+            }}
+            locale={{
+              emptyText: error ? "Chưa tải được dữ liệu." : "Chưa có dữ liệu ICD cảnh báo.",
+            }}
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "20", "50", "100"],
+              showTotal: (value) => `Tổng số: ${value}`,
+              onChange: (nextPage, nextSize) => {
+                setPage(nextSize !== pageSize ? 1 : nextPage);
+                setPageSize(nextSize);
+              },
+            }}
+          />
+        </Card>
+      </div>
 
-          <div
-            className="icd-form-grid"
-          >
+      <Text type="secondary" className="iw-legend">
+        Cấu hình đang bật được áp dụng khi chạy lại kiểm tra hồ sơ. Di chuột vào nội dung để xem đầy
+        đủ.
+      </Text>
 
+      <Modal
+        open={formModalOpen}
+        centered
+        width={760}
+        destroyOnHidden
+        className="iw-modal"
+        title={
+          <div className="iw-modal-heading">
+            <div className="iw-modal-icon">
+              <SafetyCertificateOutlined />
+            </div>
+
+            <div>
+              <div className="iw-modal-title">
+                {editingItem ? "Cập nhật ICD cảnh báo" : "Thêm ICD cảnh báo"}
+              </div>
+
+              <div className="iw-subtitle">
+                Thiết lập mã ICD và nội dung hiển thị khi kiểm tra hồ sơ
+              </div>
+            </div>
+          </div>
+        }
+        okText={editingItem ? "Cập nhật" : "Thêm mới"}
+        cancelText="Hủy"
+        confirmLoading={saving}
+        cancelButtonProps={{
+          disabled: saving,
+        }}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
+        onCancel={closeForm}
+        onOk={() => form.submit()}
+      >
+        <Form<FormValues>
+          form={form}
+          layout="vertical"
+          preserve={false}
+          requiredMark={false}
+          disabled={saving}
+          onFinish={handleSave}
+          style={{ marginTop: 18 }}
+        >
+          <div className="iw-form-grid">
             <Form.Item
-              label="Mã ICD"
-
               name="icdCode"
-
+              label="Mã ICD"
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập mã ICD.",
+                  required: true,
+                  whitespace: true,
+                  message: "Vui lòng nhập mã ICD.",
                 },
               ]}
             >
-              <Input
-                placeholder="Ví dụ: M62.9"
-
-                maxLength={
-                  50
-                }
-              />
+              <Input maxLength={50} placeholder="Ví dụ: M62.9" />
             </Form.Item>
-
 
             <Form.Item
-              label="Mã lỗi"
-
               name="errorCode"
-
+              label="Mã lỗi"
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập mã lỗi.",
+                  required: true,
+                  whitespace: true,
+                  message: "Vui lòng nhập mã lỗi.",
                 },
               ]}
             >
-              <Input
-                placeholder="Ví dụ: ERR-26"
-
-                maxLength={
-                  100
-                }
-              />
+              <Input maxLength={100} placeholder="Ví dụ: ERR-26" />
             </Form.Item>
-
           </div>
 
-
-          <Form.Item
-            label="Tên bệnh"
-
-            name="diseaseName"
-          >
-            <Input
-              placeholder="Nhập tên bệnh"
-            />
+          <Form.Item name="diseaseName" label="Tên bệnh">
+            <Input placeholder="Nhập tên bệnh" />
           </Form.Item>
 
-
           <Form.Item
-            label="Nội dung cảnh báo"
-
             name="errorMessage"
-
+            label="Nội dung cảnh báo"
             rules={[
               {
-                required:
-                  true,
-
-                message:
-                  "Vui lòng nhập nội dung cảnh báo.",
+                required: true,
+                whitespace: true,
+                message: "Vui lòng nhập nội dung cảnh báo.",
               },
             ]}
           >
             <Input.TextArea
-              rows={
-                4
-              }
-
-              placeholder="Nhập nội dung cảnh báo..."
+              autoSize={{
+                minRows: 3,
+                maxRows: 7,
+              }}
+              placeholder="Nhập nội dung hiển thị khi phát hiện ICD..."
             />
           </Form.Item>
 
-
-          <Form.Item
-            label="Ghi chú"
-
-            name="note"
-          >
+          <Form.Item name="note" label="Ghi chú">
             <Input.TextArea
-              rows={
-                3
-              }
-
-              placeholder="Nhập ghi chú"
+              autoSize={{
+                minRows: 2,
+                maxRows: 5,
+              }}
+              placeholder="Nhập ghi chú nếu có"
             />
           </Form.Item>
 
-
-          <Form.Item
-            label="Trạng thái"
-
-            name="active"
-
-            valuePropName="checked"
-          >
-            <Switch
-              checkedChildren="Hoạt động"
-
-              unCheckedChildren="Ngừng"
-            />
-          </Form.Item>
-
-        </Form>
-
-      </Modal>
-
-
-      {/* ==================================================
-          IMPORT MODAL
-      ================================================== */}
-
-      <Modal
-        open={
-          importModalOpen
-        }
-
-        title="Import ICD Cảnh báo"
-
-        width={
-          900
-        }
-
-        okText="Import"
-
-        cancelText="Đóng"
-
-        confirmLoading={
-          importing
-        }
-
-        okButtonProps={{
-          disabled:
-            importFileList.length ===
-              0 ||
-            importResult !==
-              null,
-        }}
-
-        onOk={() =>
-          void handleImportExcel()
-        }
-
-        onCancel={
-          closeImportModal
-        }
-      >
-
-        <div
-          style={{
-            marginTop:
-              16,
-          }}
-        >
-
-          <Alert
-            type="info"
-
-            showIcon
-
-            message="Import danh mục ICD cảnh báo từ Excel"
-
-            description={
-              <>
-                File Excel cần có tối thiểu{" "}
-                <b>ICD</b>
-                {" "}
-                và{" "}
-                <b>MA_LOI</b>.
-                {" "}
-
-                Có thể sử dụng thêm các cột{" "}
-                <b>TEN_BENH</b>,
-                {" "}
-                <b>NOI_DUNG_LOI</b>,
-                {" "}
-                <b>TRANG_THAI</b>
-                {" "}
-                và{" "}
-                <b>GHI_CHU</b>.
-                {" "}
-
-                Mã đã tồn tại sẽ được cập nhật,
-                mã mới sẽ được thêm mới.
-              </>
-            }
-
-            style={{
-              marginBottom:
-                16,
-            }}
-          />
-
-
-          <Upload
-            accept=".xlsx"
-
-            maxCount={
-              1
-            }
-
-            fileList={
-              importFileList
-            }
-
-            beforeUpload={() =>
-              false
-            }
-
-            disabled={
-              importing
-            }
-
-            onRemove={() => {
-
-              setImportFileList(
-                []
-              );
-
-
-              setImportResult(
-                null
-              );
-
-
-              setImportErrors(
-                []
-              );
-
-
-              setImportMessage(
-                ""
-              );
-
-
-              return true;
-            }}
-
-            onChange={(
-              info
-            ) => {
-
-              setImportFileList(
-                info.fileList.slice(
-                  -1
-                )
-              );
-
-
-              setImportResult(
-                null
-              );
-
-
-              setImportErrors(
-                []
-              );
-
-
-              setImportMessage(
-                ""
-              );
-            }}
-          >
-
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              disabled={
-                importing
-              }
-            >
-              Chọn file Excel
-            </Button>
-
-          </Upload>
-
-
-          {importResult && (
-
-            <Alert
-              type="success"
-
-              showIcon
-
-              style={{
-                marginTop:
-                  20,
-              }}
-
-              message={
-                importMessage ||
-                "Import thành công"
-              }
-
-              description={
-                <div
-                  className="icd-import-result"
-                >
-
-                  <div>
-                    Tổng số dòng:{" "}
-                    <b>
-                      {
-                        importResult.totalRows
-                      }
-                    </b>
-                  </div>
-
-
-                  <div>
-                    Thêm mới:{" "}
-                    <b>
-                      {
-                        importResult.inserted
-                      }
-                    </b>
-                  </div>
-
-
-                  <div>
-                    Cập nhật:{" "}
-                    <b>
-                      {
-                        importResult.updated
-                      }
-                    </b>
-                  </div>
-
-
-                  <div>
-                    Bỏ qua:{" "}
-                    <b>
-                      {
-                        importResult.skipped
-                      }
-                    </b>
-                  </div>
-
-                </div>
-              }
-            />
-
-          )}
-
-
-          {!importResult &&
-            importMessage &&
-            importErrors.length ===
-              0 && (
-
-              <Alert
-                type="error"
-
-                showIcon
-
-                message={
-                  importMessage
-                }
-
-                style={{
-                  marginTop:
-                    20,
-                }}
-              />
-
-            )}
-
-
-          {importErrors.length >
-            0 && (
-
-            <div
-              style={{
-                marginTop:
-                  20,
-              }}
-            >
-
-              <Alert
-                type="error"
-
-                showIcon
-
-                message={
-                  importMessage ||
-                  `File có ${importErrors.length} lỗi.`
-                }
-
-                description="Không có dữ liệu nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
-                style={{
-                  marginBottom:
-                    12,
-                }}
-              />
-
-
-              <Table<IcdWarningImportError>
-                size="small"
-
-                bordered
-
-                rowKey={(
-                  record
-                ) =>
-                  `${record.row}-${record.field}-${record.message}`
-                }
-
-                dataSource={
-                  importErrors
-                }
-
-                pagination={{
-                  pageSize:
-                    10,
-
-                  showSizeChanger:
-                    false,
-
-                  showTotal:
-                    (
-                      value
-                    ) =>
-                      `Tổng lỗi: ${value}`,
-                }}
-
-                scroll={{
-                  y:
-                    320,
-                }}
-
-                columns={[
-                  {
-                    title:
-                      "Dòng",
-
-                    dataIndex:
-                      "row",
-
-                    width:
-                      80,
-
-                    align:
-                      "center",
-                  },
-
-                  {
-                    title:
-                      "Cột",
-
-                    dataIndex:
-                      "field",
-
-                    width:
-                      170,
-                  },
-
-                  {
-                    title:
-                      "Lỗi",
-
-                    dataIndex:
-                      "message",
-                  },
-                ]}
-              />
-
+          <div className="iw-active">
+            <div>
+              <Text strong>Kích hoạt quy tắc</Text>
+
+              <Text type="secondary" className="iw-subtitle">
+                Áp dụng trong lần kiểm tra hồ sơ tiếp theo
+              </Text>
             </div>
 
-          )}
-
-        </div>
-
+            <Form.Item name="active" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
+        </Form>
       </Modal>
 
+      <Modal
+        open={importModalOpen}
+        centered
+        width={920}
+        destroyOnHidden
+        className="iw-import-modal"
+        title={
+          <div className="iw-modal-heading">
+            <div className="iw-modal-icon">
+              <UploadOutlined />
+            </div>
 
-      {/* ==================================================
-          STYLE
-      ================================================== */}
+            <div>
+              <div className="iw-modal-title">Import ICD cảnh báo</div>
+
+              <div className="iw-subtitle">Nhập danh mục từ file Excel</div>
+            </div>
+          </div>
+        }
+        okText="Import"
+        cancelText="Đóng"
+        confirmLoading={importing}
+        okButtonProps={{
+          disabled: importFileList.length === 0 || importResult !== null,
+        }}
+        cancelButtonProps={{
+          disabled: importing,
+        }}
+        closable={!importing}
+        maskClosable={!importing}
+        keyboard={!importing}
+        onCancel={closeImportModal}
+        onOk={() => void handleImportExcel()}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+          message="Cấu trúc file Excel"
+          description={
+            <div className="iw-import-help">
+              File cần có tối thiểu <b>ICD</b> và <b>MA_LOI</b>. Các cột bổ sung: <b>TEN_BENH</b>,{" "}
+              <b>NOI_DUNG_LOI</b>, <b>TRANG_THAI</b>, <b>GHI_CHU</b>. Mã đã tồn tại sẽ được cập
+              nhật, mã mới được thêm mới.
+            </div>
+          }
+        />
+
+        <div className="iw-upload-area">
+          <Upload
+            accept=".xlsx"
+            maxCount={1}
+            fileList={importFileList}
+            disabled={importing}
+            beforeUpload={(file) => {
+              if (!file.name.toLowerCase().endsWith(".xlsx")) {
+                messageApi.error("Chỉ hỗ trợ file Excel .xlsx.");
+                return Upload.LIST_IGNORE;
+              }
+
+              setImportFileList([
+                {
+                  uid: file.uid,
+                  name: file.name,
+                  status: "done",
+                  originFileObj: file,
+                },
+              ]);
+
+              clearImportResult();
+
+              return false;
+            }}
+            onRemove={() => {
+              if (importingRef.current) {
+                return false;
+              }
+
+              setImportFileList([]);
+              clearImportResult();
+              return true;
+            }}
+          >
+            <Button icon={<UploadOutlined />} disabled={importing}>
+              Chọn file Excel
+            </Button>
+          </Upload>
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Định dạng hỗ trợ: .xlsx
+          </Text>
+        </div>
+
+        {importResult && (
+          <>
+            <Alert
+              type="success"
+              showIcon
+              message={importMessage || "Import thành công."}
+              style={{ marginTop: 16 }}
+            />
+
+            <div className="iw-import-summary">
+              {[
+                {
+                  label: "Tổng số dòng",
+                  value: importResult.totalRows,
+                  className: "",
+                },
+                {
+                  label: "Thêm mới",
+                  value: importResult.inserted,
+                  className: "iw-summary-success",
+                },
+                {
+                  label: "Cập nhật",
+                  value: importResult.updated,
+                  className: "iw-summary-info",
+                },
+                {
+                  label: "Bỏ qua",
+                  value: importResult.skipped,
+                  className: "iw-summary-warning",
+                },
+              ].map((item) => (
+                <div key={item.label} className={`iw-summary-item ${item.className}`}>
+                  <div className="iw-summary-label">{item.label}</div>
+
+                  <div className="iw-summary-value">{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {!importResult && importMessage && (
+          <Alert
+            type="error"
+            showIcon
+            message={importMessage}
+            description={
+              importErrors.length > 0
+                ? "Không có dữ liệu nào được import. Sửa các dòng lỗi rồi import lại."
+                : undefined
+            }
+            style={{ marginTop: 16 }}
+          />
+        )}
+
+        {importErrors.length > 0 && (
+          <div className="iw-import-errors">
+            <Table<ImportError>
+              rowKey={(record) => `${record.row}-${record.field}-${record.message}`}
+              columns={importErrorColumns}
+              dataSource={importErrors}
+              size="small"
+              tableLayout="fixed"
+              scroll={{ x: 600, y: 280 }}
+              pagination={{
+                defaultPageSize: 10,
+                showSizeChanger: false,
+                showTotal: (value) => `Tổng lỗi: ${value}`,
+              }}
+            />
+          </div>
+        )}
+      </Modal>
 
       <style>
         {`
-          /* Trang ICD không làm cuộn khung trình duyệt trên desktop. */
-          body:has(.icd-warning-page) {
-            overflow-y: hidden !important;
-          }
-
-          .icd-warning-page {
+          .iw-page {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
             width: 100%;
             min-width: 0;
             min-height: 0;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
           }
 
-          .icd-warning-page > .icd-breadcrumb,
-          .icd-warning-page > .icd-header,
-          .icd-warning-page > .icd-filter-grid {
-            flex: 0 0 auto;
+          .iw-page > .ant-breadcrumb,
+          .iw-header,
+          .iw-filters,
+          .iw-page > .ant-alert,
+          .iw-legend {
+            flex-shrink: 0;
           }
 
-          .icd-table-region {
-            flex: 1 1 auto;
-            min-height: 0;
-            min-width: 0;
-            overflow: hidden;
-          }
-
-          .icd-table-region .ant-table-body {
-            overflow-y: auto !important;
-          }
-
-          .icd-table-region .ant-pagination {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 4px;
-            margin: 10px 10px 8px !important;
-          }
-
-          @media (max-width: 900px), (max-height: 650px) {
-            body:has(.icd-warning-page) {
-              overflow-y: auto !important;
-            }
-            .icd-warning-page {
-              height: auto !important;
-              overflow: visible;
-            }
-            .icd-table-region {
-              overflow: visible;
-            }
-          }
-
-          .icd-breadcrumb {
-            margin-bottom: 14px;
+          .iw-page .ant-breadcrumb {
             font-size: 12px;
           }
 
-          .icd-header {
+          .iw-crumb.ant-btn {
+            height: auto;
+            padding: 0;
+            font-size: 12px;
+            line-height: inherit;
+          }
+
+          .iw-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
-            margin-bottom: 16px;
           }
 
-          .icd-title-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+          .iw-header .ant-btn {
+            height: 36px;
+            border-radius: 8px;
+            font-weight: 600;
           }
 
-          .icd-title-row h3 {
-            color: #172033 !important;
-            font-weight: 800 !important;
-            font-size: 22px !important;
-          }
-
-          .icd-title-icon {
-            font-size: 25px;
-            color: #1677ff;
-          }
-
-          .icd-subtitle {
+          .iw-subtitle {
             display: block;
-            margin-top: 3px;
+            margin-top: 4px;
+            color: #64748b;
             font-size: 12px;
+            font-weight: 400;
+            line-height: 1.6;
           }
 
-          .icd-filter-grid {
+          .iw-filters {
             display: grid;
             grid-template-columns:
-              minmax(180px, 1fr)
-              minmax(180px, 1fr)
-              minmax(260px, 1.4fr)
+              minmax(0, 1fr)
+              minmax(0, 1fr)
+              minmax(0, 1.4fr)
               auto;
-
             align-items: end;
             gap: 10px;
-            margin-bottom: 14px;
           }
 
-          .icd-filter-item {
-            min-width: 0;
-          }
-
-          .icd-filter-label {
-            display: block;
-            margin-bottom: 6px;
-            color: #172033;
-            font-size: 12px;
-            font-weight: 700;
-          }
-
-          .icd-filter-actions {
+          .iw-filter {
             display: flex;
-            gap: 8px;
-            align-items: center;
+            flex-direction: column;
+            min-width: 0;
+            gap: 6px;
           }
 
-          .medguard-icd-table {
-            border: 1px solid #e5eaf0;
-            border-radius: 8px;
-            overflow: hidden;
-          }
-
-          .medguard-icd-table .ant-table {
-            border-radius: 8px;
-          }
-
-          .medguard-icd-table
-          .ant-table-thead
-          > tr
-          > th {
-            background: #f3f6f9 !important;
+          .iw-filter > label {
             color: #172033;
             font-size: 12px;
-            font-weight: 700;
-            padding: 11px 10px !important;
-            border-bottom: 1px solid #e5eaf0 !important;
+            font-weight: 600;
           }
 
-          .medguard-icd-table
-          .ant-table-tbody
-          > tr
-          > td {
-            padding: 11px 10px !important;
+          .iw-filters .ant-btn {
+            height: 32px;
+            border-radius: 7px;
+            font-weight: 600;
+          }
+
+          .iw-table-region {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 265px;
+          }
+
+          .iw-table,
+          .iw-import-errors {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid #dfe6ee;
+            border-radius: 8px;
+            box-shadow:
+              0 2px 8px rgba(15, 23, 42, .03);
+          }
+
+          .iw-table
+          .ant-table-thead > tr > th,
+          .iw-import-errors
+          .ant-table-thead > tr > th {
+            background: #f2f5f8 !important;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 700;
+            border-bottom: 1px solid #d8e0e8;
+          }
+
+          .iw-table
+          .ant-table-tbody > tr > td,
+          .iw-import-errors
+          .ant-table-tbody > tr > td {
+            padding: 11px 12px;
+            color: #334155;
             font-size: 12px;
             vertical-align: middle;
-            border-bottom: 1px solid #edf0f5 !important;
+            overflow-wrap: anywhere;
           }
 
-          .medguard-icd-table
-          .ant-table-tbody
-          > tr:hover
-          > td {
+          .iw-table
+          .ant-table-tbody > tr:hover > td {
             background: #f7fbff !important;
           }
 
-          .medguard-icd-table
-          .ant-table-cell-fix-right {
-            background: #ffffff;
+          .iw-table .ant-tag {
+            margin: 0;
+            border-radius: 999px;
+            font-size: 11px;
           }
 
-          .medguard-icd-table
-          .ant-table-thead
-          .ant-table-cell-fix-right {
-            background: #f3f6f9 !important;
+          .iw-code-tag {
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
           }
 
-          .medguard-icd-table
-          .ant-pagination {
-            margin: 14px 8px 8px;
+          .iw-table .ant-pagination {
+            margin: 12px !important;
           }
 
-          .icd-form-grid {
+          .iw-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 20px;
+            max-height: 40px;
+          }
+
+          .iw-wrap {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 1.7;
+          }
+
+          .iw-legend {
+            margin-top: -5px;
+            font-size: 11px;
+            line-height: 1.7;
+          }
+
+          .iw-modal .ant-modal-content,
+          .iw-import-modal .ant-modal-content {
+            border-radius: 14px;
+          }
+
+          .iw-modal-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 8px;
+          }
+
+          .iw-modal-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #e6f4ff;
+            color: #1677ff;
+            font-size: 21px;
+          }
+
+          .iw-modal-title {
+            color: #172033;
+            font-size: 18px;
+            font-weight: 800;
+          }
+
+          .iw-form-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            grid-template-columns:
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+            column-gap: 16px;
           }
 
-          .icd-import-result {
-            line-height: 2;
+          .iw-modal
+          .ant-form-item-label > label {
+            font-size: 12px;
+            font-weight: 600;
           }
 
-          @media (max-width: 1000px) {
-            .icd-filter-grid {
-              grid-template-columns: 1fr 1fr;
-            }
+          .iw-modal .ant-input {
+            border-radius: 8px;
+          }
 
-            .icd-header {
+          .iw-modal input.ant-input {
+            min-height: 36px;
+          }
+
+          .iw-active {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 9px;
+            background: #fafcff;
+          }
+
+          .iw-modal
+          .ant-modal-footer .ant-btn,
+          .iw-import-modal
+          .ant-modal-footer .ant-btn {
+            border-radius: 8px;
+          }
+
+          .iw-import-help {
+            font-size: 12px;
+            line-height: 1.8;
+          }
+
+          .iw-upload-area {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 14px 16px;
+            border: 1px dashed #d9e2ec;
+            border-radius: 10px;
+            background: #fafcff;
+          }
+
+          .iw-import-summary {
+            display: grid;
+            grid-template-columns:
+              repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+          }
+
+          .iw-summary-item {
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+          }
+
+          .iw-summary-label {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .iw-summary-value {
+            margin-top: 3px;
+            color: #172033;
+            font-size: 23px;
+            font-weight: 800;
+          }
+
+          .iw-summary-success {
+            border-color: #d9f7be;
+            background: #f6ffed;
+          }
+
+          .iw-summary-info {
+            border-color: #bae0ff;
+            background: #e6f4ff;
+          }
+
+          .iw-summary-warning {
+            border-color: #ffe58f;
+            background: #fffbe6;
+          }
+
+          .iw-import-errors {
+            margin-top: 14px;
+          }
+
+          @media (max-width: 1100px) {
+            .iw-header {
               flex-direction: column;
             }
+
+            .iw-filters {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
           }
 
-          @media (max-width: 700px) {
-            .icd-filter-grid {
+          @media (max-width: 900px),
+                 (max-height: 650px) {
+            .iw-page {
+              height: auto !important;
+            }
+
+            .iw-table-region {
+              flex: none;
+              min-height: 0;
+            }
+          }
+
+          @media (max-width: 600px) {
+            .iw-filters,
+            .iw-form-grid {
               grid-template-columns: 1fr;
             }
 
-            .icd-filter-actions {
-              width: 100%;
+            .iw-import-summary {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
             }
 
-            .icd-form-grid {
-              grid-template-columns: 1fr;
+            .iw-upload-area {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+
+            .iw-modal-title {
+              font-size: 16px;
             }
           }
         `}
       </style>
-
-    </>
+    </div>
   );
 }

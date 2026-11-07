@@ -24,12 +24,11 @@ import {
 import type { ColumnsType } from "antd/es/table";
 
 import {
-  ArrowLeftOutlined,
-  DeleteOutlined,
   HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 
 import { apiFetch } from "../../api/apiClient";
@@ -54,10 +53,12 @@ interface FormValues {
 
 interface RuleRow extends FormValues {
   id: string | number;
+  service_name?: string | null;
 }
 
 interface GroupedRow {
   serviceCode: string;
+  serviceName: string;
   rows: RuleRow[];
 }
 
@@ -86,9 +87,17 @@ async function request<T>(path = "", init?: RequestInit): Promise<T | undefined>
     headers.set("Content-Type", "application/json");
   }
 
+  // Chuyển Headers thành object để apiFetch
+  // giữ được Content-Type khi gộp header.
+  const headerObject: Record<string, string> = {};
+
+  headers.forEach((value, key) => {
+    headerObject[key] = value;
+  });
+
   const response = await apiFetch(`${API}${path}`, {
     ...init,
-    headers,
+    headers: headerObject,
   });
 
   const contentType = response.headers.get("content-type") ?? "";
@@ -210,6 +219,9 @@ export default function ServiceDiagnosis() {
 
     return Array.from(groups.entries()).map(([serviceCode, items]) => ({
       serviceCode,
+
+      serviceName: items.map((item) => text(item.service_name)).find(Boolean) ?? "",
+
       rows: items,
     }));
   }, [filteredRows]);
@@ -311,6 +323,26 @@ export default function ServiceDiagnosis() {
       render: (_, __, index) => (currentPage - 1) * pageSize + index + 1,
     },
     {
+      title: "Tên dịch vụ kỹ thuật",
+      dataIndex: "serviceName",
+      key: "serviceName",
+      width: 220,
+
+      render: (value: string) => (
+        <div
+          style={{
+            color: value ? "#172033" : "#94a3b8",
+            fontWeight: value ? 600 : 400,
+            lineHeight: 1.7,
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {value || "Chưa có tên trong danh mục"}
+        </div>
+      ),
+    },
+    {
       title: "Mã DVKT",
       dataIndex: "serviceCode",
       width: 200,
@@ -365,7 +397,7 @@ export default function ServiceDiagnosis() {
                   size="small"
                   className="sd-diagnosis-delete"
                   aria-label={`Xóa chẩn đoán ` + item.diagnosis_pattern}
-                  icon={<DeleteOutlined />}
+                  icon={<CloseOutlined />}
                   disabled={busy || loading}
                   loading={deletingId === item.id}
                 />
@@ -472,19 +504,6 @@ export default function ServiceDiagnosis() {
         </div>
 
         <Space size={8} wrap>
-          <Button icon={<ArrowLeftOutlined />} disabled={busy} onClick={backToCatalog}>
-            Quay lại
-          </Button>
-
-          <Button
-            icon={<ReloadOutlined />}
-            loading={loading}
-            disabled={busy}
-            onClick={() => void loadData()}
-          >
-            Làm mới
-          </Button>
-
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -576,7 +595,7 @@ export default function ServiceDiagnosis() {
           columns={columns}
           tableLayout="fixed"
           size="middle"
-          scroll={{ x: 960 }}
+          scroll={{ x: 1180 }}
           pagination={{
             current: currentPage,
             pageSize,
@@ -599,8 +618,8 @@ export default function ServiceDiagnosis() {
       </Card>
 
       <Text type="secondary" className="sd-legend">
-        Bấm vào chẩn đoán để chỉnh sửa, bấm biểu tượng thùng rác để xóa. Khi lọc, bảng chỉ hiển thị
-        và đếm các cấu hình phù hợp bộ lọc.
+        Bấm vào chẩn đoán để chỉnh sửa, bấm biểu tượng X để xóa. Khi lọc, bảng chỉ hiển thị và đếm
+        các cấu hình phù hợp bộ lọc.
       </Text>
 
       <Modal
