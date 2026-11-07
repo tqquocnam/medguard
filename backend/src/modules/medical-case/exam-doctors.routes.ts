@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import type { Pool } from "pg";
 
@@ -19,6 +18,201 @@ export function createExamDoctorRouter(pool: Pool) {
   // Danh sách bác sĩ thực hiện công khám.
   // Chỉ đọc dữ liệu được trích xuất từ XML3.
   // ==================================================
+  // GET /api/medical-cases/:caseId/xml-details
+  router.get("/:caseId/xml-details", async (req, res) => {
+    const { caseId } = req.params;
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(caseId)) {
+      res.status(400).json({
+        success: false,
+        message: "ID hồ sơ không hợp lệ.",
+      });
+      return;
+    }
+
+    type StaffLookup = {
+      name: string | null;
+      status: "FOUND" | "NOT_FOUND" | "AMBIGUOUS";
+    };
+
+    function normalizeCode(value: unknown): string {
+      return String(value ?? "")
+        .toLowerCase()
+        .replace(/\s+/g, "");
+    }
+
+    function splitCodes(value: unknown): string[] {
+      return String(value ?? "")
+        .split(/[;|,]+/)
+        .map((code) => normalizeCode(code))
+        .filter(Boolean);
+    }
+
+    function collectStaffCodes(value: unknown, codes: Set<string>): void {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          collectStaffCodes(item, codes);
+        }
+        return;
+      }
+
+      if (typeof value !== "object" || value === null) return;
+
+      for (const [key, child] of Object.entries(value)) {
+        if (key === "MA_BAC_SI" || key === "NGUOI_THUC_HIEN" || key === "MA_BS_DOC_KQ") {
+          for (const code of splitCodes(child)) {
+            codes.add(code);
+          }
+        } else {
+          collectStaffCodes(child, codes);
+        }
+      }
+    }
+
+    try {
+      const result = await pool.query(
+        `
+        SELECT
+          c.id,
+          c.branch_id,
+          c.ma_lk,
+          c.ma_bn,
+          c.ho_ten,
+          COALESCE(
+            (
+              SELECT jsonb_agg(
+                jsonb_build_object(
+                  'type', f.xml_type,
+                  'data', f.parsed_data
+                )
+                ORDER BY f.xml_type
+              )
+              FROM core.medical_xml_files f
+              WHERE f.medical_case_id = c.id
+                AND f.branch_id = c.branch_id
+                AND UPPER(TRIM(f.xml_type)) IN (
+                  'XML1', 'XML2', 'XML3', 'XML4', 'XML5'
+                )
+            ),
+            '[]'::jsonb
+          ) AS files
+        FROM core.medical_cases c
+        WHERE c.id = $1
+        `,
+        [caseId],
+      );
+
+      const medicalCase = result.rows[0];
+
+      if (!medicalCase) {
+        res.status(404).json({
+          success: false,
+          message: "Không tìm thấy hồ sơ.",
+        });
+        return;
+      }
+
+      const codes = new Set<string>();
+
+      collectStaffCodes(medicalCase.files, codes);
+
+      const staffLookup: Record<string, StaffLookup> = {};
+
+      for (const code of codes) {
+        staffLookup[code] = {
+          name: null,
+          status: "NOT_FOUND",
+        };
+      }
+
+      if (codes.size > 0) {
+        const staffResult = await pool.query<{
+          id: string;
+          full_name: string | null;
+          license_number: string | null;
+          social_insurance_code: string | null;
+        }>(
+          `
+          SELECT
+            id,
+            full_name,
+            license_number,
+            social_insurance_code
+          FROM catalog.medical_staff
+          WHERE branch_id = $2
+            AND (
+              REGEXP_REPLACE(
+                LOWER(COALESCE(license_number, '')),
+                '[[:space:]]+', '', 'g'
+              ) = ANY($1::text[])
+              OR
+              REGEXP_REPLACE(
+                LOWER(COALESCE(social_insurance_code, '')),
+                '[[:space:]]+', '', 'g'
+              ) = ANY($1::text[])
+            )
+          `,
+          [[...codes], medicalCase.branch_id],
+        );
+
+        const matches = new Map<string, Map<string, string | null>>();
+
+        for (const staff of staffResult.rows) {
+          const staffCodes = new Set([
+            normalizeCode(staff.license_number),
+            normalizeCode(staff.social_insurance_code),
+          ]);
+
+          for (const code of staffCodes) {
+            if (!code || !codes.has(code)) continue;
+
+            const people = matches.get(code) ?? new Map<string, string | null>();
+
+            people.set(String(staff.id), staff.full_name?.trim() || null);
+
+            matches.set(code, people);
+          }
+        }
+
+        for (const code of codes) {
+          const people = matches.get(code);
+
+          if (!people?.size) continue;
+
+          if (people.size > 1) {
+            staffLookup[code] = {
+              name: null,
+              status: "AMBIGUOUS",
+            };
+          } else {
+            staffLookup[code] = {
+              name: [...people.values()][0] ?? null,
+              status: "FOUND",
+            };
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          id: medicalCase.id,
+          ma_lk: medicalCase.ma_lk,
+          ma_bn: medicalCase.ma_bn,
+          ho_ten: medicalCase.ho_ten,
+          files: medicalCase.files,
+          staffLookup,
+        },
+      });
+    } catch (error) {
+      console.error("[Medical Case XML Details]", error);
+
+      res.status(500).json({
+        success: false,
+        message: "Không tải được chi tiết hồ sơ.",
+      });
+    }
+  });
 
   router.get("/exam-doctors", async (_req, res) => {
     try {
@@ -78,19 +272,13 @@ export function createExamDoctorRouter(pool: Pool) {
         success: true,
         data: doctors,
       });
-
     } catch (error) {
-      console.error(
-        "[Exam Doctors] GET error:",
-        error
-      );
+      console.error("[Exam Doctors] GET error:", error);
 
       res.status(500).json({
         success: false,
         message:
-          error instanceof Error
-            ? error.message
-            : "Không tải được danh sách bác sĩ công khám.",
+          error instanceof Error ? error.message : "Không tải được danh sách bác sĩ công khám.",
       });
     }
   });

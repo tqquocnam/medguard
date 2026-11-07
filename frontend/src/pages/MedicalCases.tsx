@@ -23,6 +23,7 @@ import {
   ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  EllipsisOutlined,
 } from "@ant-design/icons";
 
 import { useQuery } from "@apollo/client/react";
@@ -36,6 +37,8 @@ import { useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 
 import { gql } from "@apollo/client";
+
+import CaseXmlDetailsModal from "../components/CaseXmlDetailsModal";
 
 // Phân trang cần ORDER BY có khóa duy nhất: nếu chỉ sort ngày vào,
 // các hồ sơ cùng ngày có thể đổi chỗ giữa các lần gọi LIMIT/OFFSET.
@@ -332,7 +335,7 @@ const statusTagStyle: CSSProperties = {
 
 export default function MedicalCases() {
   const [searchParams] = useSearchParams();
-
+  const [xmlDetailCase, setXmlDetailCase] = useState<MedicalCase | null>(null);
   // ====================================================
   // FIX TRANG - CHỈ TABLE ĐƯỢC SCROLL
   // ====================================================
@@ -1789,6 +1792,26 @@ export default function MedicalCases() {
                 // =========================================
                 // TRẠNG THÁI
                 // =========================================
+                {
+                  title: "",
+                  key: "xml-details",
+                  width: 48,
+                  fixed: "left",
+                  align: "center",
+                  render: (_: unknown, record: MedicalCase) => (
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EllipsisOutlined style={{ fontSize: 22 }} />}
+                      aria-label={`Xem chi tiết hồ sơ ${record.ho_ten || record.ma_lk || ""}`}
+                      title="Xem chi tiết hồ sơ XML1–XML5"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setXmlDetailCase(record);
+                      }}
+                    />
+                  ),
+                },
 
                 {
                   title: "Trạng thái",
@@ -2975,6 +2998,11 @@ export default function MedicalCases() {
       {/* ==================================================
           MODAL CHI TIẾT
       ================================================== */}
+      <CaseXmlDetailsModal
+        open={xmlDetailCase !== null}
+        caseId={xmlDetailCase?.id ?? null}
+        onClose={() => setXmlDetailCase(null)}
+      />
 
       <CaseCheckResultsModal
         open={resultCase !== null}
