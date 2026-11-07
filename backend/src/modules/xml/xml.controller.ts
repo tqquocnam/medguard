@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { parseBhytXml } from "./bhytXmlParser.js";
 import {
   saveBhytImport,
+  validateXmlBranch,
   validateRequestedTreatmentGroup,
 } from "./xml.service.js";
 import type { TreatmentGroup } from "./xml.service.js";
@@ -31,6 +32,7 @@ export async function uploadXml(req: Request, res: Response): Promise<void> {
     }
     const treatmentGroup = requireGroup(req);
     const parsed = parseBhytXml(req.file.buffer.toString("utf8"));
+    validateXmlBranch(parsed);
     const validation = validateImportFile(parsed);
     if (!validation.canImport) {
       res.status(422).json({
@@ -100,6 +102,7 @@ export async function analyzeXml(req: Request, res: Response): Promise<void> {
     }
     const treatmentGroup = requireGroup(req);
     const parsed = parseBhytXml(req.file.buffer.toString("utf8"));
+    validateXmlBranch(parsed);
     const validation = validateImportFile(parsed);
     if (validation.canImport) {
       validateRequestedTreatmentGroup(parsed, treatmentGroup);

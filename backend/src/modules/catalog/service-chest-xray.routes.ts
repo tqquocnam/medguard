@@ -121,7 +121,7 @@ router.get(
           required,
           blocks_ok,
           config
-        FROM validation.rules
+        FROM validation.branch_rules
         WHERE code = $1
         LIMIT 1
         `,
@@ -253,7 +253,7 @@ router.put(
 
       const result = await db.query<RuleRow>(
         `
-        UPDATE validation.rules
+        UPDATE validation.branch_rules
         SET
           enabled = $2,
           severity = $3,

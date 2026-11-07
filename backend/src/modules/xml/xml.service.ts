@@ -1,3 +1,4 @@
+import { requireBranch } from "../../config/branch-context.js";
 
 import { db } from "../../config/database.js";
 
@@ -315,12 +316,28 @@ export function validateRequestedTreatmentGroup(
 // SAVE BHYT IMPORT
 // ======================================================
 
+export function validateXmlBranch(result: ParsedBhytResult): void {
+  const branchId = requireBranch();
+  const facility = String(result.facilityCode ?? "").trim();
+  if (facility !== branchId) {
+    throw new Error(`Mã CSKCB trong XML (${facility || "trống"}) không khớp chi nhánh tài khoản (${branchId}).`);
+  }
+  for (const record of result.cases) {
+    const xml1 = record.files.find((file: { type: string; data?: any }) => file.type === "XML1");
+    const facilityCode = String(xml1?.data?.TONG_HOP?.MA_CSKCB ?? "").trim();
+    if (facilityCode && facilityCode !== branchId) {
+      throw new Error(`Hồ sơ ${record.maLk || record.index}: mã CSKCB ${facilityCode} khác chi nhánh ${branchId}.`);
+    }
+  }
+}
+
 export async function saveBhytImport(
   fileName: string,
   result: ParsedBhytResult,
   onProgress?: ImportProgressCallback,
   requestedGroup?: TreatmentGroup
 ) {
+  validateXmlBranch(result);
   const client = await db.connect();
 
   try {
@@ -516,7 +533,7 @@ export async function saveBhytImport(
 
           tongHop.MA_KHOA ?? null,
 
-          tongHop.MA_CSKCB ?? facilityCode,
+          String(tongHop.MA_CSKCB ?? "").trim() || facilityCode,
 
           bhytDateTime(
             tongHop.NGAY_VAO ??

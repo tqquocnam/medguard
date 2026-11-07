@@ -132,7 +132,7 @@ async function findRule() {
       required,
       blocks_ok,
       config
-    FROM validation.rules
+    FROM validation.branch_rules
     WHERE code = $1
     LIMIT 1
     `,
@@ -285,7 +285,7 @@ router.put(
 
       const updated = await db.query<RuleRecord>(
         `
-        UPDATE validation.rules
+        UPDATE validation.branch_rules
         SET
           enabled = $2,
           severity = $3,

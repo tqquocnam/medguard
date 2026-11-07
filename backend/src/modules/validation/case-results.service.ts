@@ -97,7 +97,7 @@ export async function getCaseResults(
         validation.rule_results rr
 
       INNER JOIN
-        validation.rules r
+        validation.branch_rules r
 
         ON
           r.id = rr.rule_id

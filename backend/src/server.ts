@@ -288,6 +288,12 @@ app.use(
 );
 
 
+// All remaining API routes require an authenticated branch.
+app.use("/api", requireAuth, (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 // ======================================================
 // GRAPHQL PROXY
 // ======================================================

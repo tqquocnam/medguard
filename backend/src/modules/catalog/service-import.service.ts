@@ -1280,7 +1280,7 @@ Promise<
           ${placeholders}
 
         ON CONFLICT
-          (code)
+          (branch_id, code)
 
         DO UPDATE SET
 

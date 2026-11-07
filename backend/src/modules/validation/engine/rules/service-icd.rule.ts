@@ -127,7 +127,7 @@ function splitIcdValues(values: string[]): string[] {
 //
 // Mặc định EXACT để tránh cảnh báo sai.
 // Có thể cấu hình icdMatchMode = PREFIX
-// trong validation.rules.config.
+// trong validation.branch_rules.config.
 //
 // Không tự động dùng CONTAINS.
 // ======================================================

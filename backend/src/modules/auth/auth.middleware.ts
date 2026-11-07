@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from "express";
 
 import jwt from "jsonwebtoken";
 
+import { withBranch } from "../../config/branch-context.js";
+
 import { db } from "../../config/database.js";
 
 import { AUTH_COOKIE_NAME, getAuthCookieOptions } from "./auth.cookies.js";
@@ -57,10 +59,12 @@ export async function requireAuth(
       algorithms: ["HS256"],
     });
 
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     if (
       typeof decoded === "string" ||
       typeof decoded.sub !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded.sub)
+      !uuidPattern.test(decoded.sub)
     ) {
       rejectSession(res, 401, "Phiên đăng nhập không hợp lệ.");
 
@@ -92,10 +96,14 @@ export async function requireAuth(
         u.branch_id,
         b.name AS branch_name,
         b.active AS branch_active
+
       FROM auth.users u
+
       LEFT JOIN auth.branches b
         ON b.id = u.branch_id
+
       WHERE u.id = $1
+
       LIMIT 1
       `,
       [userId],
@@ -121,8 +129,6 @@ export async function requireAuth(
       return;
     }
 
-    // Chi nhánh lấy từ database theo tài khoản.
-    // Không lấy từ body, query, header hoặc nội dung JWT.
     req.user = {
       id: String(account.id),
       username: account.username,
@@ -142,5 +148,11 @@ export async function requireAuth(
     return;
   }
 
-  next();
+  withBranch(
+    {
+      branchId: req.user!.branchId,
+      userId: req.user!.id,
+    },
+    next,
+  );
 }

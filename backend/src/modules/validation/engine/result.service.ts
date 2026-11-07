@@ -182,7 +182,7 @@ export async function calculateCaseStatus(
         ) AS blocks_ok,
         rr.details
       FROM validation.rule_results rr
-      LEFT JOIN validation.rules r
+      LEFT JOIN validation.branch_rules r
         ON r.id = rr.rule_id
       WHERE
         rr.check_run_id = $1

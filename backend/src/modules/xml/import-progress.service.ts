@@ -1,3 +1,7 @@
+import { requireBranch } from "../../config/branch-context.js";
+
+function progressKey(id: string): string { return `${requireBranch()}:${id}`; }
+
 export type ImportProgressStatus =
   | "PROCESSING"
   | "DONE"
@@ -62,7 +66,7 @@ export function createImportProgress(
 
 
   jobs.set(
-    id,
+    progressKey(id),
     progress
   );
 
@@ -85,7 +89,7 @@ export function updateImportProgress(
 
   const job =
     jobs.get(
-      id
+      progressKey(id)
     );
 
 
@@ -149,7 +153,7 @@ export function finishImportProgress(
 
   const job =
     jobs.get(
-      id
+      progressKey(id)
     );
 
 
@@ -187,7 +191,7 @@ export function failImportProgress(
 
   const job =
     jobs.get(
-      id
+      progressKey(id)
     );
 
 
@@ -221,7 +225,7 @@ export function getImportProgress(
 
   return (
     jobs.get(
-      id
+      progressKey(id)
     ) ??
     null
   );

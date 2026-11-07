@@ -88,7 +88,7 @@ export async function getCheckRunCaseResults(
         validation.rule_results rr
 
       INNER JOIN
-        validation.rules r
+        validation.branch_rules r
 
       ON
         r.id =

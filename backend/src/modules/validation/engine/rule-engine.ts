@@ -143,7 +143,7 @@ export async function loadEnabledRules(
         source_xml,
         target_xml,
         category
-      FROM validation.rules
+      FROM validation.branch_rules
       WHERE enabled = TRUE
       ORDER BY
         priority ASC,
