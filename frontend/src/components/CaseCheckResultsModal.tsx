@@ -1,22 +1,8 @@
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Modal,
-  Spin,
-  Statistic,
-  Table,
-  Tag,
-  Typography,
-} from "antd";
+import { Alert, Button, Descriptions, Modal, Spin, Statistic, Table, Tag, Typography } from "antd";
 
 import type { ColumnsType } from "antd/es/table";
 
-import {
-  CalendarOutlined,
-  CloseCircleFilled,
-  EyeOutlined,
-} from "@ant-design/icons";
+import { CalendarOutlined, CloseCircleFilled, EyeOutlined } from "@ant-design/icons";
 
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
@@ -96,9 +82,7 @@ function formatTime(value: unknown) {
 
   const date = dayjs(String(value));
 
-  return date.isValid()
-    ? date.format("DD/MM/YYYY HH:mm")
-    : String(value);
+  return date.isValid() ? date.format("DD/MM/YYYY HH:mm") : String(value);
 }
 
 function formatYhctActivityTime(value: string) {
@@ -107,15 +91,10 @@ function formatYhctActivityTime(value: string) {
   const hour = value.slice(8, 10);
   const minute = value.slice(10, 12);
 
-  return value.length === 14
-    ? `${hour}:${minute}:${value.slice(12, 14)}`
-    : `${hour}:${minute}`;
+  return value.length === 14 ? `${hour}:${minute}:${value.slice(12, 14)}` : `${hour}:${minute}`;
 }
 
-function getRuleDisplayName(
-  ruleCode: string,
-  ruleName: string,
-) {
+function getRuleDisplayName(ruleCode: string, ruleName: string) {
   switch (ruleCode) {
     case "STAFF_TIME_OVERLAP":
       return "Trùng thời gian";
@@ -144,10 +123,7 @@ function getRuleDisplayName(
 // FORMAT VIOLATION
 // ======================================================
 
-function formatViolation(
-  rule: RuleResult,
-  violation: any,
-): string {
+function formatViolation(rule: RuleResult, violation: any): string {
   if (violation?.displayMessage) {
     return String(violation.displayMessage);
   }
@@ -161,15 +137,10 @@ function formatViolation(
       "";
 
     const sourceName =
-      violation.sourceItemName ??
-      violation.itemName ??
-      violation.source_name ??
-      "";
+      violation.sourceItemName ?? violation.itemName ?? violation.source_name ?? "";
 
     const sourceTime = formatTime(
-      violation.sourceStart ??
-      violation.sourceTime ??
-      violation.startTime,
+      violation.sourceStart ?? violation.sourceTime ?? violation.startTime,
     );
 
     const conflictPatient =
@@ -179,20 +150,11 @@ function formatViolation(
       "";
 
     const conflictItem =
-      violation.conflictItemName ??
-      violation.otherItemName ??
-      violation.conflict_name ??
-      "";
+      violation.conflictItemName ?? violation.otherItemName ?? violation.conflict_name ?? "";
 
-    const conflictStart = formatTime(
-      violation.conflictStart ??
-      violation.otherStart,
-    );
+    const conflictStart = formatTime(violation.conflictStart ?? violation.otherStart);
 
-    const conflictEnd = formatTime(
-      violation.conflictEnd ??
-      violation.otherEnd,
-    );
+    const conflictEnd = formatTime(violation.conflictEnd ?? violation.otherEnd);
 
     return [
       staff,
@@ -203,80 +165,47 @@ function formatViolation(
           : "(Trùng thời gian) với",
       conflictPatient,
       conflictItem ? `- ${conflictItem}:` : "",
-      conflictStart && conflictEnd
-        ? `${conflictStart} → ${conflictEnd}`
-        : conflictStart,
+      conflictStart && conflictEnd ? `${conflictStart} → ${conflictEnd}` : conflictStart,
     ]
       .filter(Boolean)
       .join(" ");
   }
 
   if (rule.rule_code === "EXAM_MIN_TIME") {
-    const name =
-      violation.itemName ??
-      violation.examName ??
-      "Công khám";
+    const name = violation.itemName ?? violation.examName ?? "Công khám";
 
     const start = formatTime(violation.startTime);
     const end = formatTime(violation.endTime);
 
-    const minutes =
-      violation.durationMinutes ??
-      violation.minutes;
+    const minutes = violation.durationMinutes ?? violation.minutes;
 
     return (
       `${name}: ${start}` +
       (end ? ` → ${end}` : "") +
-      (
-        minutes !== undefined
-          ? ` (${minutes} phút - thời gian khám không đủ)`
-          : " (Thời gian khám không đủ)"
-      )
+      (minutes !== undefined
+        ? ` (${minutes} phút - thời gian khám không đủ)`
+        : " (Thời gian khám không đủ)")
     );
   }
 
   if (rule.rule_code === "DRUG_ICD") {
-    const drug =
-      violation.drugName ??
-      violation.itemName ??
-      violation.drugCode ??
-      "Thuốc";
+    const drug = violation.drugName ?? violation.itemName ?? violation.drugCode ?? "Thuốc";
 
-    const code =
-      violation.drugCode ??
-      violation.itemCode ??
-      "";
+    const code = violation.drugCode ?? violation.itemCode ?? "";
 
-    return (
-      `${code ? `${code} - ` : ""}` +
-      `${drug}: Không phù hợp ICD của hồ sơ`
-    );
+    return `${code ? `${code} - ` : ""}` + `${drug}: Không phù hợp ICD của hồ sơ`;
   }
 
   if (rule.rule_code === "SERVICE_ICD") {
-    const service =
-      violation.serviceName ??
-      violation.itemName ??
-      violation.serviceCode ??
-      "DVKT";
+    const service = violation.serviceName ?? violation.itemName ?? violation.serviceCode ?? "DVKT";
 
-    const code =
-      violation.serviceCode ??
-      violation.itemCode ??
-      "";
+    const code = violation.serviceCode ?? violation.itemCode ?? "";
 
-    return (
-      `${code ? `${code} - ` : ""}` +
-      `${service}: Không phù hợp ICD của hồ sơ`
-    );
+    return `${code ? `${code} - ` : ""}` + `${service}: Không phù hợp ICD của hồ sơ`;
   }
 
   if (rule.rule_code === "SERVICE_DIAGNOSIS") {
-    const service =
-      violation.serviceName ??
-      violation.itemName ??
-      violation.serviceCode ??
-      "DVKT";
+    const service = violation.serviceName ?? violation.itemName ?? violation.serviceCode ?? "DVKT";
 
     return `${service}: Không phù hợp chẩn đoán vào`;
   }
@@ -299,61 +228,36 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
   for (const rule of rules) {
     if (rule.result !== "FAIL") continue;
 
-    const violations = Array.isArray(rule.details?.violations)
-      ? rule.details.violations
-      : [];
+    const violations = Array.isArray(rule.details?.violations) ? rule.details.violations : [];
 
     if (violations.length > 0) {
       for (let index = 0; index < violations.length; index++) {
         const violation = violations[index];
 
         const sourceEventId =
-          violation.eventId ??
-          violation.sourceEventId ??
-          violation.source_event_id ??
-          "";
+          violation.eventId ?? violation.sourceEventId ?? violation.source_event_id ?? "";
 
         const conflictEventId =
-          violation.conflictEventId ??
-          violation.otherEventId ??
-          violation.conflict_event_id ??
-          "";
+          violation.conflictEventId ?? violation.otherEventId ?? violation.conflict_event_id ?? "";
 
         let duplicateKey = "";
 
         if (sourceEventId && conflictEventId) {
           duplicateKey = [
             rule.rule_code,
-            ...[
-              String(sourceEventId),
-              String(conflictEventId),
-            ].sort(),
+            ...[String(sourceEventId), String(conflictEventId)].sort(),
           ].join("|");
         } else {
-          const sourceCase =
-            violation.medicalCaseId ??
-            violation.sourceCaseId ??
-            "";
+          const sourceCase = violation.medicalCaseId ?? violation.sourceCaseId ?? "";
 
-          const conflictCase =
-            violation.conflictCaseId ??
-            violation.otherCaseId ??
-            "";
+          const conflictCase = violation.conflictCaseId ?? violation.otherCaseId ?? "";
 
           if (sourceCase && conflictCase) {
             duplicateKey = [
               rule.rule_code,
-              ...[
-                String(sourceCase),
-                String(conflictCase),
-              ].sort(),
-              violation.itemCode ??
-                violation.drugCode ??
-                violation.serviceCode ??
-                "",
-              violation.startTime ??
-                violation.sourceStart ??
-                "",
+              ...[String(sourceCase), String(conflictCase)].sort(),
+              violation.itemCode ?? violation.drugCode ?? violation.serviceCode ?? "",
+              violation.startTime ?? violation.sourceStart ?? "",
             ].join("|");
           }
         }
@@ -369,10 +273,7 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
         rows.push({
           key: `${rule.id}-${index}`,
           ruleCode: rule.rule_code,
-          ruleName: getRuleDisplayName(
-            rule.rule_code,
-            rule.rule_name,
-          ),
+          ruleName: getRuleDisplayName(rule.rule_code, rule.rule_name),
           severity: rule.severity,
           content: formatViolation(rule, violation),
         });
@@ -381,16 +282,12 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
       continue;
     }
 
-    const findings = Array.isArray(rule.details?.findings)
-      ? rule.details.findings
-      : [];
+    const findings = Array.isArray(rule.details?.findings) ? rule.details.findings : [];
 
     if (findings.length > 0) {
       findings.forEach((finding: any, index: number) => {
         const overlapDetail =
-          rule.rule_code === "YHCT_PERFORM_OVERLAP" &&
-          finding?.currentCode &&
-          finding?.otherCode
+          rule.rule_code === "YHCT_PERFORM_OVERLAP" && finding?.currentCode && finding?.otherCode
             ? [
                 finding.type === "SAME_MACHINE_OVERLAP"
                   ? `Trùng thời gian sử dụng máy ${finding.machine || ""}`
@@ -404,21 +301,12 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
             : "";
 
         const content = String(
-          finding?.message ||
-          overlapDetail ||
-          finding?.note ||
-          rule.message ||
-          rule.rule_name,
+          finding?.message || overlapDetail || finding?.note || rule.message || rule.rule_name,
         );
 
         const date = String(finding?.date || "");
 
-        const key = [
-          rule.rule_code,
-          finding?.type || "FINDING",
-          date,
-          content,
-        ].join("|");
+        const key = [rule.rule_code, finding?.type || "FINDING", date, content].join("|");
 
         if (seen.has(key)) return;
 
@@ -427,10 +315,7 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
         rows.push({
           key: `${rule.id}-finding-${index}`,
           ruleCode: rule.rule_code,
-          ruleName: getRuleDisplayName(
-            rule.rule_code,
-            rule.rule_name,
-          ),
+          ruleName: getRuleDisplayName(rule.rule_code, rule.rule_name),
           severity: rule.severity,
           content,
           findingDate: date || undefined,
@@ -443,10 +328,7 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
     rows.push({
       key: rule.id,
       ruleCode: rule.rule_code,
-      ruleName: getRuleDisplayName(
-        rule.rule_code,
-        rule.rule_name,
-      ),
+      ruleName: getRuleDisplayName(rule.rule_code, rule.rule_name),
       severity: rule.severity,
       content: rule.message || rule.rule_name,
     });
@@ -459,44 +341,33 @@ function buildErrorRows(rules: RuleResult[]): ErrorRow[] {
 // NHÂN SỰ THEO NGÀY
 // ======================================================
 
-function YhctDayStaff({
-  activities,
-}: {
-  activities?: YhctStaffActivity[];
-}) {
+function YhctDayStaff({ activities }: { activities?: YhctStaffActivity[] }) {
   const columns: ColumnsType<YhctStaffActivity> = [
     {
       title: "Thời gian",
       dataIndex: "at",
       key: "at",
       width: 95,
-      render: (value: string) =>
-        formatYhctActivityTime(value),
+      render: (value: string) => formatYhctActivityTime(value),
     },
     {
       title: "Họ tên / Mã nhân viên",
       dataIndex: "staffName",
       key: "staffName",
       width: 220,
-      render: (
-        value: string | null,
-        item: YhctStaffActivity,
-      ) => (
+      render: (value: string | null, item: YhctStaffActivity) => (
         <div>
           <Typography.Text strong={Boolean(value)}>
-            {value || (
-              item.lookupStatus === "AMBIGUOUS"
+            {value ||
+              (item.lookupStatus === "AMBIGUOUS"
                 ? "Mã khớp nhiều nhân viên"
                 : item.lookupStatus === "FOUND"
                   ? "Danh mục chưa có họ tên"
-                  : "Chưa tìm thấy trong danh mục"
-            )}
+                  : "Chưa tìm thấy trong danh mục")}
           </Typography.Text>
 
           <div>
-            <Typography.Text type="secondary">
-              {item.staffCode}
-            </Typography.Text>
+            <Typography.Text type="secondary">{item.staffCode}</Typography.Text>
           </div>
         </div>
       ),
@@ -506,18 +377,9 @@ function YhctDayStaff({
       dataIndex: "role",
       key: "role",
       width: 200,
-      render: (
-        value: string,
-        item: YhctStaffActivity,
-      ) => (
+      render: (value: string, item: YhctStaffActivity) => (
         <Tag
-          color={
-            item.source === "XML5"
-              ? "purple"
-              : value === "Bác sĩ chỉ định"
-                ? "blue"
-                : "cyan"
-          }
+          color={item.source === "XML5" ? "purple" : value === "Bác sĩ chỉ định" ? "blue" : "cyan"}
           style={{
             whiteSpace: "normal",
             margin: 0,
@@ -532,28 +394,18 @@ function YhctDayStaff({
       key: "activity",
       render: (_value, item) => (
         <div>
-          <div>
-            {item.serviceName ||
-              item.serviceCode ||
-              "Diễn biến lâm sàng"}
-          </div>
+          <div>{item.serviceName || item.serviceCode || "Diễn biến lâm sàng"}</div>
 
           {item.serviceName && item.serviceCode && (
             <div>
-              <Typography.Text type="secondary">
-                {item.serviceCode}
-              </Typography.Text>
+              <Typography.Text type="secondary">{item.serviceCode}</Typography.Text>
             </div>
           )}
 
           <div style={{ marginTop: 4 }}>
             <Tag>{item.source}</Tag>
 
-            {item.stt && (
-              <Typography.Text type="secondary">
-                STT: {item.stt}
-              </Typography.Text>
-            )}
+            {item.stt && <Typography.Text type="secondary">STT: {item.stt}</Typography.Text>}
           </div>
         </div>
       ),
@@ -562,10 +414,7 @@ function YhctDayStaff({
 
   return (
     <div style={{ marginTop: 18 }}>
-      <Typography.Title
-        level={5}
-        style={{ marginTop: 0, marginBottom: 10 }}
-      >
+      <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 10 }}>
         Nhân sự liên quan trong ngày
       </Typography.Title>
 
@@ -573,13 +422,12 @@ function YhctDayStaff({
         <Alert
           type="info"
           showIcon
-          message="Kết quả kiểm tra cũ chưa có thông tin nhân sự."
+          title="Kết quả kiểm tra cũ chưa có thông tin nhân sự."
           description="Chạy lại Rule Check sau khi cập nhật backend."
         />
       ) : activities.length === 0 ? (
         <Typography.Text type="secondary">
-          Chưa ghi nhận mã nhân viên có thời điểm hợp lệ
-          trong ngày này.
+          Chưa ghi nhận mã nhân viên có thời điểm hợp lệ trong ngày này.
         </Typography.Text>
       ) : (
         <>
@@ -590,14 +438,9 @@ function YhctDayStaff({
             scroll={{ x: 850 }}
             columns={columns}
             dataSource={activities}
-            rowKey={(item, index) => [
-              item.source,
-              item.stt,
-              item.role,
-              item.staffCode,
-              item.at,
-              index,
-            ].join("|")}
+            rowKey={(item, index) =>
+              [item.source, item.stt, item.role, item.staffCode, item.at, index].join("|")
+            }
           />
 
           <Typography.Text
@@ -608,8 +451,7 @@ function YhctDayStaff({
               fontSize: 12,
             }}
           >
-            Một người có thể xuất hiện nhiều dòng theo
-            từng vai trò, dịch vụ và thời điểm.
+            Một người có thể xuất hiện nhiều dòng theo từng vai trò, dịch vụ và thời điểm.
           </Typography.Text>
         </>
       )}
@@ -629,12 +471,7 @@ function validCalendar(raw: unknown): YhctDay[] {
       item != null &&
       typeof item === "object" &&
       typeof item.date === "string" &&
-      [
-        "BOTH",
-        "XML3_ONLY",
-        "XML5_ONLY",
-        "NEITHER",
-      ].includes(item.status),
+      ["BOTH", "XML3_ONLY", "XML5_ONLY", "NEITHER"].includes(item.status),
   );
 }
 
@@ -647,43 +484,26 @@ function YhctTreatmentCalendar({
 }) {
   const details = rule.details ?? {};
 
-  const calendar = useMemo(
-    () => validCalendar(details.calendar),
-    [details.calendar],
-  );
+  const calendar = useMemo(() => validCalendar(details.calendar), [details.calendar]);
 
-  const [selectedDate, setSelectedDate] =
-    useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedDate(
-      calendar.some(item => item.date === preferredDate)
+      calendar.some((item) => item.date === preferredDate)
         ? preferredDate!
-        : (
-            calendar.find(
-              item => item.status === "XML3_ONLY",
-            )?.date ||
-            calendar[0]?.date ||
-            null
-          ),
+        : calendar.find((item) => item.status === "XML3_ONLY")?.date || calendar[0]?.date || null,
     );
   }, [preferredDate, rule.id, calendar]);
 
-  const selected = calendar.find(
-    item => item.date === selectedDate,
-  );
+  const selected = calendar.find((item) => item.date === selectedDate);
 
-  const findings: any[] = Array.isArray(details.findings)
-    ? details.findings
-    : [];
+  const findings: any[] = Array.isArray(details.findings) ? details.findings : [];
 
   const selectedFindings = findings.filter(
-    item =>
+    (item) =>
       item.date === selectedDate ||
-      (
-        Array.isArray(item.missingDays) &&
-        item.missingDays.includes(selectedDate)
-      ),
+      (Array.isArray(item.missingDays) && item.missingDays.includes(selectedDate)),
   );
 
   if (!calendar.length) {
@@ -691,17 +511,14 @@ function YhctTreatmentCalendar({
       <Alert
         type="info"
         showIcon
-        message="Chưa có dữ liệu lịch điều trị của lần kiểm tra này."
+        title="Chưa có dữ liệu lịch điều trị của lần kiểm tra này."
         description="Hãy chạy lại Rule Check với bản mới của YHCT_DAILY_TREATMENT_CONTINUITY."
       />
     );
   }
 
   return (
-    <section
-      className="mg-yhct-panel"
-      aria-label="Lịch điều trị YHCT"
-    >
+    <section className="mg-yhct-panel" aria-label="Lịch điều trị YHCT">
       <div className="mg-yhct-heading">
         <CalendarOutlined />
 
@@ -715,33 +532,15 @@ function YhctTreatmentCalendar({
       </div>
 
       <div className="mg-yhct-stats">
-        <Statistic
-          title="Tổng ngày"
-          value={
-            details.totalTreatmentDays ??
-            calendar.length
-          }
-        />
+        <Statistic title="Tổng ngày" value={details.totalTreatmentDays ?? calendar.length} />
 
-        <Statistic
-          title="Ngày có XML3"
-          value={details.daysWithXml3Service ?? 0}
-        />
+        <Statistic title="Ngày có XML3" value={details.daysWithXml3Service ?? 0} />
 
-        <Statistic
-          title="Ngày có XML5"
-          value={details.daysWithXml5Progress ?? 0}
-        />
+        <Statistic title="Ngày có XML5" value={details.daysWithXml5Progress ?? 0} />
 
-        <Statistic
-          title="Chỉ XML3"
-          value={details.daysWithServiceOnly ?? 0}
-        />
+        <Statistic title="Chỉ XML3" value={details.daysWithServiceOnly ?? 0} />
 
-        <Statistic
-          title="Thiếu cả hai"
-          value={details.daysWithNeither ?? 0}
-        />
+        <Statistic title="Thiếu cả hai" value={details.daysWithNeither ?? 0} />
       </div>
 
       <div className="mg-yhct-legend">
@@ -752,7 +551,7 @@ function YhctTreatmentCalendar({
       </div>
 
       <div className="mg-yhct-days">
-        {calendar.map(item => {
+        {calendar.map((item) => {
           const active = item.date === selectedDate;
 
           return (
@@ -768,9 +567,7 @@ function YhctTreatmentCalendar({
               aria-pressed={active}
               title={dayLabels[item.status]}
             >
-              <strong>
-                {dayjs(item.date).format("DD/MM")}
-              </strong>
+              <strong>{dayjs(item.date).format("DD/MM")}</strong>
 
               <small>
                 {item.status === "BOTH"
@@ -788,22 +585,12 @@ function YhctTreatmentCalendar({
 
       {selected && (
         <div className="mg-yhct-day-detail">
-          <Typography.Title
-            level={5}
-            style={{ marginTop: 0 }}
-          >
+          <Typography.Title level={5} style={{ marginTop: 0 }}>
             Ngày {dayjs(selected.date).format("DD/MM/YYYY")}
           </Typography.Title>
 
-          <Descriptions
-            bordered
-            size="small"
-            column={{ xs: 1, sm: 2 }}
-          >
-            <Descriptions.Item
-              label="Trạng thái"
-              span={2}
-            >
+          <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+            <Descriptions.Item label="Trạng thái" span={2}>
               <Tag
                 color={
                   selected.status === "BOTH"
@@ -819,29 +606,20 @@ function YhctTreatmentCalendar({
               </Tag>
             </Descriptions.Item>
 
-            <Descriptions.Item label="Lượt DVKT XML3">
-              {selected.serviceCount}
-            </Descriptions.Item>
+            <Descriptions.Item label="Lượt DVKT XML3">{selected.serviceCount}</Descriptions.Item>
 
             <Descriptions.Item label="Bản ghi diễn biến XML5">
               {selected.progressCount}
             </Descriptions.Item>
 
-            <Descriptions.Item
-              label="Mã DVKT"
-              span={2}
-            >
+            <Descriptions.Item label="Mã DVKT" span={2}>
               {selected.serviceCodes?.length
-                ? selected.serviceCodes.map(code => (
-                    <Tag key={code}>{code}</Tag>
-                  ))
+                ? selected.serviceCodes.map((code) => <Tag key={code}>{code}</Tag>)
                 : "Không có trong nhóm DVKT được cấu hình"}
             </Descriptions.Item>
           </Descriptions>
 
-          <YhctDayStaff
-            activities={selected.staffActivities}
-          />
+          <YhctDayStaff activities={selected.staffActivities} />
 
           {selectedFindings.map((finding, index) => (
             <Alert
@@ -849,26 +627,22 @@ function YhctTreatmentCalendar({
               style={{ marginTop: 12 }}
               type="warning"
               showIcon
-              message={String(
-                finding.message || "Cần rà soát",
-              )}
+              title={String(finding.message || "Cần rà soát")}
             />
           ))}
 
-          {selected.status === "NEITHER" &&
-            !selectedFindings.length && (
-              <Typography.Text
-                type="secondary"
-                style={{
-                  display: "block",
-                  marginTop: 8,
-                }}
-              >
-                Chưa ghi nhận DVKT thuộc phạm vi kiểm tra
-                hoặc diễn biến XML5 trong ngày. Không tự
-                kết luận vi phạm BHYT.
-              </Typography.Text>
-            )}
+          {selected.status === "NEITHER" && !selectedFindings.length && (
+            <Typography.Text
+              type="secondary"
+              style={{
+                display: "block",
+                marginTop: 8,
+              }}
+            >
+              Chưa ghi nhận DVKT thuộc phạm vi kiểm tra hoặc diễn biến XML5 trong ngày. Không tự kết
+              luận vi phạm BHYT.
+            </Typography.Text>
+          )}
         </div>
       )}
     </section>
@@ -879,55 +653,36 @@ function YhctTreatmentCalendar({
 // NỘI DUNG TRÙNG THỜI GIAN
 // ======================================================
 
-function renderOverlapContent(
-  content: string,
-  ruleCode: string,
-) {
+function renderOverlapContent(content: string, ruleCode: string) {
   if (ruleCode !== "STAFF_TIME_OVERLAP") {
     return content;
   }
 
   const formattedContent = content
-    .replace(
-      /\(Trùng thời gian với\)/gi,
-      "(Trùng thời gian) với",
-    )
-    .replace(
-      /\(Trùng thời gian\)\s+với(?=\s*\])/gi,
-      "(Trùng thời gian) với",
-    )
-    .replace(
-      /\(Trùng thời gian\)(?!\s+với)/gi,
-      "(Trùng thời gian) với",
-    )
-    .replace(
-      /\(Trùng thời gian\) với\](?=\s+)/gi,
-      "(Trùng thời gian) với",
-    );
+    .replace(/\(Trùng thời gian với\)/gi, "(Trùng thời gian) với")
+    .replace(/\(Trùng thời gian\)\s+với(?=\s*\])/gi, "(Trùng thời gian) với")
+    .replace(/\(Trùng thời gian\)(?!\s+với)/gi, "(Trùng thời gian) với")
+    .replace(/\(Trùng thời gian\) với\](?=\s+)/gi, "(Trùng thời gian) với");
 
-  const timePattern =
-    /(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/g;
+  const timePattern = /(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/g;
 
-  const exactTimePattern =
-    /^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}$/;
+  const exactTimePattern = /^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}$/;
 
-  return formattedContent
-    .split(timePattern)
-    .map((part, index) =>
-      exactTimePattern.test(part) ? (
-        <strong
-          key={index}
-          style={{
-            fontWeight: 700,
-            color: "#111827",
-          }}
-        >
-          {part}
-        </strong>
-      ) : (
-        <span key={index}>{part}</span>
-      ),
-    );
+  return formattedContent.split(timePattern).map((part, index) =>
+    exactTimePattern.test(part) ? (
+      <strong
+        key={index}
+        style={{
+          fontWeight: 700,
+          color: "#111827",
+        }}
+      >
+        {part}
+      </strong>
+    ) : (
+      <span key={index}>{part}</span>
+    ),
+  );
 }
 
 // ======================================================
@@ -947,11 +702,9 @@ export default function CaseCheckResultsModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [calendarExpanded, setCalendarExpanded] =
-    useState(false);
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
 
-  const [preferredDate, setPreferredDate] =
-    useState<string | undefined>();
+  const [preferredDate, setPreferredDate] = useState<string | undefined>();
 
   useEffect(() => {
     if (!open || !caseId) return;
@@ -966,42 +719,27 @@ export default function CaseCheckResultsModal({
       setPreferredDate(undefined);
 
       try {
-        const response = await apiFetch(
-          `/checks/cases/${encodeURIComponent(caseId)}/results`,
-          { method: "GET" },
-        );
+        const response = await apiFetch(`/checks/cases/${encodeURIComponent(caseId)}/results`, {
+          method: "GET",
+        });
 
         if (response.status === 401) {
-          throw new Error(
-            "Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.",
-          );
+          throw new Error("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");
         }
 
         if (response.status === 403) {
-          throw new Error(
-            "Bạn không có quyền xem kết quả hồ sơ này.",
-          );
+          throw new Error("Bạn không có quyền xem kết quả hồ sơ này.");
         }
 
         const json = await response.json();
 
-        if (
-          !response.ok ||
-          json.success !== true ||
-          !json.data
-        ) {
-          throw new Error(
-            json.message ||
-              "Không thể tải kết quả kiểm tra.",
-          );
+        if (!response.ok || json.success !== true || !json.data) {
+          throw new Error(json.message || "Không thể tải kết quả kiểm tra.");
         }
 
         const incoming = json.data as ApiData;
 
-        if (
-          checkRunId &&
-          incoming.checkRunId !== checkRunId
-        ) {
+        if (checkRunId && incoming.checkRunId !== checkRunId) {
           throw new Error(
             "API đang trả kết quả của lần kiểm tra khác. " +
               "Cần hỗ trợ checkRunId trên backend trước khi " +
@@ -1014,11 +752,7 @@ export default function CaseCheckResultsModal({
         }
       } catch (e) {
         if (!cancelled) {
-          setError(
-            e instanceof Error
-              ? e.message
-              : "Không thể tải kết quả.",
-          );
+          setError(e instanceof Error ? e.message : "Không thể tải kết quả.");
         }
       } finally {
         if (!cancelled) {
@@ -1034,36 +768,23 @@ export default function CaseCheckResultsModal({
     };
   }, [open, caseId, checkRunId]);
 
-  const errorRows = useMemo(
-    () => buildErrorRows(data?.results ?? []),
-    [data],
-  );
+  const errorRows = useMemo(() => buildErrorRows(data?.results ?? []), [data]);
 
   const yhctRule = useMemo(
-    () =>
-      data?.results.find(
-        rule => rule.rule_code === YHCT_CODE,
-      ),
+    () => data?.results.find((rule) => rule.rule_code === YHCT_CODE),
     [data],
   );
 
   const isYhct =
-    treatmentGroup != null &&
-    treatmentGroup.trim() !== ""
+    treatmentGroup != null && treatmentGroup.trim() !== ""
       ? treatmentGroup.trim().toUpperCase() === "YHCT"
       : yhctRule?.details?.scope === "YHCT_MA_LOAI_KCB_02";
 
   const counts = useMemo(
     () => ({
-      errors: errorRows.filter(
-        row => row.severity === "ERROR",
-      ).length,
-      warnings: errorRows.filter(
-        row => row.severity === "WARNING",
-      ).length,
-      info: errorRows.filter(
-        row => row.severity === "INFO",
-      ).length,
+      errors: errorRows.filter((row) => row.severity === "ERROR").length,
+      warnings: errorRows.filter((row) => row.severity === "WARNING").length,
+      info: errorRows.filter((row) => row.severity === "INFO").length,
     }),
     [errorRows],
   );
@@ -1111,10 +832,7 @@ export default function CaseCheckResultsModal({
             lineHeight: 1.65,
           }}
         >
-          {renderOverlapContent(
-            value,
-            record.ruleCode,
-          )}
+          {renderOverlapContent(value, record.ruleCode)}
         </span>
       ),
     },
@@ -1125,12 +843,8 @@ export default function CaseCheckResultsModal({
             key: "action",
             width: 130,
             align: "center" as const,
-            render: (
-              _value: unknown,
-              record: ErrorRow,
-            ) =>
-              record.ruleCode === YHCT_CODE &&
-              yhctRule ? (
+            render: (_value: unknown, record: ErrorRow) =>
+              record.ruleCode === YHCT_CODE && yhctRule ? (
                 <Button
                   size="small"
                   icon={<EyeOutlined />}
@@ -1153,7 +867,7 @@ export default function CaseCheckResultsModal({
       onCancel={onClose}
       footer={null}
       width={1000}
-      destroyOnClose
+      destroyOnHidden
       className="medguard-case-error-modal"
       style={{
         top: "5vh",
@@ -1188,9 +902,7 @@ export default function CaseCheckResultsModal({
           />
 
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700 }}>
-              Chi tiết hồ sơ
-            </div>
+            <div style={{ fontWeight: 700 }}>Chi tiết hồ sơ</div>
 
             <Typography.Text
               type="secondary"
@@ -1218,13 +930,7 @@ export default function CaseCheckResultsModal({
         </div>
       )}
 
-      {!loading && error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error}
-        />
-      )}
+      {!loading && error && <Alert type="error" showIcon message={error} />}
 
       {!loading && !error && data && (
         <>
@@ -1232,24 +938,16 @@ export default function CaseCheckResultsModal({
             <Alert
               type="success"
               showIcon
-              message="Không phát hiện lỗi hoặc cảnh báo trong lần kiểm tra này."
+              title="Không phát hiện lỗi hoặc cảnh báo trong lần kiểm tra này."
             />
           ) : (
             <>
               <div className="mg-error-summary">
-                <Tag color="error">
-                  {counts.errors} lỗi
-                </Tag>
+                <Tag color="error">{counts.errors} lỗi</Tag>
 
-                <Tag color="warning">
-                  {counts.warnings} cảnh báo
-                </Tag>
+                <Tag color="warning">{counts.warnings} cảnh báo</Tag>
 
-                {counts.info > 0 && (
-                  <Tag color="processing">
-                    {counts.info} thông tin
-                  </Tag>
-                )}
+                {counts.info > 0 && <Tag color="processing">{counts.info} thông tin</Tag>}
               </div>
 
               <Table<ErrorRow>
@@ -1261,13 +959,8 @@ export default function CaseCheckResultsModal({
                 pagination={{
                   pageSize: 10,
                   showSizeChanger: true,
-                  pageSizeOptions: [
-                    "10",
-                    "20",
-                    "50",
-                  ],
-                  showTotal: total =>
-                    `Tổng ${total} mục`,
+                  pageSizeOptions: ["10", "20", "50"],
+                  showTotal: (total) => `Tổng ${total} mục`,
                 }}
                 scroll={{
                   x: isYhct ? 800 : 670,
@@ -1276,38 +969,25 @@ export default function CaseCheckResultsModal({
             </>
           )}
 
-          {isYhct &&
-            yhctRule &&
-            validCalendar(
-              yhctRule.details?.calendar,
-            ).length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <Button
-                  type={
-                    calendarExpanded
-                      ? "default"
-                      : "primary"
-                  }
-                  ghost={!calendarExpanded}
-                  icon={<CalendarOutlined />}
-                  onClick={() => {
-                    setPreferredDate(undefined);
-                    setCalendarExpanded(value => !value);
-                  }}
-                >
-                  {calendarExpanded
-                    ? "Thu gọn lịch điều trị YHCT"
-                    : "Xem lịch điều trị YHCT"}
-                </Button>
+          {isYhct && yhctRule && validCalendar(yhctRule.details?.calendar).length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <Button
+                type={calendarExpanded ? "default" : "primary"}
+                ghost={!calendarExpanded}
+                icon={<CalendarOutlined />}
+                onClick={() => {
+                  setPreferredDate(undefined);
+                  setCalendarExpanded((value) => !value);
+                }}
+              >
+                {calendarExpanded ? "Thu gọn lịch điều trị YHCT" : "Xem lịch điều trị YHCT"}
+              </Button>
 
-                {calendarExpanded && (
-                  <YhctTreatmentCalendar
-                    rule={yhctRule}
-                    preferredDate={preferredDate}
-                  />
-                )}
-              </div>
-            )}
+              {calendarExpanded && (
+                <YhctTreatmentCalendar rule={yhctRule} preferredDate={preferredDate} />
+              )}
+            </div>
+          )}
         </>
       )}
 

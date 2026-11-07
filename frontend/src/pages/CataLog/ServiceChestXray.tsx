@@ -290,7 +290,7 @@ export default function ServiceChestXray() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải cấu hình"
+          title="Không thể tải cấu hình"
           description={loadError}
           action={
             <Button size="small" onClick={() => void loadRule()}>
@@ -435,7 +435,7 @@ export default function ServiceChestXray() {
             </Col>
           </Row>
 
-          {validationError && <Alert type="error" showIcon message={validationError} />}
+          {validationError && <Alert type="error" showIcon title={validationError} />}
 
           <Card className="chest-rule-card">
             <div className="chest-preview-heading">

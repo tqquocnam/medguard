@@ -8,42 +8,17 @@ import {
   RightOutlined,
 } from "@ant-design/icons";
 
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Empty,
-  Row,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-} from "antd";
+import { Alert, Button, Card, Col, Empty, Row, Space, Spin, Tag, Typography } from "antd";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type {
-  ReactNode,
-} from "react";
+import type { ReactNode } from "react";
 
-import {
-  useNavigate,
-} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-import {
-  apiFetch,
-} from "../api/apiClient";
+import { apiFetch } from "../api/apiClient";
 
-const {
-  Title,
-  Text,
-} = Typography;
+const { Title, Text } = Typography;
 
 interface DashboardMonthSummary {
   month: number;
@@ -59,85 +34,45 @@ interface DashboardResponse {
   success?: boolean;
   message?: string;
 
-  data?:
-    DashboardMonthSummary[];
+  data?: DashboardMonthSummary[];
 }
 
-type StatType =
-  | "normal"
-  | "success"
-  | "error"
-  | "warning";
+type StatType = "normal" | "success" | "error" | "warning";
 
 function formatMonth(
-  month:
-    number,
+  month: number,
 
-  year:
-    number
+  year: number,
 ) {
-  return `Tháng ${String(
-    month
-  ).padStart(
-    2,
-    "0"
-  )}/${year}`;
+  return `Tháng ${String(month).padStart(2, "0")}/${year}`;
 }
 
-function formatNumber(
-  value:
-    number
-) {
-  return new Intl.NumberFormat(
-    "vi-VN"
-  ).format(
-    value
-  );
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("vi-VN").format(value);
 }
 
 function getPercent(
-  value:
-    number,
+  value: number,
 
-  total:
-    number
+  total: number,
 ) {
-  if (
-    total <=
-    0
-  ) {
+  if (total <= 0) {
     return 0;
   }
 
-  return Math.round(
-    (
-      value /
-      total
-    ) *
-      100
-  );
+  return Math.round((value / total) * 100);
 }
 
 function NumberBadge({
   value,
   type,
 }: {
-  value:
-    number;
+  value: number;
 
-  type:
-    StatType;
+  type: StatType;
 }) {
   return (
-    <span
-      className={`dashboard-number-badge dashboard-number-${type}`}
-    >
-      {
-        formatNumber(
-          value
-        )
-      }
-    </span>
+    <span className={`dashboard-number-badge dashboard-number-${type}`}>{formatNumber(value)}</span>
   );
 }
 
@@ -147,47 +82,23 @@ function StatRow({
   value,
   type,
 }: {
-  icon:
-    ReactNode;
+  icon: ReactNode;
 
-  label:
-    string;
+  label: string;
 
-  value:
-    number;
+  value: number;
 
-  type:
-    StatType;
+  type: StatType;
 }) {
   return (
-    <div
-      className="dashboard-stat-row"
-    >
-      <div
-        className="dashboard-stat-row-left"
-      >
-        <span
-          className={`dashboard-stat-icon dashboard-stat-icon-${type}`}
-        >
-          {icon}
-        </span>
+    <div className="dashboard-stat-row">
+      <div className="dashboard-stat-row-left">
+        <span className={`dashboard-stat-icon dashboard-stat-icon-${type}`}>{icon}</span>
 
-        <Text
-          className="dashboard-stat-label"
-        >
-          {label}
-        </Text>
+        <Text className="dashboard-stat-label">{label}</Text>
       </div>
 
-      <NumberBadge
-        value={
-          value
-        }
-
-        type={
-          type
-        }
-      />
+      <NumberBadge value={value} type={type} />
     </div>
   );
 }
@@ -198,44 +109,22 @@ function SummaryCard({
   icon,
   type,
 }: {
-  title:
-    string;
+  title: string;
 
-  value:
-    number;
+  value: number;
 
-  icon:
-    ReactNode;
+  icon: ReactNode;
 
-  type:
-    StatType;
+  type: StatType;
 }) {
   return (
-    <div
-      className={`dashboard-summary-card dashboard-summary-${type}`}
-    >
-      <div
-        className={`dashboard-summary-icon dashboard-summary-icon-${type}`}
-      >
-        {icon}
-      </div>
+    <div className={`dashboard-summary-card dashboard-summary-${type}`}>
+      <div className={`dashboard-summary-icon dashboard-summary-icon-${type}`}>{icon}</div>
 
       <div>
-        <div
-          className="dashboard-summary-title"
-        >
-          {title}
-        </div>
+        <div className="dashboard-summary-title">{title}</div>
 
-        <div
-          className="dashboard-summary-number"
-        >
-          {
-            formatNumber(
-              value
-            )
-          }
-        </div>
+        <div className="dashboard-summary-number">{formatNumber(value)}</div>
       </div>
     </div>
   );
@@ -246,188 +135,78 @@ function MonthCard({
   onView,
   latest,
 }: {
-  item:
-    DashboardMonthSummary;
+  item: DashboardMonthSummary;
 
-  onView:
-    (
-      item:
-        DashboardMonthSummary
-    ) => void;
+  onView: (item: DashboardMonthSummary) => void;
 
-  latest?:
-    boolean;
+  latest?: boolean;
 }) {
-  const checked =
-    item.goodCases +
-    item.errorCases;
+  const checked = item.goodCases + item.errorCases;
 
-  const goodPercent =
-    getPercent(
-      item.goodCases,
-      checked
-    );
+  const goodPercent = getPercent(item.goodCases, checked);
 
   return (
-    <Card
-      className={`dashboard-month-card ${
-        latest
-          ? "dashboard-month-card-latest"
-          : ""
-      }`}
-    >
-      <div
-        className="dashboard-month-card-top"
-      >
-        <Tag
-          color="blue"
-
-          className="dashboard-month-tag"
-        >
-          {
-            formatMonth(
-              item.month,
-              item.year
-            )
-          }
+    <Card className={`dashboard-month-card ${latest ? "dashboard-month-card-latest" : ""}`}>
+      <div className="dashboard-month-card-top">
+        <Tag color="blue" className="dashboard-month-tag">
+          {formatMonth(item.month, item.year)}
         </Tag>
 
-        {
-          latest &&
-          (
-            <span
-              className="dashboard-latest-badge"
-            >
-              Mới nhất
-            </span>
-          )
-        }
+        {latest && <span className="dashboard-latest-badge">Mới nhất</span>}
       </div>
 
-      <div
-        className="dashboard-month-heading"
-      >
+      <div className="dashboard-month-heading">
         <div>
-          <div
-            className="dashboard-month-title"
-          >
-            Hồ sơ thanh toán
-          </div>
+          <div className="dashboard-month-title">Hồ sơ thanh toán</div>
 
-          <div
-            className="dashboard-month-subtitle"
-          >
-            Tổng hợp kết quả kiểm tra trong tháng
-          </div>
+          <div className="dashboard-month-subtitle">Tổng hợp kết quả kiểm tra trong tháng</div>
         </div>
 
-        {
-          checked >
-            0 &&
-          (
-            <div
-              className="dashboard-rate"
-            >
-              <span>
-                {
-                  goodPercent
-                }
-                %
-              </span>
+        {checked > 0 && (
+          <div className="dashboard-rate">
+            <span>{goodPercent}%</span>
 
-              <small>
-                hồ sơ đúng
-              </small>
-            </div>
-          )
-        }
+            <small>hồ sơ đúng</small>
+          </div>
+        )}
       </div>
 
-      <div
-        className="dashboard-month-divider"
-      />
+      <div className="dashboard-month-divider" />
 
-      <div
-        className="dashboard-month-stats"
-      >
+      <div className="dashboard-month-stats">
         <StatRow
-          icon={
-            <BarsOutlined />
-          }
-
+          icon={<BarsOutlined />}
           label="Tổng số hồ sơ"
-
-          value={
-            item.totalCases
-          }
-
+          value={item.totalCases}
           type="normal"
         />
 
         <StatRow
-          icon={
-            <CheckCircleFilled />
-          }
-
+          icon={<CheckCircleFilled />}
           label="Hồ sơ đúng"
-
-          value={
-            item.goodCases
-          }
-
+          value={item.goodCases}
           type="success"
         />
 
         <StatRow
-          icon={
-            <CloseCircleFilled />
-          }
-
+          icon={<CloseCircleFilled />}
           label="Hồ sơ lỗi"
-
-          value={
-            item.errorCases
-          }
-
+          value={item.errorCases}
           type="error"
         />
 
         <StatRow
-          icon={
-            <ClockCircleFilled />
-          }
-
+          icon={<ClockCircleFilled />}
           label="Chưa kiểm tra"
-
-          value={
-            item.uncheckedCases
-          }
-
+          value={item.uncheckedCases}
           type="warning"
         />
       </div>
 
-      <div
-        className="dashboard-month-footer"
-      >
-        <Button
-          block
-
-          className="dashboard-detail-button"
-
-          onClick={() =>
-            onView(
-              item
-            )
-          }
-        >
-          <Space
-            size={
-              8
-            }
-          >
+      <div className="dashboard-month-footer">
+        <Button block className="dashboard-detail-button" onClick={() => onView(item)}>
+          <Space size={8}>
             Xem chi tiết
-
             <RightOutlined />
           </Space>
         </Button>
@@ -437,515 +216,234 @@ function MonthCard({
 }
 
 export default function Dashboard() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      true
-    );
+  const [loading, setLoading] = useState(true);
 
-  const [
-    error,
-    setError,
-  ] =
-    useState<
-      string |
-      null
-    >(
-      null
-    );
+  const [error, setError] = useState<string | null>(null);
 
-  const [
-    summaries,
-    setSummaries,
-  ] =
-    useState<
-      DashboardMonthSummary[]
-    >([]);
+  const [summaries, setSummaries] = useState<DashboardMonthSummary[]>([]);
 
-  const loadDashboard =
-    useCallback(
-      async () => {
-        try {
-          setLoading(
-            true
-          );
+  const loadDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
 
-          setError(
-            null
-          );
+      setError(null);
 
-          const response =
-            await apiFetch(
-              "/dashboard/summary",
-              {
-                method:
-                  "GET",
-              }
-            );
+      const response = await apiFetch("/dashboard/summary", {
+        method: "GET",
+      });
 
-          if (
-            response.status ===
-            401
-          ) {
-            return;
-          }
+      if (response.status === 401) {
+        return;
+      }
 
-          let json:
-            DashboardResponse;
+      let json: DashboardResponse;
 
-          try {
-            json =
-              await response.json();
-          } catch {
-            throw new Error(
-              "Backend trả về dữ liệu Dashboard không hợp lệ."
-            );
-          }
+      try {
+        json = await response.json();
+      } catch {
+        throw new Error("Backend trả về dữ liệu Dashboard không hợp lệ.");
+      }
 
-          if (
-            !response.ok ||
-            json.success !==
-              true
-          ) {
-            throw new Error(
-              json.message ||
-              "Không thể tải dữ liệu Dashboard."
-            );
-          }
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải dữ liệu Dashboard.");
+      }
 
-          setSummaries(
-            Array.isArray(
-              json.data
-            )
-              ? json.data
-              : []
-          );
-        } catch (
-          loadError
-        ) {
-          console.error(
-            "Dashboard load error:",
-            loadError
-          );
+      setSummaries(Array.isArray(json.data) ? json.data : []);
+    } catch (loadError) {
+      console.error("Dashboard load error:", loadError);
 
-          setError(
-            loadError instanceof
-            Error
-              ? loadError.message
-              : "Không thể tải dữ liệu Dashboard."
-          );
-        } finally {
-          setLoading(
-            false
-          );
+      setError(loadError instanceof Error ? loadError.message : "Không thể tải dữ liệu Dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loadDashboard]);
+
+  const sortedSummaries = useMemo(
+    () =>
+      [...summaries].sort((a, b) => {
+        if (a.year !== b.year) {
+          return b.year - a.year;
         }
-      },
-      []
-    );
 
-  useEffect(
-    () => {
-      const timer =
-        window.setTimeout(
-          () => {
-            void loadDashboard();
-          },
-          0
-        );
-
-      return () => {
-        window.clearTimeout(
-          timer
-        );
-      };
-    },
-    [
-      loadDashboard,
-    ]
+        return b.month - a.month;
+      }),
+    [summaries],
   );
 
-  const sortedSummaries =
-    useMemo(
-      () =>
-        [
-          ...summaries,
-        ].sort(
-          (
-            a,
-            b
-          ) => {
-            if (
-              a.year !==
-              b.year
-            ) {
-              return (
-                b.year -
-                a.year
-              );
-            }
+  const totals = useMemo(() => {
+    return sortedSummaries.reduce(
+      (accumulator, item) => {
+        accumulator.total += item.totalCases;
 
-            return (
-              b.month -
-              a.month
-            );
-          }
-        ),
-      [
-        summaries,
-      ]
-    );
+        accumulator.good += item.goodCases;
 
-  const totals =
-    useMemo(
-      () => {
-        return sortedSummaries.reduce(
-          (
-            accumulator,
-            item
-          ) => {
-            accumulator.total +=
-              item.totalCases;
+        accumulator.error += item.errorCases;
 
-            accumulator.good +=
-              item.goodCases;
+        accumulator.unchecked += item.uncheckedCases;
 
-            accumulator.error +=
-              item.errorCases;
-
-            accumulator.unchecked +=
-              item.uncheckedCases;
-
-            return accumulator;
-          },
-          {
-            total:
-              0,
-
-            good:
-              0,
-
-            error:
-              0,
-
-            unchecked:
-              0,
-          }
-        );
+        return accumulator;
       },
-      [
-        sortedSummaries,
-      ]
-    );
+      {
+        total: 0,
 
-  function handleViewDetail(
-    item:
-      DashboardMonthSummary
-  ) {
-    navigate(
-      `/medical-cases?year=${item.year}&month=${item.month}`
+        good: 0,
+
+        error: 0,
+
+        unchecked: 0,
+      },
     );
+  }, [sortedSummaries]);
+
+  function handleViewDetail(item: DashboardMonthSummary) {
+    navigate(`/medical-cases?year=${item.year}&month=${item.month}`);
   }
 
   return (
     <>
-      <div
-        className="dashboard-page"
-      >
-        <div
-          className="dashboard-header"
-        >
+      <div className="dashboard-page">
+        <div className="dashboard-header">
           <div>
             <Title
-              level={
-                3
-              }
-
+              level={3}
               style={{
-                margin:
-                  0,
+                margin: 0,
 
-                color:
-                  "#172033",
+                color: "#172033",
 
-                fontWeight:
-                  800,
+                fontWeight: 800,
               }}
             >
               <DashboardOutlined
                 style={{
-                  marginRight:
-                    10,
+                  marginRight: 10,
 
-                  color:
-                    "#1677ff",
+                  color: "#1677ff",
                 }}
               />
-
               Dashboard
             </Title>
 
-            <Text
-              type="secondary"
-
-              className="dashboard-subtitle"
-            >
+            <Text type="secondary" className="dashboard-subtitle">
               Tổng quan hồ sơ thanh toán và kết quả kiểm tra BHYT theo tháng
             </Text>
           </div>
 
           <Button
-            icon={
-              <ReloadOutlined />
-            }
-
-            loading={
-              loading
-            }
-
-            onClick={() =>
-              void loadDashboard()
-            }
-
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => void loadDashboard()}
             className="dashboard-refresh-button"
           >
             Làm mới
           </Button>
         </div>
 
-        {
-          loading
-            ? (
-              <div
-                className="dashboard-loading"
-              >
-                <Spin
-                  size="large"
-                />
+        {loading ? (
+          <div className="dashboard-loading">
+            <Spin size="large" />
 
-                <Text
-                  type="secondary"
-                >
-                  Đang tải dữ liệu Dashboard...
-                </Text>
-              </div>
-            )
-            : null
-        }
+            <Text type="secondary">Đang tải dữ liệu Dashboard...</Text>
+          </div>
+        ) : null}
 
-        {
-          !loading &&
-          error &&
-          (
-            <Alert
-              type="error"
+        {!loading && error && (
+          <Alert
+            type="error"
+            showIcon
+            title="Không thể tải Dashboard"
+            description={error}
+            action={
+              <Button size="small" onClick={() => void loadDashboard()}>
+                Thử lại
+              </Button>
+            }
+          />
+        )}
 
-              showIcon
+        {!loading && !error && sortedSummaries.length === 0 && (
+          <Card className="dashboard-empty-card">
+            <Empty description="Chưa có dữ liệu hồ sơ." />
+          </Card>
+        )}
 
-              message="Không thể tải Dashboard"
-
-              description={
-                error
-              }
-
-              action={
-                <Button
-                  size="small"
-
-                  onClick={() =>
-                    void loadDashboard()
-                  }
-                >
-                  Thử lại
-                </Button>
-              }
-            />
-          )
-        }
-
-        {
-          !loading &&
-          !error &&
-          sortedSummaries.length ===
-            0 &&
-          (
-            <Card
-              className="dashboard-empty-card"
-            >
-              <Empty
-                description="Chưa có dữ liệu hồ sơ."
+        {!loading && !error && sortedSummaries.length > 0 && (
+          <>
+            <div className="dashboard-summary-grid">
+              <SummaryCard
+                title="Tổng hồ sơ"
+                value={totals.total}
+                type="normal"
+                icon={<BarsOutlined />}
               />
-            </Card>
-          )
-        }
 
-        {
-          !loading &&
-          !error &&
-          sortedSummaries.length >
-            0 &&
-          (
-            <>
-              <div
-                className="dashboard-summary-grid"
-              >
-                <SummaryCard
-                  title="Tổng hồ sơ"
+              <SummaryCard
+                title="Hồ sơ đúng"
+                value={totals.good}
+                type="success"
+                icon={<CheckCircleFilled />}
+              />
 
-                  value={
-                    totals.total
-                  }
+              <SummaryCard
+                title="Hồ sơ lỗi"
+                value={totals.error}
+                type="error"
+                icon={<CloseCircleFilled />}
+              />
 
-                  type="normal"
+              <SummaryCard
+                title="Chưa kiểm tra"
+                value={totals.unchecked}
+                type="warning"
+                icon={<ClockCircleFilled />}
+              />
+            </div>
 
-                  icon={
-                    <BarsOutlined />
-                  }
-                />
+            <div className="dashboard-section">
+              <div className="dashboard-section-header">
+                <div>
+                  <div className="dashboard-section-title">Hồ sơ thanh toán theo tháng</div>
 
-                <SummaryCard
-                  title="Hồ sơ đúng"
-
-                  value={
-                    totals.good
-                  }
-
-                  type="success"
-
-                  icon={
-                    <CheckCircleFilled />
-                  }
-                />
-
-                <SummaryCard
-                  title="Hồ sơ lỗi"
-
-                  value={
-                    totals.error
-                  }
-
-                  type="error"
-
-                  icon={
-                    <CloseCircleFilled />
-                  }
-                />
-
-                <SummaryCard
-                  title="Chưa kiểm tra"
-
-                  value={
-                    totals.unchecked
-                  }
-
-                  type="warning"
-
-                  icon={
-                    <ClockCircleFilled />
-                  }
-                />
-              </div>
-
-              <div
-                className="dashboard-section"
-              >
-                <div
-                  className="dashboard-section-header"
-                >
-                  <div>
-                    <div
-                      className="dashboard-section-title"
-                    >
-                      Hồ sơ thanh toán theo tháng
-                    </div>
-
-                    <div
-                      className="dashboard-section-subtitle"
-                    >
-                      Chọn một tháng để xem chi tiết danh sách hồ sơ
-                    </div>
+                  <div className="dashboard-section-subtitle">
+                    Chọn một tháng để xem chi tiết danh sách hồ sơ
                   </div>
-
-                  <Tag
-                    color="blue"
-
-                    className="dashboard-month-count"
-                  >
-                    {
-                      sortedSummaries.length
-                    }{" "}
-                    tháng
-                  </Tag>
                 </div>
 
-                <Row
-                  gutter={[
-                    16,
-                    16,
-                  ]}
-                >
-                  {
-                    sortedSummaries.map(
-                      (
-                        item,
-                        index
-                      ) => (
-                        <Col
-                          key={
-                            `${item.year}-${item.month}`
-                          }
-
-                          xs={
-                            24
-                          }
-
-                          sm={
-                            24
-                          }
-
-                          md={
-                            12
-                          }
-
-                          lg={
-                            8
-                          }
-
-                          xl={
-                            8
-                          }
-
-                          xxl={
-                            6
-                          }
-                        >
-                          <MonthCard
-                            item={
-                              item
-                            }
-
-                            latest={
-                              index ===
-                              0
-                            }
-
-                            onView={
-                              handleViewDetail
-                            }
-                          />
-                        </Col>
-                      )
-                    )
-                  }
-                </Row>
+                <Tag color="blue" className="dashboard-month-count">
+                  {sortedSummaries.length} tháng
+                </Tag>
               </div>
-            </>
-          )
-        }
+
+              <Row gutter={[16, 16]}>
+                {sortedSummaries.map((item, index) => (
+                  <Col
+                    key={`${item.year}-${item.month}`}
+                    xs={24}
+                    sm={24}
+                    md={12}
+                    lg={8}
+                    xl={8}
+                    xxl={6}
+                  >
+                    <MonthCard item={item} latest={index === 0} onView={handleViewDetail} />
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          </>
+        )}
       </div>
 
       <style>

@@ -16,10 +16,7 @@ import {
   message,
 } from "antd";
 
-import type {
-  TableColumnsType,
-  UploadFile,
-} from "antd";
+import type { TableColumnsType, UploadFile } from "antd";
 
 import {
   EditOutlined,
@@ -31,22 +28,11 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {
-  apiFetch,
-} from "../../api/apiClient";
+import { apiFetch } from "../../api/apiClient";
 
-
-const {
-  Title,
-  Text,
-} = Typography;
-
+const { Title, Text } = Typography;
 
 // ======================================================
 // TYPES
@@ -57,117 +43,64 @@ interface DrugItem {
   code: string;
   name: string;
 
-  activeIngredient:
-    | string
-    | null;
+  activeIngredient: string | null;
 
-  strength:
-    | string
-    | null;
+  strength: string | null;
 
-  unit:
-    | string
-    | null;
+  unit: string | null;
 
-  groupCode:
-    | string
-    | null;
+  groupCode: string | null;
 
-  route:
-    | string
-    | null;
+  route: string | null;
 
-  routeCode:
-    | string
-    | null;
+  routeCode: string | null;
 
-  dosageForm:
-    | string
-    | null;
+  dosageForm: string | null;
 
-  registrationNumber:
-    | string
-    | null;
+  registrationNumber: string | null;
 
-  quantity:
-    | number
-    | null;
+  quantity: number | null;
 
   unitPrice: number;
 
-  insuranceUnitPrice:
-    | number
-    | null;
+  insuranceUnitPrice: number | null;
 
-  packaging:
-    | string
-    | null;
+  packaging: string | null;
 
-  manufacturer:
-    | string
-    | null;
+  manufacturer: string | null;
 
-  country:
-    | string
-    | null;
+  country: string | null;
 
-  contractor:
-    | string
-    | null;
+  contractor: string | null;
 
-  tenderInfo:
-    | string
-    | null;
+  tenderInfo: string | null;
 
-  drugType:
-    | string
-    | null;
+  drugType: string | null;
 
-  scientificName:
-    | string
-    | null;
+  scientificName: string | null;
 
-  origin:
-    | string
-    | null;
+  origin: string | null;
 
-  processingMethod:
-    | string
-    | null;
+  processingMethod: string | null;
 
-  importedMaterialCode:
-    | string
-    | null;
+  importedMaterialCode: string | null;
 
-  processedMaterialCode:
-    | string
-    | null;
+  processedMaterialCode: string | null;
 
-  processingLossRate:
-    | number
-    | null;
+  processingLossRate: number | null;
 
-  preservationLossRate:
-    | number
-    | null;
+  preservationLossRate: number | null;
 
-  qualityStandard:
-    | string
-    | null;
+  qualityStandard: string | null;
 
-  decisionNo:
-    | string
-    | null;
+  decisionNo: string | null;
 
   insurancePaymentRate: number;
 
-  note:
-    | string
-    | null;
+  note: string | null;
 
   active: boolean;
 }
-
 
 interface DrugFormValues {
   code: string;
@@ -182,15 +115,11 @@ interface DrugFormValues {
   dosageForm?: string;
   registrationNumber?: string;
 
-  quantity?:
-    | number
-    | null;
+  quantity?: number | null;
 
   unitPrice?: number;
 
-  insuranceUnitPrice?:
-    | number
-    | null;
+  insuranceUnitPrice?: number | null;
 
   packaging?: string;
   manufacturer?: string;
@@ -204,13 +133,9 @@ interface DrugFormValues {
   importedMaterialCode?: string;
   processedMaterialCode?: string;
 
-  processingLossRate?:
-    | number
-    | null;
+  processingLossRate?: number | null;
 
-  preservationLossRate?:
-    | number
-    | null;
+  preservationLossRate?: number | null;
 
   qualityStandard?: string;
   decisionNo?: string;
@@ -220,13 +145,11 @@ interface DrugFormValues {
   active: boolean;
 }
 
-
 interface DrugImportError {
   row: number;
   field: string;
   message: string;
 }
-
 
 interface DrugImportResult {
   totalRows: number;
@@ -235,2219 +158,1122 @@ interface DrugImportResult {
   skipped: number;
 }
 
-
 // ======================================================
 // HELPERS
 // ======================================================
 
-function formatMoney(
-  value:
-    | number
-    | null
-    | undefined
-) {
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
+function formatMoney(value: number | null | undefined) {
+  if (value === null || value === undefined) {
     return "-";
   }
 
-  return Number(
-    value
-  ).toLocaleString(
-    "vi-VN"
-  );
+  return Number(value).toLocaleString("vi-VN");
 }
 
-
-function textOrDash(
-  value:
-    | string
-    | null
-    | undefined
-) {
-
-  return (
-    value &&
-    String(
-      value
-    ).trim()
-  )
-    ? value
-    : "-";
+function textOrDash(value: string | null | undefined) {
+  return value && String(value).trim() ? value : "-";
 }
 
-
-function numberOrDash(
-  value:
-    | number
-    | null
-    | undefined
-) {
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
+function numberOrDash(value: number | null | undefined) {
+  if (value === null || value === undefined) {
     return "-";
   }
 
-  return Number(
-    value
-  ).toLocaleString(
-    "vi-VN"
-  );
+  return Number(value).toLocaleString("vi-VN");
 }
 
+function trimOrNull(value: string | undefined) {
+  const result = value?.trim();
 
-function trimOrNull(
-  value:
-    | string
-    | undefined
-) {
-
-  const result =
-    value?.trim();
-
-  return (
-    result ||
-    null
-  );
+  return result || null;
 }
-
 
 // ======================================================
 // COMPONENT
 // ======================================================
 
 export default function Drugs() {
-
   // ====================================================
   // FILTERS
   // ====================================================
 
-  const [
-    searchCode,
-    setSearchCode,
-  ] = useState(
-    ""
-  );
+  const [searchCode, setSearchCode] = useState("");
 
+  const [searchName, setSearchName] = useState("");
 
-  const [
-    searchName,
-    setSearchName,
-  ] = useState(
-    ""
-  );
+  const [searchIngredient, setSearchIngredient] = useState("");
 
-
-  const [
-    searchIngredient,
-    setSearchIngredient,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    searchGroup,
-    setSearchGroup,
-  ] = useState(
-    ""
-  );
-
+  const [searchGroup, setSearchGroup] = useState("");
 
   // ====================================================
   // TABLE
   // ====================================================
 
-  const [
-    items,
-    setItems,
-  ] = useState<
-    DrugItem[]
-  >(
-    []
-  );
+  const [items, setItems] = useState<DrugItem[]>([]);
 
+  const [total, setTotal] = useState(0);
 
-  const [
-    total,
-    setTotal,
-  ] = useState(
-    0
-  );
+  const [page, setPage] = useState(1);
 
+  const [pageSize, setPageSize] = useState(10);
 
-  const [
-    page,
-    setPage,
-  ] = useState(
-    1
-  );
-
-
-  const [
-    pageSize,
-    setPageSize,
-  ] = useState(
-    10
-  );
-
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(
-    false
-  );
-
+  const [loading, setLoading] = useState(false);
 
   // ====================================================
   // ADD / EDIT
   // ====================================================
 
-  const [
-    saving,
-    setSaving,
-  ] = useState(
-    false
-  );
+  const [saving, setSaving] = useState(false);
 
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const [
-    modalOpen,
-    setModalOpen,
-  ] = useState(
-    false
-  );
+  const [editingDrug, setEditingDrug] = useState<DrugItem | null>(null);
 
-
-  const [
-    editingDrug,
-    setEditingDrug,
-  ] = useState<
-    DrugItem |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    form,
-  ] =
-    Form.useForm<
-      DrugFormValues
-    >();
-
+  const [form] = Form.useForm<DrugFormValues>();
 
   // ====================================================
   // IMPORT
   // ====================================================
 
-  const [
-    importModalOpen,
-    setImportModalOpen,
-  ] = useState(
-    false
-  );
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
+  const [importFileList, setImportFileList] = useState<UploadFile[]>([]);
 
-  const [
-    importFileList,
-    setImportFileList,
-  ] = useState<
-    UploadFile[]
-  >(
-    []
-  );
+  const [importing, setImporting] = useState(false);
 
+  const [importResult, setImportResult] = useState<DrugImportResult | null>(null);
 
-  const [
-    importing,
-    setImporting,
-  ] = useState(
-    false
-  );
+  const [importErrors, setImportErrors] = useState<DrugImportError[]>([]);
 
-
-  const [
-    importResult,
-    setImportResult,
-  ] = useState<
-    DrugImportResult |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    importErrors,
-    setImportErrors,
-  ] = useState<
-    DrugImportError[]
-  >(
-    []
-  );
-
-
-  const [
-    importMessage,
-    setImportMessage,
-  ] = useState(
-    ""
-  );
-
+  const [importMessage, setImportMessage] = useState("");
 
   // ====================================================
   // LOAD DRUGS
   // ====================================================
 
-  const loadDrugs =
-    useCallback(
-      async () => {
+  const loadDrugs = useCallback(async () => {
+    try {
+      setLoading(true);
 
-        try {
+      const params = new URLSearchParams({
+        page: String(page),
 
-          setLoading(
-            true
-          );
+        pageSize: String(pageSize),
+      });
 
+      if (searchCode.trim()) {
+        params.set("code", searchCode.trim());
+      }
 
-          const params =
-            new URLSearchParams({
-              page:
-                String(
-                  page
-                ),
+      if (searchName.trim()) {
+        params.set("name", searchName.trim());
+      }
 
-              pageSize:
-                String(
-                  pageSize
-                ),
-            });
+      if (searchIngredient.trim()) {
+        params.set("activeIngredient", searchIngredient.trim());
+      }
 
+      if (searchGroup.trim()) {
+        params.set("groupCode", searchGroup.trim());
+      }
 
-          if (
-            searchCode.trim()
-          ) {
+      const response = await apiFetch(`/catalog/drugs?${params.toString()}`, {
+        method: "GET",
+      });
 
-            params.set(
-              "code",
-              searchCode.trim()
-            );
-          }
+      const json = await response.json();
 
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải danh mục thuốc.");
+      }
 
-          if (
-            searchName.trim()
-          ) {
+      setItems(json.data?.items ?? []);
 
-            params.set(
-              "name",
-              searchName.trim()
-            );
-          }
+      setTotal(Number(json.data?.total ?? 0));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể tải danh mục thuốc.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, searchCode, searchName, searchIngredient, searchGroup]);
 
-
-          if (
-            searchIngredient.trim()
-          ) {
-
-            params.set(
-              "activeIngredient",
-              searchIngredient.trim()
-            );
-          }
-
-
-          if (
-            searchGroup.trim()
-          ) {
-
-            params.set(
-              "groupCode",
-              searchGroup.trim()
-            );
-          }
-
-
-          const response =
-            await apiFetch(
-              `/catalog/drugs?${params.toString()}`,
-              {
-                method:
-                  "GET",
-              }
-            );
-
-
-          const json =
-            await response.json();
-
-
-          if (
-            !response.ok ||
-            json.success !== true
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải danh mục thuốc."
-            );
-          }
-
-
-          setItems(
-            json.data?.items ??
-            []
-          );
-
-
-          setTotal(
-            Number(
-              json.data?.total ??
-              0
-            )
-          );
-
-        } catch (
-          error
-        ) {
-
-          message.error(
-            error instanceof Error
-              ? error.message
-              : "Không thể tải danh mục thuốc."
-          );
-
-        } finally {
-
-          setLoading(
-            false
-          );
-        }
-      },
-      [
-        page,
-        pageSize,
-        searchCode,
-        searchName,
-        searchIngredient,
-        searchGroup,
-      ]
-    );
-
-
-  useEffect(
-    () => {
-
-      void loadDrugs();
-
-    },
-    [
-      loadDrugs,
-    ]
-  );
-
+  useEffect(() => {
+    void loadDrugs();
+  }, [loadDrugs]);
 
   // ====================================================
   // OPEN ADD
   // ====================================================
 
   function openAddModal() {
-
-    setEditingDrug(
-      null
-    );
-
+    setEditingDrug(null);
 
     form.resetFields();
 
-
     form.setFieldsValue({
-      code:
-        "",
+      code: "",
 
-      name:
-        "",
+      name: "",
 
-      activeIngredient:
-        "",
+      activeIngredient: "",
 
-      strength:
-        "",
+      strength: "",
 
-      unit:
-        "",
+      unit: "",
 
-      groupCode:
-        "",
+      groupCode: "",
 
-      route:
-        "",
+      route: "",
 
-      routeCode:
-        "",
+      routeCode: "",
 
-      dosageForm:
-        "",
+      dosageForm: "",
 
-      registrationNumber:
-        "",
+      registrationNumber: "",
 
-      quantity:
-        null,
+      quantity: null,
 
-      unitPrice:
-        0,
+      unitPrice: 0,
 
-      insuranceUnitPrice:
-        null,
+      insuranceUnitPrice: null,
 
-      packaging:
-        "",
+      packaging: "",
 
-      manufacturer:
-        "",
+      manufacturer: "",
 
-      country:
-        "",
+      country: "",
 
-      contractor:
-        "",
+      contractor: "",
 
-      tenderInfo:
-        "",
+      tenderInfo: "",
 
-      drugType:
-        "",
+      drugType: "",
 
-      scientificName:
-        "",
+      scientificName: "",
 
-      origin:
-        "",
+      origin: "",
 
-      processingMethod:
-        "",
+      processingMethod: "",
 
-      importedMaterialCode:
-        "",
+      importedMaterialCode: "",
 
-      processedMaterialCode:
-        "",
+      processedMaterialCode: "",
 
-      processingLossRate:
-        null,
+      processingLossRate: null,
 
-      preservationLossRate:
-        null,
+      preservationLossRate: null,
 
-      qualityStandard:
-        "",
+      qualityStandard: "",
 
-      decisionNo:
-        "",
+      decisionNo: "",
 
-      insurancePaymentRate:
-        100,
+      insurancePaymentRate: 100,
 
-      note:
-        "",
+      note: "",
 
-      active:
-        true,
+      active: true,
     });
 
-
-    setModalOpen(
-      true
-    );
+    setModalOpen(true);
   }
-
 
   // ====================================================
   // OPEN EDIT
   // ====================================================
 
-  async function openEditModal(
-    record:
-      DrugItem
-  ) {
-
+  async function openEditModal(record: DrugItem) {
     try {
-
-      const response =
-        await apiFetch(
-          `/catalog/drugs/${encodeURIComponent(
-            record.id
-          )}`,
-          {
-            method:
-              "GET",
-          }
-        );
-
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !== true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể tải thuốc."
-        );
-      }
-
-
-      const data =
-        json.data;
-
-
-      setEditingDrug(
-        data
-      );
-
-
-      form.setFieldsValue({
-        code:
-          data.code ??
-          "",
-
-        name:
-          data.name ??
-          "",
-
-        activeIngredient:
-          data.activeIngredient ??
-          "",
-
-        strength:
-          data.strength ??
-          "",
-
-        unit:
-          data.unit ??
-          "",
-
-        groupCode:
-          data.groupCode ??
-          "",
-
-        route:
-          data.route ??
-          "",
-
-        routeCode:
-          data.routeCode ??
-          "",
-
-        dosageForm:
-          data.dosageForm ??
-          "",
-
-        registrationNumber:
-          data.registrationNumber ??
-          "",
-
-        quantity:
-          data.quantity === null ||
-          data.quantity === undefined
-            ? null
-            : Number(
-                data.quantity
-              ),
-
-        unitPrice:
-          Number(
-            data.unitPrice ??
-            0
-          ),
-
-        insuranceUnitPrice:
-          data.insuranceUnitPrice === null ||
-          data.insuranceUnitPrice === undefined
-            ? null
-            : Number(
-                data.insuranceUnitPrice
-              ),
-
-        packaging:
-          data.packaging ??
-          "",
-
-        manufacturer:
-          data.manufacturer ??
-          "",
-
-        country:
-          data.country ??
-          "",
-
-        contractor:
-          data.contractor ??
-          "",
-
-        tenderInfo:
-          data.tenderInfo ??
-          "",
-
-        drugType:
-          data.drugType ??
-          "",
-
-        scientificName:
-          data.scientificName ??
-          "",
-
-        origin:
-          data.origin ??
-          "",
-
-        processingMethod:
-          data.processingMethod ??
-          "",
-
-        importedMaterialCode:
-          data.importedMaterialCode ??
-          "",
-
-        processedMaterialCode:
-          data.processedMaterialCode ??
-          "",
-
-        processingLossRate:
-          data.processingLossRate === null ||
-          data.processingLossRate === undefined
-            ? null
-            : Number(
-                data.processingLossRate
-              ),
-
-        preservationLossRate:
-          data.preservationLossRate === null ||
-          data.preservationLossRate === undefined
-            ? null
-            : Number(
-                data.preservationLossRate
-              ),
-
-        qualityStandard:
-          data.qualityStandard ??
-          "",
-
-        decisionNo:
-          data.decisionNo ??
-          "",
-
-        insurancePaymentRate:
-          Number(
-            data.insurancePaymentRate ??
-            100
-          ),
-
-        note:
-          data.note ??
-          "",
-
-        active:
-          Boolean(
-            data.active
-          ),
+      const response = await apiFetch(`/catalog/drugs/${encodeURIComponent(record.id)}`, {
+        method: "GET",
       });
 
+      const json = await response.json();
 
-      setModalOpen(
-        true
-      );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải thuốc.");
+      }
 
-    } catch (
-      error
-    ) {
+      const data = json.data;
 
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải thuốc."
-      );
+      setEditingDrug(data);
+
+      form.setFieldsValue({
+        code: data.code ?? "",
+
+        name: data.name ?? "",
+
+        activeIngredient: data.activeIngredient ?? "",
+
+        strength: data.strength ?? "",
+
+        unit: data.unit ?? "",
+
+        groupCode: data.groupCode ?? "",
+
+        route: data.route ?? "",
+
+        routeCode: data.routeCode ?? "",
+
+        dosageForm: data.dosageForm ?? "",
+
+        registrationNumber: data.registrationNumber ?? "",
+
+        quantity:
+          data.quantity === null || data.quantity === undefined ? null : Number(data.quantity),
+
+        unitPrice: Number(data.unitPrice ?? 0),
+
+        insuranceUnitPrice:
+          data.insuranceUnitPrice === null || data.insuranceUnitPrice === undefined
+            ? null
+            : Number(data.insuranceUnitPrice),
+
+        packaging: data.packaging ?? "",
+
+        manufacturer: data.manufacturer ?? "",
+
+        country: data.country ?? "",
+
+        contractor: data.contractor ?? "",
+
+        tenderInfo: data.tenderInfo ?? "",
+
+        drugType: data.drugType ?? "",
+
+        scientificName: data.scientificName ?? "",
+
+        origin: data.origin ?? "",
+
+        processingMethod: data.processingMethod ?? "",
+
+        importedMaterialCode: data.importedMaterialCode ?? "",
+
+        processedMaterialCode: data.processedMaterialCode ?? "",
+
+        processingLossRate:
+          data.processingLossRate === null || data.processingLossRate === undefined
+            ? null
+            : Number(data.processingLossRate),
+
+        preservationLossRate:
+          data.preservationLossRate === null || data.preservationLossRate === undefined
+            ? null
+            : Number(data.preservationLossRate),
+
+        qualityStandard: data.qualityStandard ?? "",
+
+        decisionNo: data.decisionNo ?? "",
+
+        insurancePaymentRate: Number(data.insurancePaymentRate ?? 100),
+
+        note: data.note ?? "",
+
+        active: Boolean(data.active),
+      });
+
+      setModalOpen(true);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể tải thuốc.");
     }
   }
-
 
   // ====================================================
   // SAVE
   // ====================================================
 
   async function handleSave() {
-
     try {
+      const values = await form.validateFields();
 
-      const values =
-        await form.validateFields();
+      setSaving(true);
 
+      const isEdit = editingDrug !== null;
 
-      setSaving(
-        true
-      );
+      const endpoint = isEdit
+        ? `/catalog/drugs/${encodeURIComponent(editingDrug.id)}`
+        : "/catalog/drugs";
 
+      const response = await apiFetch(endpoint, {
+        method: isEdit ? "PUT" : "POST",
 
-      const isEdit =
-        editingDrug !== null;
+        headers: {
+          "Content-Type": "application/json",
+        },
 
+        body: JSON.stringify({
+          code: values.code.trim(),
 
-      const endpoint =
-        isEdit
-          ? `/catalog/drugs/${encodeURIComponent(
-              editingDrug.id
-            )}`
-          : "/catalog/drugs";
+          name: values.name.trim(),
 
+          activeIngredient: trimOrNull(values.activeIngredient),
 
-      const response =
-        await apiFetch(
-          endpoint,
-          {
-            method:
-              isEdit
-                ? "PUT"
-                : "POST",
+          strength: trimOrNull(values.strength),
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          unit: trimOrNull(values.unit),
 
-            body:
-              JSON.stringify({
-                code:
-                  values.code.trim(),
+          groupCode: trimOrNull(values.groupCode),
 
-                name:
-                  values.name.trim(),
+          route: trimOrNull(values.route),
 
-                activeIngredient:
-                  trimOrNull(
-                    values.activeIngredient
-                  ),
+          routeCode: trimOrNull(values.routeCode),
 
-                strength:
-                  trimOrNull(
-                    values.strength
-                  ),
+          dosageForm: trimOrNull(values.dosageForm),
 
-                unit:
-                  trimOrNull(
-                    values.unit
-                  ),
+          registrationNumber: trimOrNull(values.registrationNumber),
 
-                groupCode:
-                  trimOrNull(
-                    values.groupCode
-                  ),
+          quantity: values.quantity ?? null,
 
-                route:
-                  trimOrNull(
-                    values.route
-                  ),
+          unitPrice: Number(values.unitPrice ?? 0),
 
-                routeCode:
-                  trimOrNull(
-                    values.routeCode
-                  ),
+          insuranceUnitPrice: values.insuranceUnitPrice ?? null,
 
-                dosageForm:
-                  trimOrNull(
-                    values.dosageForm
-                  ),
+          packaging: trimOrNull(values.packaging),
 
-                registrationNumber:
-                  trimOrNull(
-                    values.registrationNumber
-                  ),
+          manufacturer: trimOrNull(values.manufacturer),
 
-                quantity:
-                  values.quantity ??
-                  null,
+          country: trimOrNull(values.country),
 
-                unitPrice:
-                  Number(
-                    values.unitPrice ??
-                    0
-                  ),
+          contractor: trimOrNull(values.contractor),
 
-                insuranceUnitPrice:
-                  values.insuranceUnitPrice ??
-                  null,
+          tenderInfo: trimOrNull(values.tenderInfo),
 
-                packaging:
-                  trimOrNull(
-                    values.packaging
-                  ),
+          drugType: trimOrNull(values.drugType),
 
-                manufacturer:
-                  trimOrNull(
-                    values.manufacturer
-                  ),
+          scientificName: trimOrNull(values.scientificName),
 
-                country:
-                  trimOrNull(
-                    values.country
-                  ),
+          origin: trimOrNull(values.origin),
 
-                contractor:
-                  trimOrNull(
-                    values.contractor
-                  ),
+          processingMethod: trimOrNull(values.processingMethod),
 
-                tenderInfo:
-                  trimOrNull(
-                    values.tenderInfo
-                  ),
+          importedMaterialCode: trimOrNull(values.importedMaterialCode),
 
-                drugType:
-                  trimOrNull(
-                    values.drugType
-                  ),
+          processedMaterialCode: trimOrNull(values.processedMaterialCode),
 
-                scientificName:
-                  trimOrNull(
-                    values.scientificName
-                  ),
+          processingLossRate: values.processingLossRate ?? null,
 
-                origin:
-                  trimOrNull(
-                    values.origin
-                  ),
+          preservationLossRate: values.preservationLossRate ?? null,
 
-                processingMethod:
-                  trimOrNull(
-                    values.processingMethod
-                  ),
+          qualityStandard: trimOrNull(values.qualityStandard),
 
-                importedMaterialCode:
-                  trimOrNull(
-                    values.importedMaterialCode
-                  ),
+          decisionNo: trimOrNull(values.decisionNo),
 
-                processedMaterialCode:
-                  trimOrNull(
-                    values.processedMaterialCode
-                  ),
+          insurancePaymentRate: Number(values.insurancePaymentRate ?? 100),
 
-                processingLossRate:
-                  values.processingLossRate ??
-                  null,
+          note: trimOrNull(values.note),
 
-                preservationLossRate:
-                  values.preservationLossRate ??
-                  null,
+          active: values.active,
+        }),
+      });
 
-                qualityStandard:
-                  trimOrNull(
-                    values.qualityStandard
-                  ),
+      const json = await response.json();
 
-                decisionNo:
-                  trimOrNull(
-                    values.decisionNo
-                  ),
-
-                insurancePaymentRate:
-                  Number(
-                    values.insurancePaymentRate ??
-                    100
-                  ),
-
-                note:
-                  trimOrNull(
-                    values.note
-                  ),
-
-                active:
-                  values.active,
-              }),
-          }
-        );
-
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !== true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể lưu thuốc."
-        );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể lưu thuốc.");
       }
 
+      message.success(isEdit ? "Cập nhật thuốc thành công." : "Thêm thuốc thành công.");
 
-      message.success(
-        isEdit
-          ? "Cập nhật thuốc thành công."
-          : "Thêm thuốc thành công."
-      );
+      setModalOpen(false);
 
-
-      setModalOpen(
-        false
-      );
-
-
-      setEditingDrug(
-        null
-      );
-
+      setEditingDrug(null);
 
       form.resetFields();
 
-
       await loadDrugs();
-
-    } catch (
-      error
-    ) {
-
-      if (
-        error &&
-        typeof error === "object" &&
-        "errorFields" in error
-      ) {
-
+    } catch (error) {
+      if (error && typeof error === "object" && "errorFields" in error) {
         return;
       }
 
-
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể lưu thuốc."
-      );
-
+      message.error(error instanceof Error ? error.message : "Không thể lưu thuốc.");
     } finally {
-
-      setSaving(
-        false
-      );
+      setSaving(false);
     }
   }
-
 
   // ====================================================
   // DISABLE
   // ====================================================
 
-  function confirmDisable(
-    record:
-      DrugItem
-  ) {
-
+  function confirmDisable(record: DrugItem) {
     Modal.confirm({
-      title:
-        "Ngừng sử dụng thuốc?",
+      title: "Ngừng sử dụng thuốc?",
 
-      content:
-        `${record.code} - ${record.name}`,
+      content: `${record.code} - ${record.name}`,
 
-      okText:
-        "Đồng ý",
+      okText: "Đồng ý",
 
-      cancelText:
-        "Hủy",
+      cancelText: "Hủy",
 
       okButtonProps: {
-        danger:
-          true,
+        danger: true,
       },
 
-      onOk:
-        async () => {
+      onOk: async () => {
+        try {
+          const response = await apiFetch(`/catalog/drugs/${encodeURIComponent(record.id)}`, {
+            method: "DELETE",
+          });
 
-          try {
+          const json = await response.json();
 
-            const response =
-              await apiFetch(
-                `/catalog/drugs/${encodeURIComponent(
-                  record.id
-                )}`,
-                {
-                  method:
-                    "DELETE",
-                }
-              );
-
-
-            const json =
-              await response.json();
-
-
-            if (
-              !response.ok ||
-              json.success !== true
-            ) {
-
-              throw new Error(
-                json.message ||
-                "Không thể ngừng sử dụng thuốc."
-              );
-            }
-
-
-            message.success(
-              "Đã ngừng sử dụng thuốc."
-            );
-
-
-            await loadDrugs();
-
-          } catch (
-            error
-          ) {
-
-            message.error(
-              error instanceof Error
-                ? error.message
-                : "Không thể ngừng sử dụng thuốc."
-            );
+          if (!response.ok || json.success !== true) {
+            throw new Error(json.message || "Không thể ngừng sử dụng thuốc.");
           }
-        },
+
+          message.success("Đã ngừng sử dụng thuốc.");
+
+          await loadDrugs();
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : "Không thể ngừng sử dụng thuốc.");
+        }
+      },
     });
   }
-
 
   // ====================================================
   // REFRESH
   // ====================================================
 
   function handleRefresh() {
+    setSearchCode("");
 
-    setSearchCode(
-      ""
-    );
+    setSearchName("");
 
-    setSearchName(
-      ""
-    );
+    setSearchIngredient("");
 
-    setSearchIngredient(
-      ""
-    );
+    setSearchGroup("");
 
-    setSearchGroup(
-      ""
-    );
-
-    setPage(
-      1
-    );
+    setPage(1);
   }
-
 
   // ====================================================
   // IMPORT OPEN
   // ====================================================
 
   function openImportModal() {
+    setImportFileList([]);
 
-    setImportFileList(
-      []
-    );
+    setImportResult(null);
 
-    setImportResult(
-      null
-    );
+    setImportErrors([]);
 
-    setImportErrors(
-      []
-    );
+    setImportMessage("");
 
-    setImportMessage(
-      ""
-    );
-
-    setImportModalOpen(
-      true
-    );
+    setImportModalOpen(true);
   }
-
 
   // ====================================================
   // IMPORT CLOSE
   // ====================================================
 
   function closeImportModal() {
-
-    if (
-      importing
-    ) {
+    if (importing) {
       return;
     }
 
+    setImportModalOpen(false);
 
-    setImportModalOpen(
-      false
-    );
+    setImportFileList([]);
 
-    setImportFileList(
-      []
-    );
+    setImportResult(null);
 
-    setImportResult(
-      null
-    );
+    setImportErrors([]);
 
-    setImportErrors(
-      []
-    );
-
-    setImportMessage(
-      ""
-    );
+    setImportMessage("");
   }
-
 
   // ====================================================
   // IMPORT EXCEL
   // ====================================================
 
   async function handleImportExcel() {
+    const file = importFileList[0]?.originFileObj;
 
-    const file =
-      importFileList[0]
-        ?.originFileObj;
-
-
-    if (
-      !file
-    ) {
-
-      message.warning(
-        "Vui lòng chọn file Excel."
-      );
+    if (!file) {
+      message.warning("Vui lòng chọn file Excel.");
 
       return;
     }
 
-
-    if (
-      !file.name
-        .toLowerCase()
-        .endsWith(
-          ".xlsx"
-        )
-    ) {
-
-      message.error(
-        "Chỉ hỗ trợ file Excel .xlsx."
-      );
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      message.error("Chỉ hỗ trợ file Excel .xlsx.");
 
       return;
     }
-
 
     try {
+      setImporting(true);
 
-      setImporting(
-        true
-      );
+      setImportResult(null);
 
-      setImportResult(
-        null
-      );
+      setImportErrors([]);
 
-      setImportErrors(
-        []
-      );
+      setImportMessage("");
 
-      setImportMessage(
-        ""
-      );
+      const formData = new FormData();
 
+      formData.append("file", file);
 
-      const formData =
-        new FormData();
+      const response = await apiFetch("/catalog/drugs/import", {
+        method: "POST",
 
+        body: formData,
+      });
 
-      formData.append(
-        "file",
-        file
-      );
-
-
-      const response =
-        await apiFetch(
-          "/catalog/drugs/import",
-          {
-            method:
-              "POST",
-
-            body:
-              formData,
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
+      let json: any = null;
 
       try {
-
-        json =
-          await response.json();
-
+        json = await response.json();
       } catch {
-
         // Backend không trả JSON.
       }
 
+      if (!response.ok || json?.success !== true) {
+        const errors = Array.isArray(json?.errors) ? json.errors : [];
 
-      if (
-        !response.ok ||
-        json?.success !== true
-      ) {
+        setImportErrors(errors);
 
-        const errors =
-          Array.isArray(
-            json?.errors
-          )
-            ? json.errors
-            : [];
+        setImportMessage(json?.message || "Import thuốc thất bại.");
 
-
-        setImportErrors(
-          errors
-        );
-
-
-        setImportMessage(
-          json?.message ||
-          "Import thuốc thất bại."
-        );
-
-
-        message.error(
-          json?.message ||
-          "Import thuốc thất bại."
-        );
-
+        message.error(json?.message || "Import thuốc thất bại.");
 
         return;
       }
 
+      const result: DrugImportResult = {
+        totalRows: Number(json.data?.totalRows ?? 0),
 
-      const result:
-        DrugImportResult = {
+        inserted: Number(json.data?.inserted ?? 0),
 
-        totalRows:
-          Number(
-            json.data?.totalRows ??
-            0
-          ),
+        updated: Number(json.data?.updated ?? 0),
 
-        inserted:
-          Number(
-            json.data?.inserted ??
-            0
-          ),
-
-        updated:
-          Number(
-            json.data?.updated ??
-            0
-          ),
-
-        skipped:
-          Number(
-            json.data?.skipped ??
-            0
-          ),
+        skipped: Number(json.data?.skipped ?? 0),
       };
 
+      setImportResult(result);
 
-      setImportResult(
-        result
-      );
+      setImportMessage(json?.message || "Import thuốc thành công.");
 
+      message.success(json?.message || "Import thuốc thành công.");
 
-      setImportMessage(
-        json?.message ||
-        "Import thuốc thành công."
-      );
-
-
-      message.success(
-        json?.message ||
-        "Import thuốc thành công."
-      );
-
-
-      if (
-        page !== 1
-      ) {
-
-        setPage(
-          1
-        );
-
+      if (page !== 1) {
+        setPage(1);
       } else {
-
         await loadDrugs();
       }
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Import thuốc thất bại.";
 
-    } catch (
-      error
-    ) {
+      setImportMessage(text);
 
-      const text =
-        error instanceof Error
-          ? error.message
-          : "Import thuốc thất bại.";
-
-
-      setImportMessage(
-        text
-      );
-
-
-      message.error(
-        text
-      );
-
+      message.error(text);
     } finally {
-
-      setImporting(
-        false
-      );
+      setImporting(false);
     }
   }
-
 
   // ====================================================
   // TABLE COLUMNS
   // ====================================================
 
-  const columns:
-    TableColumnsType<
-      DrugItem
-    > = [
-
+  const columns: TableColumnsType<DrugItem> = [
     {
-      title:
-        "STT",
+      title: "STT",
 
-      key:
-        "stt",
+      key: "stt",
 
-      width:
-        60,
+      width: 60,
 
-      fixed:
-        "left",
+      fixed: "left",
 
-      align:
-        "center",
+      align: "center",
 
-      render:
-        (
-          _,
-          __,
-          index
-        ) =>
-          (
-            page -
-            1
-          ) *
-            pageSize +
-          index +
-          1,
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
 
+    {
+      title: "Mã thuốc",
+
+      dataIndex: "code",
+
+      key: "code",
+
+      width: 135,
+
+      fixed: "left",
+
+      render: (value: string) => <Text strong>{value || "-"}</Text>,
+    },
 
     {
-      title:
-        "Mã thuốc",
+      title: "Tên thuốc",
 
-      dataIndex:
-        "code",
+      dataIndex: "name",
 
-      key:
-        "code",
+      key: "name",
 
-      width:
-        135,
+      width: 220,
 
-      fixed:
-        "left",
+      fixed: "left",
 
-      render:
-        (
-          value:
-            string
-        ) => (
-          <Text
-            strong
-          >
-            {
-              value ||
-              "-"
-            }
-          </Text>
+      ellipsis: true,
+    },
+
+    {
+      title: "Hoạt chất",
+
+      dataIndex: "activeIngredient",
+
+      key: "activeIngredient",
+
+      width: 220,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Hàm lượng",
+
+      dataIndex: "strength",
+
+      key: "strength",
+
+      width: 150,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "ĐVT",
+
+      dataIndex: "unit",
+
+      key: "unit",
+
+      width: 90,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Mã nhóm",
+
+      dataIndex: "groupCode",
+
+      key: "groupCode",
+
+      width: 105,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Đường dùng",
+
+      dataIndex: "route",
+
+      key: "route",
+
+      width: 125,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Mã đường dùng",
+
+      dataIndex: "routeCode",
+
+      key: "routeCode",
+
+      width: 120,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Dạng bào chế",
+
+      dataIndex: "dosageForm",
+
+      key: "dosageForm",
+
+      width: 170,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Số đăng ký",
+
+      dataIndex: "registrationNumber",
+
+      key: "registrationNumber",
+
+      width: 145,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Số lượng",
+
+      dataIndex: "quantity",
+
+      key: "quantity",
+
+      width: 105,
+
+      align: "right",
+
+      render: numberOrDash,
+    },
+
+    {
+      title: "Đơn giá",
+
+      dataIndex: "unitPrice",
+
+      key: "unitPrice",
+
+      width: 120,
+
+      align: "right",
+
+      render: formatMoney,
+    },
+
+    {
+      title: "Đơn giá BH",
+
+      dataIndex: "insuranceUnitPrice",
+
+      key: "insuranceUnitPrice",
+
+      width: 125,
+
+      align: "right",
+
+      render: formatMoney,
+    },
+
+    {
+      title: "Quy cách",
+
+      dataIndex: "packaging",
+
+      key: "packaging",
+
+      width: 190,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Nhà sản xuất",
+
+      dataIndex: "manufacturer",
+
+      key: "manufacturer",
+
+      width: 190,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Nước SX",
+
+      dataIndex: "country",
+
+      key: "country",
+
+      width: 130,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Nhà thầu",
+
+      dataIndex: "contractor",
+
+      key: "contractor",
+
+      width: 190,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Thông tin thầu",
+
+      dataIndex: "tenderInfo",
+
+      key: "tenderInfo",
+
+      width: 210,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Loại thuốc",
+
+      dataIndex: "drugType",
+
+      key: "drugType",
+
+      width: 145,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Tên khoa học",
+
+      dataIndex: "scientificName",
+
+      key: "scientificName",
+
+      width: 190,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Nguồn gốc",
+
+      dataIndex: "origin",
+
+      key: "origin",
+
+      width: 150,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "PP chế biến",
+
+      dataIndex: "processingMethod",
+
+      key: "processingMethod",
+
+      width: 170,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Mã DL nhập",
+
+      dataIndex: "importedMaterialCode",
+
+      key: "importedMaterialCode",
+
+      width: 140,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Mã DL chế biến",
+
+      dataIndex: "processedMaterialCode",
+
+      key: "processedMaterialCode",
+
+      width: 145,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "TLHH chế biến",
+
+      dataIndex: "processingLossRate",
+
+      key: "processingLossRate",
+
+      width: 125,
+
+      align: "right",
+
+      render: numberOrDash,
+    },
+
+    {
+      title: "TLHH bảo quản",
+
+      dataIndex: "preservationLossRate",
+
+      key: "preservationLossRate",
+
+      width: 125,
+
+      align: "right",
+
+      render: numberOrDash,
+    },
+
+    {
+      title: "Tiêu chuẩn CL",
+
+      dataIndex: "qualityStandard",
+
+      key: "qualityStandard",
+
+      width: 170,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Quyết định",
+
+      dataIndex: "decisionNo",
+
+      key: "decisionNo",
+
+      width: 145,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Tỷ lệ BHYT (%)",
+
+      dataIndex: "insurancePaymentRate",
+
+      key: "insurancePaymentRate",
+
+      width: 125,
+
+      align: "center",
+    },
+
+    {
+      title: "Ghi chú",
+
+      dataIndex: "note",
+
+      key: "note",
+
+      width: 170,
+
+      ellipsis: true,
+
+      render: textOrDash,
+    },
+
+    {
+      title: "Trạng thái",
+
+      dataIndex: "active",
+
+      key: "active",
+
+      width: 105,
+
+      fixed: "right",
+
+      align: "center",
+
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="success" className="drugs-status">
+            Đang dùng
+          </Tag>
+        ) : (
+          <Tag className="drugs-status">Ngừng dùng</Tag>
         ),
     },
 
-
     {
-      title:
-        "Tên thuốc",
-
-      dataIndex:
-        "name",
-
-      key:
-        "name",
-
-      width:
-        220,
-
-      fixed:
-        "left",
-
-      ellipsis:
-        true,
-    },
-
-
-    {
-      title:
-        "Hoạt chất",
-
-      dataIndex:
-        "activeIngredient",
-
-      key:
-        "activeIngredient",
-
-      width:
-        220,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Hàm lượng",
-
-      dataIndex:
-        "strength",
-
-      key:
-        "strength",
-
-      width:
-        150,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "ĐVT",
-
-      dataIndex:
-        "unit",
-
-      key:
-        "unit",
-
-      width:
-        90,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Mã nhóm",
-
-      dataIndex:
-        "groupCode",
-
-      key:
-        "groupCode",
-
-      width:
-        105,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Đường dùng",
-
-      dataIndex:
-        "route",
-
-      key:
-        "route",
-
-      width:
-        125,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Mã đường dùng",
-
-      dataIndex:
-        "routeCode",
-
-      key:
-        "routeCode",
-
-      width:
-        120,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Dạng bào chế",
-
-      dataIndex:
-        "dosageForm",
-
-      key:
-        "dosageForm",
-
-      width:
-        170,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Số đăng ký",
-
-      dataIndex:
-        "registrationNumber",
-
-      key:
-        "registrationNumber",
-
-      width:
-        145,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Số lượng",
-
-      dataIndex:
-        "quantity",
-
-      key:
-        "quantity",
-
-      width:
-        105,
-
-      align:
-        "right",
-
-      render:
-        numberOrDash,
-    },
-
-
-    {
-      title:
-        "Đơn giá",
-
-      dataIndex:
-        "unitPrice",
-
-      key:
-        "unitPrice",
-
-      width:
-        120,
-
-      align:
-        "right",
-
-      render:
-        formatMoney,
-    },
-
-
-    {
-      title:
-        "Đơn giá BH",
-
-      dataIndex:
-        "insuranceUnitPrice",
-
-      key:
-        "insuranceUnitPrice",
-
-      width:
-        125,
-
-      align:
-        "right",
-
-      render:
-        formatMoney,
-    },
-
-
-    {
-      title:
-        "Quy cách",
-
-      dataIndex:
-        "packaging",
-
-      key:
-        "packaging",
-
-      width:
-        190,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Nhà sản xuất",
-
-      dataIndex:
-        "manufacturer",
-
-      key:
-        "manufacturer",
-
-      width:
-        190,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Nước SX",
-
-      dataIndex:
-        "country",
-
-      key:
-        "country",
-
-      width:
-        130,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Nhà thầu",
-
-      dataIndex:
-        "contractor",
-
-      key:
-        "contractor",
-
-      width:
-        190,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Thông tin thầu",
-
-      dataIndex:
-        "tenderInfo",
-
-      key:
-        "tenderInfo",
-
-      width:
-        210,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Loại thuốc",
-
-      dataIndex:
-        "drugType",
-
-      key:
-        "drugType",
-
-      width:
-        145,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Tên khoa học",
-
-      dataIndex:
-        "scientificName",
-
-      key:
-        "scientificName",
-
-      width:
-        190,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Nguồn gốc",
-
-      dataIndex:
-        "origin",
-
-      key:
-        "origin",
-
-      width:
-        150,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "PP chế biến",
-
-      dataIndex:
-        "processingMethod",
-
-      key:
-        "processingMethod",
-
-      width:
-        170,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Mã DL nhập",
-
-      dataIndex:
-        "importedMaterialCode",
-
-      key:
-        "importedMaterialCode",
-
-      width:
-        140,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Mã DL chế biến",
-
-      dataIndex:
-        "processedMaterialCode",
-
-      key:
-        "processedMaterialCode",
-
-      width:
-        145,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "TLHH chế biến",
-
-      dataIndex:
-        "processingLossRate",
-
-      key:
-        "processingLossRate",
-
-      width:
-        125,
-
-      align:
-        "right",
-
-      render:
-        numberOrDash,
-    },
-
-
-    {
-      title:
-        "TLHH bảo quản",
-
-      dataIndex:
-        "preservationLossRate",
-
-      key:
-        "preservationLossRate",
-
-      width:
-        125,
-
-      align:
-        "right",
-
-      render:
-        numberOrDash,
-    },
-
-
-    {
-      title:
-        "Tiêu chuẩn CL",
-
-      dataIndex:
-        "qualityStandard",
-
-      key:
-        "qualityStandard",
-
-      width:
-        170,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Quyết định",
-
-      dataIndex:
-        "decisionNo",
-
-      key:
-        "decisionNo",
-
-      width:
-        145,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Tỷ lệ BHYT (%)",
-
-      dataIndex:
-        "insurancePaymentRate",
-
-      key:
-        "insurancePaymentRate",
-
-      width:
-        125,
-
-      align:
-        "center",
-    },
-
-
-    {
-      title:
-        "Ghi chú",
-
-      dataIndex:
-        "note",
-
-      key:
-        "note",
-
-      width:
-        170,
-
-      ellipsis:
-        true,
-
-      render:
-        textOrDash,
-    },
-
-
-    {
-      title:
-        "Trạng thái",
-
-      dataIndex:
-        "active",
-
-      key:
-        "active",
-
-      width:
-        105,
-
-      fixed:
-        "right",
-
-      align:
-        "center",
-
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="success"
-
-                className="drugs-status"
-              >
-                Đang dùng
-              </Tag>
-            )
-            : (
-              <Tag
-                className="drugs-status"
-              >
-                Ngừng dùng
-              </Tag>
-            ),
-    },
-
-
-    {
-      title:
-        "Thao tác",
-
-      key:
-        "actions",
-
-      width:
-        100,
-
-      fixed:
-        "right",
-
-      align:
-        "center",
-
-      render:
-        (
-          _,
-          record
-        ) => (
-
-          <Space
-            size={
-              8
-            }
-          >
-
-            <Tooltip
-              title="Cập nhật"
-            >
-              <Button
-                type="text"
-
-                size="small"
-
-                icon={
-                  <EditOutlined
-                    style={{
-                      color:
-                        "#1677ff",
-                    }}
-                  />
-                }
-
-                onClick={() =>
-                  void openEditModal(
-                    record
-                  )
-                }
-              />
-            </Tooltip>
-
-
-            <Tooltip
-              title={
-                record.active
-                  ? "Ngừng sử dụng"
-                  : "Đã ngừng sử dụng"
+      title: "Thao tác",
+
+      key: "actions",
+
+      width: 100,
+
+      fixed: "right",
+
+      align: "center",
+
+      render: (_, record) => (
+        <Space size={8}>
+          <Tooltip title="Cập nhật">
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <EditOutlined
+                  style={{
+                    color: "#1677ff",
+                  }}
+                />
               }
-            >
-              <Button
-                type="text"
+              onClick={() => void openEditModal(record)}
+            />
+          </Tooltip>
 
-                size="small"
-
-                disabled={
-                  !record.active
-                }
-
-                icon={
-                  <StopOutlined
-                    style={{
-                      color:
-                        record.active
-                          ? "#ff4d4f"
-                          : "#bfbfbf",
-                    }}
-                  />
-                }
-
-                onClick={() =>
-                  confirmDisable(
-                    record
-                  )
-                }
-              />
-            </Tooltip>
-
-          </Space>
-        ),
+          <Tooltip title={record.active ? "Ngừng sử dụng" : "Đã ngừng sử dụng"}>
+            <Button
+              type="text"
+              size="small"
+              disabled={!record.active}
+              icon={
+                <StopOutlined
+                  style={{
+                    color: record.active ? "#ff4d4f" : "#bfbfbf",
+                  }}
+                />
+              }
+              onClick={() => confirmDisable(record)}
+            />
+          </Tooltip>
+        </Space>
+      ),
     },
   ];
-
 
   // ====================================================
   // UI
@@ -2455,306 +1281,140 @@ export default function Drugs() {
 
   return (
     <>
-
-      <div
-        className="drugs-page"
-      >
-
+      <div className="drugs-page">
         {/* =================================================
             BREADCRUMB
         ================================================= */}
 
         <Breadcrumb
           className="drugs-breadcrumb"
-
           items={[
             {
-              title: (
-                <HomeOutlined />
-              ),
+              title: <HomeOutlined />,
             },
 
             {
-              title:
-                "Danh mục",
+              title: "Danh mục",
             },
 
             {
-              title:
-                "Thuốc",
+              title: "Thuốc",
             },
           ]}
         />
-
 
         {/* =================================================
             HEADER
         ================================================= */}
 
-        <div
-          className="drugs-header"
-        >
-
+        <div className="drugs-header">
           <div>
-
-            <div
-              className="drugs-title-row"
-            >
-
-              <ExperimentOutlined
-                className="drugs-title-icon"
-              />
-
+            <div className="drugs-title-row">
+              <ExperimentOutlined className="drugs-title-icon" />
 
               <Title
-                level={
-                  3
-                }
-
+                level={3}
                 style={{
-                  margin:
-                    0,
+                  margin: 0,
                 }}
               >
                 Thuốc
               </Title>
-
             </div>
 
-
-            <Text
-              type="secondary"
-
-              className="drugs-subtitle"
-            >
+            <Text type="secondary" className="drugs-subtitle">
               Quản lý danh mục thuốc và thông tin sử dụng
             </Text>
-
           </div>
 
-
-          <Space
-            size={
-              8
-            }
-          >
-
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              onClick={
-                openImportModal
-              }
-            >
+          <Space size={8}>
+            <Button icon={<UploadOutlined />} onClick={openImportModal}>
               Import Excel
             </Button>
 
-
-            <Button
-              type="primary"
-
-              icon={
-                <PlusOutlined />
-              }
-
-              onClick={
-                openAddModal
-              }
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
               Thêm mới
             </Button>
-
           </Space>
-
         </div>
-
 
         {/* =================================================
             FILTER
         ================================================= */}
 
-        <div
-          className="drugs-filter-grid"
-        >
-
-          <div
-            className="drugs-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="drugs-filter-label"
-            >
+        <div className="drugs-filter-grid">
+          <div className="drugs-filter-item">
+            <Text strong className="drugs-filter-label">
               Mã thuốc
             </Text>
 
-
             <Input
-              value={
-                searchCode
-              }
-
+              value={searchCode}
               placeholder="Nhập mã thuốc"
-
               allowClear
+              onChange={(event) => {
+                setSearchCode(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchCode(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="drugs-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="drugs-filter-label"
-            >
+          <div className="drugs-filter-item">
+            <Text strong className="drugs-filter-label">
               Tên thuốc
             </Text>
 
-
             <Input
-              value={
-                searchName
-              }
-
+              value={searchName}
               placeholder="Nhập tên thuốc"
-
               allowClear
+              onChange={(event) => {
+                setSearchName(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchName(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="drugs-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="drugs-filter-label"
-            >
+          <div className="drugs-filter-item">
+            <Text strong className="drugs-filter-label">
               Hoạt chất
             </Text>
 
-
             <Input
-              value={
-                searchIngredient
-              }
-
+              value={searchIngredient}
               placeholder="Nhập hoạt chất"
-
               allowClear
+              onChange={(event) => {
+                setSearchIngredient(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchIngredient(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="drugs-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="drugs-filter-label"
-            >
+          <div className="drugs-filter-item">
+            <Text strong className="drugs-filter-label">
               Mã nhóm
             </Text>
 
-
             <Input
-              value={
-                searchGroup
-              }
-
+              value={searchGroup}
               placeholder="Mã nhóm"
-
               allowClear
+              onChange={(event) => {
+                setSearchGroup(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchGroup(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <Button
-            type="primary"
-
-            icon={
-              <ReloadOutlined />
-            }
-
-            onClick={
-              handleRefresh
-            }
-          >
+          <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
             Làm mới
           </Button>
-
         </div>
-
 
         {/* =================================================
             TABLE
@@ -2762,1175 +1422,591 @@ export default function Drugs() {
 
         <Table<DrugItem>
           className="drugs-table"
-
           rowKey="id"
-
           size="middle"
-
           tableLayout="fixed"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            items
-          }
-
-          columns={
-            columns
-          }
-
+          loading={loading}
+          dataSource={items}
+          columns={columns}
           scroll={{
-            x:
-              4900,
+            x: 4900,
           }}
-
           pagination={{
-            current:
-              page,
+            current: page,
 
             pageSize,
 
             total,
 
-            showSizeChanger:
-              true,
+            showSizeChanger: true,
 
-            pageSizeOptions: [
-              "10",
-              "50",
-              "100",
-            ],
+            pageSizeOptions: ["10", "50", "100"],
 
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
+            showTotal: (value) => `Tổng số: ${value}`,
 
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
+            onChange: (newPage, newPageSize) => {
+              if (newPageSize !== pageSize) {
+                setPageSize(newPageSize);
 
-                if (
-                  newPageSize !== pageSize
-                ) {
+                setPage(1);
 
-                  setPageSize(
-                    newPageSize
-                  );
+                return;
+              }
 
-
-                  setPage(
-                    1
-                  );
-
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
+              setPage(newPage);
+            },
           }}
-
           locale={{
-            emptyText:
-              "Chưa có dữ liệu thuốc",
+            emptyText: "Chưa có dữ liệu thuốc",
           }}
         />
-
       </div>
-
 
       {/* =================================================
           ADD / EDIT MODAL
       ================================================= */}
 
       <Modal
-        open={
-          modalOpen
-        }
-
-        title={
-          editingDrug
-            ? "Cập nhật Thuốc"
-            : "Thêm Thuốc"
-        }
-
-        width={
-          1250
-        }
-
-        okText={
-          editingDrug
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
+        open={modalOpen}
+        title={editingDrug ? "Cập nhật Thuốc" : "Thêm Thuốc"}
+        width={1250}
+        okText={editingDrug ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
+        confirmLoading={saving}
+        onOk={() => void handleSave()}
         onCancel={() => {
-
-          if (
-            saving
-          ) {
+          if (saving) {
             return;
           }
 
+          setModalOpen(false);
 
-          setModalOpen(
-            false
-          );
-
-
-          setEditingDrug(
-            null
-          );
-
+          setEditingDrug(null);
 
           form.resetFields();
         }}
       >
-
         <Form
-          form={
-            form
-          }
-
+          form={form}
           layout="vertical"
-
-          requiredMark={
-            false
-          }
-
+          requiredMark={false}
           style={{
-            marginTop:
-              18,
+            marginTop: 18,
           }}
         >
-
           {/* =============================================
               THÔNG TIN CƠ BẢN
           ============================================= */}
 
-          <Title
-            level={
-              5
-            }
-          >
-            Thông tin thuốc
-          </Title>
-
+          <Title level={5}>Thông tin thuốc</Title>
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 2fr",
+              gridTemplateColumns: "1fr 2fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
             <Form.Item
               label="Mã thuốc"
-
               name="code"
-
               rules={[
                 {
-                  required:
-                    true,
+                  required: true,
 
-                  whitespace:
-                    true,
+                  whitespace: true,
 
-                  message:
-                    "Vui lòng nhập mã thuốc.",
+                  message: "Vui lòng nhập mã thuốc.",
                 },
               ]}
             >
-
-              <Input
-                disabled={
-                  editingDrug !== null
-                }
-              />
-
+              <Input disabled={editingDrug !== null} />
             </Form.Item>
-
 
             <Form.Item
               label="Tên thuốc"
-
               name="name"
-
               rules={[
                 {
-                  required:
-                    true,
+                  required: true,
 
-                  whitespace:
-                    true,
+                  whitespace: true,
 
-                  message:
-                    "Vui lòng nhập tên thuốc.",
+                  message: "Vui lòng nhập tên thuốc.",
                 },
               ]}
             >
-
               <Input />
-
             </Form.Item>
-
           </div>
-
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "2fr 1fr 1fr",
+              gridTemplateColumns: "2fr 1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Tên hoạt chất"
-
-              name="activeIngredient"
-            >
+            <Form.Item label="Tên hoạt chất" name="activeIngredient">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Hàm lượng"
-
-              name="strength"
-            >
+            <Form.Item label="Hàm lượng" name="strength">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Đơn vị tính"
-
-              name="unit"
-            >
+            <Form.Item label="Đơn vị tính" name="unit">
               <Input />
             </Form.Item>
-
           </div>
-
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr 1fr 1fr",
+              gridTemplateColumns: "1fr 1fr 1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Mã nhóm"
-
-              name="groupCode"
-            >
+            <Form.Item label="Mã nhóm" name="groupCode">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Đường dùng"
-
-              name="route"
-            >
+            <Form.Item label="Đường dùng" name="route">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Mã đường dùng"
-
-              name="routeCode"
-            >
+            <Form.Item label="Mã đường dùng" name="routeCode">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Dạng bào chế"
-
-              name="dosageForm"
-            >
+            <Form.Item label="Dạng bào chế" name="dosageForm">
               <Input />
             </Form.Item>
-
           </div>
-
 
           {/* =============================================
               ĐĂNG KÝ / GIÁ
           ============================================= */}
 
-          <Title
-            level={
-              5
-            }
-          >
-            Đăng ký và giá
-          </Title>
-
+          <Title level={5}>Đăng ký và giá</Title>
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr 1fr 1fr",
+              gridTemplateColumns: "1fr 1fr 1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Số đăng ký"
-
-              name="registrationNumber"
-            >
+            <Form.Item label="Số đăng ký" name="registrationNumber">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Số lượng"
-
-              name="quantity"
-            >
-
+            <Form.Item label="Số lượng" name="quantity">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="Đơn giá"
-
-              name="unitPrice"
-            >
-
+            <Form.Item label="Đơn giá" name="unitPrice">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="Đơn giá BH"
-
-              name="insuranceUnitPrice"
-            >
-
+            <Form.Item label="Đơn giá BH" name="insuranceUnitPrice">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
-
           </div>
 
-
-          <Form.Item
-            label="Quy cách"
-
-            name="packaging"
-          >
+          <Form.Item label="Quy cách" name="packaging">
             <Input />
           </Form.Item>
-
 
           {/* =============================================
               SẢN XUẤT / THẦU
           ============================================= */}
 
-          <Title
-            level={
-              5
-            }
-          >
-            Sản xuất và đấu thầu
-          </Title>
-
+          <Title level={5}>Sản xuất và đấu thầu</Title>
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr",
+              gridTemplateColumns: "1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Nhà sản xuất"
-
-              name="manufacturer"
-            >
+            <Form.Item label="Nhà sản xuất" name="manufacturer">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Nước sản xuất"
-
-              name="country"
-            >
+            <Form.Item label="Nước sản xuất" name="country">
               <Input />
             </Form.Item>
-
           </div>
-
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 2fr",
+              gridTemplateColumns: "1fr 2fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Nhà thầu"
-
-              name="contractor"
-            >
+            <Form.Item label="Nhà thầu" name="contractor">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Thông tin thầu"
-
-              name="tenderInfo"
-            >
+            <Form.Item label="Thông tin thầu" name="tenderInfo">
               <Input />
             </Form.Item>
-
           </div>
-
 
           {/* =============================================
               THÔNG TIN DƯỢC LIỆU
           ============================================= */}
 
-          <Title
-            level={
-              5
-            }
-          >
-            Thông tin bổ sung
-          </Title>
-
+          <Title level={5}>Thông tin bổ sung</Title>
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr",
+              gridTemplateColumns: "1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Loại thuốc"
-
-              name="drugType"
-            >
+            <Form.Item label="Loại thuốc" name="drugType">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Tên khoa học"
-
-              name="scientificName"
-            >
+            <Form.Item label="Tên khoa học" name="scientificName">
               <Input />
             </Form.Item>
-
           </div>
 
-
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr",
+              gridTemplateColumns: "1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Nguồn gốc"
-
-              name="origin"
-            >
+            <Form.Item label="Nguồn gốc" name="origin">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Phương pháp chế biến"
-
-              name="processingMethod"
-            >
+            <Form.Item label="Phương pháp chế biến" name="processingMethod">
               <Input />
             </Form.Item>
-
           </div>
 
-
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr",
+              gridTemplateColumns: "1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Mã dược liệu nhập"
-
-              name="importedMaterialCode"
-            >
+            <Form.Item label="Mã dược liệu nhập" name="importedMaterialCode">
               <Input />
             </Form.Item>
 
-
-            <Form.Item
-              label="Mã dược liệu chế biến"
-
-              name="processedMaterialCode"
-            >
+            <Form.Item label="Mã dược liệu chế biến" name="processedMaterialCode">
               <Input />
             </Form.Item>
-
           </div>
 
-
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr 2fr",
+              gridTemplateColumns: "1fr 1fr 2fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="TLHH chế biến"
-
-              name="processingLossRate"
-            >
-
+            <Form.Item label="TLHH chế biến" name="processingLossRate">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="TLHH bảo quản"
-
-              name="preservationLossRate"
-            >
-
+            <Form.Item label="TLHH bảo quản" name="preservationLossRate">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="Tiêu chuẩn chất lượng"
-
-              name="qualityStandard"
-            >
+            <Form.Item label="Tiêu chuẩn chất lượng" name="qualityStandard">
               <Input />
             </Form.Item>
-
           </div>
-
 
           {/* =============================================
               MEDGUARD
           ============================================= */}
 
-          <Title
-            level={
-              5
-            }
-          >
-            Cấu hình MedGuard
-          </Title>
-
+          <Title level={5}>Cấu hình MedGuard</Title>
 
           <div
             style={{
-              display:
-                "grid",
+              display: "grid",
 
-              gridTemplateColumns:
-                "1fr 1fr",
+              gridTemplateColumns: "1fr 1fr",
 
-              gap:
-                16,
+              gap: 16,
             }}
           >
-
-            <Form.Item
-              label="Quyết định"
-
-              name="decisionNo"
-            >
+            <Form.Item label="Quyết định" name="decisionNo">
               <Input />
             </Form.Item>
 
-
             <Form.Item
               label="Tỷ lệ thanh toán BHYT (%)"
-
               name="insurancePaymentRate"
-
               rules={[
                 {
-                  type:
-                    "number",
+                  type: "number",
 
-                  min:
-                    0,
+                  min: 0,
 
-                  max:
-                    100,
+                  max: 100,
 
-                  message:
-                    "Tỷ lệ phải từ 0 đến 100.",
+                  message: "Tỷ lệ phải từ 0 đến 100.",
                 },
               ]}
             >
-
               <InputNumber
-                min={
-                  0
-                }
-
-                max={
-                  100
-                }
-
+                min={0}
+                max={100}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
-
           </div>
 
-
-          <Form.Item
-            label="Ghi chú"
-
-            name="note"
-          >
-
-            <Input.TextArea
-              rows={
-                3
-              }
-            />
-
+          <Form.Item label="Ghi chú" name="note">
+            <Input.TextArea rows={3} />
           </Form.Item>
 
-
-          <Form.Item
-            label="Đang sử dụng"
-
-            name="active"
-
-            valuePropName="checked"
-          >
-
+          <Form.Item label="Đang sử dụng" name="active" valuePropName="checked">
             <Switch />
-
           </Form.Item>
-
         </Form>
-
       </Modal>
-
 
       {/* =================================================
           IMPORT MODAL
       ================================================= */}
 
       <Modal
-        open={
-          importModalOpen
-        }
-
+        open={importModalOpen}
         title="Import Danh mục Thuốc"
-
-        width={
-          900
-        }
-
+        width={900}
         okText="Import"
-
         cancelText="Đóng"
-
-        confirmLoading={
-          importing
-        }
-
+        confirmLoading={importing}
         okButtonProps={{
-          disabled:
-            importFileList.length === 0 ||
-            importResult !== null,
+          disabled: importFileList.length === 0 || importResult !== null,
         }}
-
-        onOk={() =>
-          void handleImportExcel()
-        }
-
-        onCancel={
-          closeImportModal
-        }
+        onOk={() => void handleImportExcel()}
+        onCancel={closeImportModal}
       >
-
         <div
           style={{
-            marginTop:
-              16,
+            marginTop: 16,
           }}
         >
-
           <Alert
             type="info"
-
             showIcon
-
-            message="Import Danh mục Thuốc từ Excel"
-
+            title="Import Danh mục Thuốc từ Excel"
             description={
               <>
-                Hệ thống tự nhận diện sheet có cột{" "}
-                <b>MA_THUOC</b>{" "}
-                và{" "}
-                <b>TEN_THUOC</b>.
-                {" "}
-
-                Hỗ trợ trực tiếp file mẫu{" "}
-                <b>Generic 324</b>.
-                {" "}
-
-                Các cột DEN_NGAY và DENNGAY được bỏ qua.
-                {" "}
-
-                Nếu có lỗi dữ liệu thì toàn bộ lần import sẽ bị hủy.
-                {" "}
-
-                Mã thuốc đã tồn tại sẽ được cập nhật,
-                mã mới sẽ được thêm mới.
-                {" "}
-
-                Nếu MA_THUOC xuất hiện nhiều lần thì giữ dòng đầu tiên
-                và các dòng còn lại được tính vào Bỏ qua.
+                Hệ thống tự nhận diện sheet có cột <b>MA_THUOC</b> và <b>TEN_THUOC</b>. Hỗ trợ trực
+                tiếp file mẫu <b>Generic 324</b>. Các cột DEN_NGAY và DENNGAY được bỏ qua. Nếu có
+                lỗi dữ liệu thì toàn bộ lần import sẽ bị hủy. Mã thuốc đã tồn tại sẽ được cập nhật,
+                mã mới sẽ được thêm mới. Nếu MA_THUOC xuất hiện nhiều lần thì giữ dòng đầu tiên và
+                các dòng còn lại được tính vào Bỏ qua.
               </>
             }
-
             style={{
-              marginBottom:
-                16,
+              marginBottom: 16,
             }}
           />
 
-
           <Upload
             accept=".xlsx"
-
-            maxCount={
-              1
-            }
-
-            fileList={
-              importFileList
-            }
-
-            beforeUpload={() =>
-              false
-            }
-
-            disabled={
-              importing
-            }
-
+            maxCount={1}
+            fileList={importFileList}
+            beforeUpload={() => false}
+            disabled={importing}
             onRemove={() => {
+              setImportFileList([]);
 
-              setImportFileList(
-                []
-              );
+              setImportResult(null);
 
-              setImportResult(
-                null
-              );
+              setImportErrors([]);
 
-              setImportErrors(
-                []
-              );
-
-              setImportMessage(
-                ""
-              );
+              setImportMessage("");
 
               return true;
             }}
+            onChange={(info) => {
+              setImportFileList(info.fileList.slice(-1));
 
-            onChange={(
-              info
-            ) => {
+              setImportResult(null);
 
-              setImportFileList(
-                info.fileList.slice(
-                  -1
-                )
-              );
+              setImportErrors([]);
 
-              setImportResult(
-                null
-              );
-
-              setImportErrors(
-                []
-              );
-
-              setImportMessage(
-                ""
-              );
+              setImportMessage("");
             }}
           >
-
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              disabled={
-                importing
-              }
-            >
+            <Button icon={<UploadOutlined />} disabled={importing}>
               Chọn file Excel
             </Button>
-
           </Upload>
 
-
           {importResult && (
-
             <Alert
               type="success"
-
               showIcon
-
               style={{
-                marginTop:
-                  20,
+                marginTop: 20,
               }}
-
-              message={
-                importMessage ||
-                "Import thành công"
-              }
-
+              title={importMessage || "Import thành công"}
               description={
-
                 <div
                   style={{
-                    lineHeight:
-                      2,
+                    lineHeight: 2,
                   }}
                 >
-
                   <div>
-                    Tổng số dòng:{" "}
-                    <b>
-                      {
-                        importResult.totalRows
-                      }
-                    </b>
+                    Tổng số dòng: <b>{importResult.totalRows}</b>
                   </div>
 
-
                   <div>
-                    Thêm mới:{" "}
-                    <b>
-                      {
-                        importResult.inserted
-                      }
-                    </b>
+                    Thêm mới: <b>{importResult.inserted}</b>
                   </div>
 
-
                   <div>
-                    Cập nhật:{" "}
-                    <b>
-                      {
-                        importResult.updated
-                      }
-                    </b>
+                    Cập nhật: <b>{importResult.updated}</b>
                   </div>
 
-
                   <div>
-                    Bỏ qua:{" "}
-                    <b>
-                      {
-                        importResult.skipped
-                      }
-                    </b>
+                    Bỏ qua: <b>{importResult.skipped}</b>
                   </div>
-
                 </div>
               }
             />
-
           )}
 
-
-          {!importResult &&
-            importMessage &&
-            importErrors.length === 0 && (
-
-              <Alert
-                type="error"
-
-                showIcon
-
-                message={
-                  importMessage
-                }
-
-                style={{
-                  marginTop:
-                    20,
-                }}
-              />
-
-            )}
-
+          {!importResult && importMessage && importErrors.length === 0 && (
+            <Alert
+              type="error"
+              showIcon
+              title={importMessage}
+              style={{
+                marginTop: 20,
+              }}
+            />
+          )}
 
           {importErrors.length > 0 && (
-
             <div
               style={{
-                marginTop:
-                  20,
+                marginTop: 20,
               }}
             >
-
               <Alert
                 type="error"
-
                 showIcon
-
-                message={
-                  importMessage ||
-                  `File có ${importErrors.length} lỗi.`
-                }
-
+                title={importMessage || `File có ${importErrors.length} lỗi.`}
                 description="Không có thuốc nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
                 style={{
-                  marginBottom:
-                    12,
+                  marginBottom: 12,
                 }}
               />
-
 
               <Table<DrugImportError>
                 size="small"
-
                 bordered
-
-                rowKey={(
-                  record
-                ) =>
-                  `${record.row}-${record.field}-${record.message}`
-                }
-
-                dataSource={
-                  importErrors
-                }
-
+                rowKey={(record) => `${record.row}-${record.field}-${record.message}`}
+                dataSource={importErrors}
                 pagination={{
-                  pageSize:
-                    10,
+                  pageSize: 10,
 
-                  showSizeChanger:
-                    false,
+                  showSizeChanger: false,
 
-                  showTotal:
-                    (
-                      value
-                    ) =>
-                      `Tổng lỗi: ${value}`,
+                  showTotal: (value) => `Tổng lỗi: ${value}`,
                 }}
-
                 scroll={{
-                  y:
-                    320,
+                  y: 320,
                 }}
-
                 columns={[
                   {
-                    title:
-                      "Dòng",
+                    title: "Dòng",
 
-                    dataIndex:
-                      "row",
+                    dataIndex: "row",
 
-                    width:
-                      80,
+                    width: 80,
 
-                    align:
-                      "center",
+                    align: "center",
                   },
 
                   {
-                    title:
-                      "Cột",
+                    title: "Cột",
 
-                    dataIndex:
-                      "field",
+                    dataIndex: "field",
 
-                    width:
-                      170,
+                    width: 170,
                   },
 
                   {
-                    title:
-                      "Lỗi",
+                    title: "Lỗi",
 
-                    dataIndex:
-                      "message",
+                    dataIndex: "message",
                   },
                 ]}
               />
-
             </div>
-
           )}
-
         </div>
-
       </Modal>
-
 
       {/* =================================================
           STYLE
@@ -4095,7 +2171,6 @@ export default function Drugs() {
           }
         `}
       </style>
-
     </>
   );
 }

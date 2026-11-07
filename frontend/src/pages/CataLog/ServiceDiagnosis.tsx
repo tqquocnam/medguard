@@ -519,7 +519,7 @@ export default function ServiceDiagnosis() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải danh mục DVKT - Chẩn đoán vào"
+          title="Không thể tải danh mục DVKT - Chẩn đoán vào"
           description={error}
           action={
             <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>

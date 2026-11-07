@@ -43,9 +43,7 @@ export default function MainLayout() {
     {
       type: "group",
       label: "TỔNG QUAN",
-      children: [
-        { key: "/", icon: <DashboardOutlined />, label: "Dashboard" },
-      ],
+      children: [{ key: "/", icon: <DashboardOutlined />, label: "Dashboard" }],
     },
     {
       type: "group",
@@ -62,9 +60,7 @@ export default function MainLayout() {
       children: [
         { key: "/schedule", icon: <CalendarOutlined />, label: "Lịch trực" },
         { key: "/doctors", icon: <MedicineBoxOutlined />, label: "Bác sĩ khám" },
-        ...(isAdmin
-          ? [{ key: "/catalog", icon: <AppstoreOutlined />, label: "Danh mục" }]
-          : []),
+        ...(isAdmin ? [{ key: "/catalog", icon: <AppstoreOutlined />, label: "Danh mục" }] : []),
       ],
     },
   ];
@@ -100,7 +96,9 @@ export default function MainLayout() {
       >
         <div className="mg-side-inner">
           <div className="mg-brand">
-            <div className="mg-brand-mark"><SafetyCertificateOutlined /></div>
+            <div className="mg-brand-mark">
+              <SafetyCertificateOutlined />
+            </div>
             {!collapsed && (
               <div className="mg-brand-copy">
                 <strong>MedGuard</strong>
@@ -135,7 +133,7 @@ export default function MainLayout() {
                 {!collapsed && (
                   <span className="mg-account-info">
                     <strong>{user?.username || "Tài khoản"}</strong>
-                    <small>{isAdmin ? "Quản trị viên" : "Người dùng"}</small>
+                    <small>Chi nhánh {user?.branchId || "—"}</small>
                   </span>
                 )}
               </button>
@@ -178,9 +176,19 @@ export default function MainLayout() {
               style={{ background: "#eff6ff", color: "#1677ff" }}
             />
             <strong className="mg-header-username">{user?.username}</strong>
-            <Tag color={isAdmin ? "red" : "blue"} className="mg-role-tag">
-              {isAdmin ? "ADMIN" : "USER"}
-            </Tag>
+            <Tooltip title={user?.branchName || "Chi nhánh hiện tại"}>
+              <Tag
+                color="blue"
+                style={{
+                  margin: 0,
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Chi nhánh {user?.branchId || "—"}
+              </Tag>
+            </Tooltip>
             <Button danger size="small" icon={<LogoutOutlined />} onClick={handleLogout}>
               <span className="mg-logout-label">Đăng xuất</span>
             </Button>

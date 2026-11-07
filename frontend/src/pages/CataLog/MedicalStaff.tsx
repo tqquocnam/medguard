@@ -847,7 +847,7 @@ export default function MedicalStaff() {
         <Alert
           type={error ? "error" : "warning"}
           showIcon
-          message={error ? "Không thể tải danh sách nhân viên" : "Không thể tải danh mục khoa"}
+          title={error ? "Không thể tải danh sách nhân viên" : "Không thể tải danh mục khoa"}
           description={error || departmentError}
           action={
             <Button size="small" disabled={busy || loading} onClick={refresh}>
@@ -1206,7 +1206,7 @@ export default function MedicalStaff() {
           type="info"
           showIcon
           style={{ marginTop: 16 }}
-          message="Cấu trúc file Excel"
+          title="Cấu trúc file Excel"
           description={
             <div className="ms-import-help">
               Hệ thống nhận diện sheet có các cột <b>MA_BHXH</b>, <b>HO_TEN</b>, <b>MACCHN</b>. Cột{" "}
@@ -1268,7 +1268,7 @@ export default function MedicalStaff() {
               type="success"
               showIcon
               style={{ marginTop: 16 }}
-              message={importMessage || "Import thành công."}
+              title={importMessage || "Import thành công."}
             />
 
             <div className="ms-import-summary">
@@ -1309,7 +1309,7 @@ export default function MedicalStaff() {
             type="error"
             showIcon
             style={{ marginTop: 16 }}
-            message={importMessage}
+            title={importMessage}
             description={
               importErrors.length > 0
                 ? "Không có nhân viên nào được import. Hãy sửa các dòng lỗi rồi import lại."

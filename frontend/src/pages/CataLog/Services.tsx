@@ -18,10 +18,7 @@ import {
   message,
 } from "antd";
 
-import type {
-  TableColumnsType,
-  UploadFile,
-} from "antd";
+import type { TableColumnsType, UploadFile } from "antd";
 
 import {
   EditOutlined,
@@ -33,22 +30,11 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {
-  apiFetch,
-} from "../../api/apiClient";
+import { apiFetch } from "../../api/apiClient";
 
-
-const {
-  Title,
-  Text,
-} = Typography;
-
+const { Title, Text } = Typography;
 
 // ======================================================
 // TYPES
@@ -62,21 +48,16 @@ interface MachineOption {
   warnTimeOverlap: boolean;
 }
 
-
 interface ServiceItem {
   code: string;
 
   name: string;
 
-  groupCode:
-    | string
-    | null;
+  groupCode: string | null;
 
   unitPrice: number;
 
-  decisionNo:
-    | string
-    | null;
+  decisionNo: string | null;
 
   requiresResult: boolean;
 
@@ -90,18 +71,14 @@ interface ServiceItem {
 
   nextExecutionDays: number;
 
-  note:
-    | string
-    | null;
+  note: string | null;
 
   active: boolean;
 
-  machines:
-    MachineOption[];
+  machines: MachineOption[];
 
   machineCount: number;
 }
-
 
 interface ServiceFormValues {
   code: string;
@@ -124,14 +101,12 @@ interface ServiceFormValues {
 
   nextExecutionDays: number;
 
-  machineCodes:
-    string[];
+  machineCodes: string[];
 
   note?: string;
 
   active: boolean;
 }
-
 
 interface ServiceListResponse {
   success?: boolean;
@@ -139,20 +114,15 @@ interface ServiceListResponse {
   message?: string;
 
   data?: {
-    items:
-      ServiceItem[];
+    items: ServiceItem[];
 
-    total:
-      number;
+    total: number;
 
-    page:
-      number;
+    page: number;
 
-    pageSize:
-      number;
+    pageSize: number;
   };
 }
-
 
 interface MachineListResponse {
   success?: boolean;
@@ -160,19 +130,17 @@ interface MachineListResponse {
   message?: string;
 
   data?: {
-    items:
-      Array<{
-        code: string;
+    items: Array<{
+      code: string;
 
-        name: string;
+      name: string;
 
-        warnTimeOverlap: boolean;
+      warnTimeOverlap: boolean;
 
-        active: boolean;
-      }>;
+      active: boolean;
+    }>;
   };
 }
-
 
 interface ServiceImportError {
   row: number;
@@ -181,7 +149,6 @@ interface ServiceImportError {
 
   message: string;
 }
-
 
 interface ServiceImportResult {
   totalRows: number;
@@ -193,1826 +160,792 @@ interface ServiceImportResult {
   skipped: number;
 }
 
-
 // ======================================================
 // COMPONENT
 // ======================================================
 
 export default function Services() {
-
   // ====================================================
   // FILTERS
   // ====================================================
 
-  const [
-    searchCode,
-    setSearchCode,
-  ] = useState(
-    ""
-  );
+  const [searchCode, setSearchCode] = useState("");
 
+  const [searchName, setSearchName] = useState("");
 
-  const [
-    searchName,
-    setSearchName,
-  ] = useState(
-    ""
-  );
+  const [searchDecision, setSearchDecision] = useState("");
 
-
-  const [
-    searchDecision,
-    setSearchDecision,
-  ] = useState(
-    ""
-  );
-
-
-  const [
-    searchGroupCode,
-    setSearchGroupCode,
-  ] = useState(
-    ""
-  );
-
+  const [searchGroupCode, setSearchGroupCode] = useState("");
 
   // ====================================================
   // DATA
   // ====================================================
 
-  const [
-    items,
-    setItems,
-  ] = useState<
-    ServiceItem[]
-  >(
-    []
-  );
+  const [items, setItems] = useState<ServiceItem[]>([]);
 
+  const [machineOptions, setMachineOptions] = useState<MachineOption[]>([]);
 
-  const [
-    machineOptions,
-    setMachineOptions,
-  ] = useState<
-    MachineOption[]
-  >(
-    []
-  );
+  const [total, setTotal] = useState(0);
 
+  const [page, setPage] = useState(1);
 
-  const [
-    total,
-    setTotal,
-  ] = useState(
-    0
-  );
+  const [pageSize, setPageSize] = useState(10);
 
-
-  const [
-    page,
-    setPage,
-  ] = useState(
-    1
-  );
-
-
-  const [
-    pageSize,
-    setPageSize,
-  ] = useState(
-    10
-  );
-
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(
-    false
-  );
-
+  const [loading, setLoading] = useState(false);
 
   // ====================================================
   // ADD / EDIT
   // ====================================================
 
-  const [
-    saving,
-    setSaving,
-  ] = useState(
-    false
-  );
+  const [saving, setSaving] = useState(false);
 
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const [
-    modalOpen,
-    setModalOpen,
-  ] = useState(
-    false
-  );
+  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
 
+  const [form] = Form.useForm<ServiceFormValues>();
 
-  const [
-    editingService,
-    setEditingService,
-  ] = useState<
-    ServiceItem |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    form,
-  ] =
-    Form.useForm<
-      ServiceFormValues
-    >();
-
-
-  const requiresMachine =
-    Form.useWatch(
-      "requiresMachine",
-      form
-    );
-
+  const requiresMachine = Form.useWatch("requiresMachine", form);
 
   // ====================================================
   // IMPORT EXCEL
   // ====================================================
 
-  const [
-    importModalOpen,
-    setImportModalOpen,
-  ] = useState(
-    false
-  );
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
+  const [importFileList, setImportFileList] = useState<UploadFile[]>([]);
 
-  const [
-    importFileList,
-    setImportFileList,
-  ] = useState<
-    UploadFile[]
-  >(
-    []
-  );
+  const [importing, setImporting] = useState(false);
 
+  const [importResult, setImportResult] = useState<ServiceImportResult | null>(null);
 
-  const [
-    importing,
-    setImporting,
-  ] = useState(
-    false
-  );
+  const [importErrors, setImportErrors] = useState<ServiceImportError[]>([]);
 
-
-  const [
-    importResult,
-    setImportResult,
-  ] = useState<
-    ServiceImportResult |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    importErrors,
-    setImportErrors,
-  ] = useState<
-    ServiceImportError[]
-  >(
-    []
-  );
-
-
-  const [
-    importMessage,
-    setImportMessage,
-  ] = useState(
-    ""
-  );
-
+  const [importMessage, setImportMessage] = useState("");
 
   // ====================================================
   // LOAD MACHINES
   // ====================================================
 
-  const loadMachineOptions =
-    useCallback(
-      async () => {
+  const loadMachineOptions = useCallback(async () => {
+    try {
+      const response = await apiFetch("/catalog/machines?active=true&page=1&pageSize=100", {
+        method: "GET",
+      });
 
-        try {
+      const json: MachineListResponse = await response.json();
 
-          const response =
-            await apiFetch(
-              "/catalog/machines?active=true&page=1&pageSize=100",
-              {
-                method:
-                  "GET",
-              }
-            );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải danh mục máy.");
+      }
 
+      setMachineOptions(
+        (json.data?.items ?? []).map((item) => ({
+          code: item.code,
 
-          const json:
-            MachineListResponse =
-            await response.json();
+          name: item.name,
 
-
-          if (
-            !response.ok ||
-            json.success !==
-              true
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải danh mục máy."
-            );
-          }
-
-
-          setMachineOptions(
-            (
-              json.data
-                ?.items ??
-              []
-            ).map(
-              (
-                item
-              ) => ({
-                code:
-                  item.code,
-
-                name:
-                  item.name,
-
-                warnTimeOverlap:
-                  item.warnTimeOverlap,
-              })
-            )
-          );
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Load machine options error:",
-            error
-          );
-        }
-      },
-      []
-    );
-
+          warnTimeOverlap: item.warnTimeOverlap,
+        })),
+      );
+    } catch (error) {
+      console.error("Load machine options error:", error);
+    }
+  }, []);
 
   // ====================================================
   // LOAD SERVICES
   // ====================================================
 
-  const loadServices =
-    useCallback(
-      async () => {
+  const loadServices = useCallback(async () => {
+    try {
+      setLoading(true);
 
-        try {
+      const params = new URLSearchParams({
+        page: String(page),
 
-          setLoading(
-            true
-          );
+        pageSize: String(pageSize),
+      });
 
+      if (searchCode.trim()) {
+        params.set("code", searchCode.trim());
+      }
 
-          const params =
-            new URLSearchParams({
-              page:
-                String(
-                  page
-                ),
+      if (searchName.trim()) {
+        params.set("name", searchName.trim());
+      }
 
-              pageSize:
-                String(
-                  pageSize
-                ),
-            });
+      if (searchGroupCode.trim()) {
+        params.set("groupCode", searchGroupCode.trim());
+      }
 
+      const response = await apiFetch(`/catalog/services?${params.toString()}`, {
+        method: "GET",
+      });
 
-          if (
-            searchCode.trim()
-          ) {
+      const json: ServiceListResponse = await response.json();
 
-            params.set(
-              "code",
-              searchCode.trim()
-            );
-          }
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải danh mục DVKT.");
+      }
 
+      let rows = json.data?.items ?? [];
 
-          if (
-            searchName.trim()
-          ) {
+      // =============================================
+      // LỌC QUYẾT ĐỊNH TẠI FRONTEND
+      // =============================================
 
-            params.set(
-              "name",
-              searchName.trim()
-            );
-          }
+      if (searchDecision.trim()) {
+        const keyword = searchDecision.trim().toLowerCase();
 
+        rows = rows.filter((row) => (row.decisionNo ?? "").toLowerCase().includes(keyword));
+      }
 
-          if (
-            searchGroupCode.trim()
-          ) {
+      setItems(rows);
 
-            params.set(
-              "groupCode",
-              searchGroupCode.trim()
-            );
-          }
+      setTotal(Number(json.data?.total ?? 0));
+    } catch (error) {
+      console.error("Load services error:", error);
 
-
-          const response =
-            await apiFetch(
-              `/catalog/services?${params.toString()}`,
-              {
-                method:
-                  "GET",
-              }
-            );
-
-
-          const json:
-            ServiceListResponse =
-            await response.json();
-
-
-          if (
-            !response.ok ||
-            json.success !==
-              true
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải danh mục DVKT."
-            );
-          }
-
-
-          let rows =
-            json.data
-              ?.items ??
-            [];
-
-
-          // =============================================
-          // LỌC QUYẾT ĐỊNH TẠI FRONTEND
-          // =============================================
-
-          if (
-            searchDecision.trim()
-          ) {
-
-            const keyword =
-              searchDecision
-                .trim()
-                .toLowerCase();
-
-
-            rows =
-              rows.filter(
-                (
-                  row
-                ) =>
-                  (
-                    row.decisionNo ??
-                    ""
-                  )
-                    .toLowerCase()
-                    .includes(
-                      keyword
-                    )
-              );
-          }
-
-
-          setItems(
-            rows
-          );
-
-
-          setTotal(
-            Number(
-              json.data
-                ?.total ??
-              0
-            )
-          );
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Load services error:",
-            error
-          );
-
-
-          message.error(
-            error instanceof
-            Error
-              ? error.message
-              : "Không thể tải danh mục DVKT."
-          );
-
-        } finally {
-
-          setLoading(
-            false
-          );
-        }
-      },
-      [
-        page,
-        pageSize,
-        searchCode,
-        searchName,
-        searchDecision,
-        searchGroupCode,
-      ]
-    );
-
+      message.error(error instanceof Error ? error.message : "Không thể tải danh mục DVKT.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, searchCode, searchName, searchDecision, searchGroupCode]);
 
   // ====================================================
   // INITIAL LOAD
   // ====================================================
 
-  useEffect(
-    () => {
+  useEffect(() => {
+    void loadServices();
 
-      void loadServices();
-
-      void loadMachineOptions();
-
-    },
-    [
-      loadServices,
-      loadMachineOptions,
-    ]
-  );
-
+    void loadMachineOptions();
+  }, [loadServices, loadMachineOptions]);
 
   // ====================================================
   // ADD
   // ====================================================
 
   function openAddModal() {
-
-    setEditingService(
-      null
-    );
-
+    setEditingService(null);
 
     form.resetFields();
 
-
     form.setFieldsValue({
-      code:
-        "",
+      code: "",
 
-      name:
-        "",
+      name: "",
 
-      groupCode:
-        "",
+      groupCode: "",
 
-      unitPrice:
-        0,
+      unitPrice: 0,
 
-      decisionNo:
-        "",
+      decisionNo: "",
 
-      requiresMachine:
-        false,
+      requiresMachine: false,
 
-      allowSimultaneous:
-        false,
+      allowSimultaneous: false,
 
-      minDurationMinutes:
-        0,
+      minDurationMinutes: 0,
 
-      maxDurationMinutes:
-        0,
+      maxDurationMinutes: 0,
 
-      nextExecutionDays:
-        0,
+      nextExecutionDays: 0,
 
-      machineCodes:
-        [],
+      machineCodes: [],
 
-      note:
-        "",
+      note: "",
 
-      active:
-        true,
+      active: true,
     });
 
-
-    setModalOpen(
-      true
-    );
+    setModalOpen(true);
   }
-
 
   // ====================================================
   // EDIT
   // ====================================================
 
-  async function openEditModal(
-    record:
-      ServiceItem
-  ) {
-
+  async function openEditModal(record: ServiceItem) {
     try {
-
-      const response =
-        await apiFetch(
-          `/catalog/services/${encodeURIComponent(
-            record.code
-          )}`,
-          {
-            method:
-              "GET",
-          }
-        );
-
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể tải DVKT."
-        );
-      }
-
-
-      const data =
-        json.data;
-
-
-      setEditingService(
-        record
-      );
-
-
-      form.setFieldsValue({
-        code:
-          data.code,
-
-        name:
-          data.name,
-
-        groupCode:
-          data.groupCode ??
-          "",
-
-        unitPrice:
-          Number(
-            data.unitPrice ??
-            0
-          ),
-
-        decisionNo:
-          data.decisionNo ??
-          "",
-
-        requiresMachine:
-          Boolean(
-            data.requiresMachine
-          ),
-
-        allowSimultaneous:
-          Boolean(
-            data.allowSimultaneous
-          ),
-
-        minDurationMinutes:
-          Number(
-            data.minDurationMinutes ??
-            0
-          ),
-
-        maxDurationMinutes:
-          Number(
-            data.maxDurationMinutes ??
-            0
-          ),
-
-        nextExecutionDays:
-          Number(
-            data.nextExecutionDays ??
-            0
-          ),
-
-        machineCodes:
-          Array.isArray(
-            data.machines
-          )
-            ? data.machines.map(
-                (
-                  machine:
-                    MachineOption
-                ) =>
-                  machine.code
-              )
-            : [],
-
-        note:
-          data.note ??
-          "",
-
-        active:
-          Boolean(
-            data.active
-          ),
+      const response = await apiFetch(`/catalog/services/${encodeURIComponent(record.code)}`, {
+        method: "GET",
       });
 
+      const json = await response.json();
 
-      setModalOpen(
-        true
-      );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải DVKT.");
+      }
 
-    } catch (
-      error
-    ) {
+      const data = json.data;
 
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể tải DVKT."
-      );
+      setEditingService(record);
+
+      form.setFieldsValue({
+        code: data.code,
+
+        name: data.name,
+
+        groupCode: data.groupCode ?? "",
+
+        unitPrice: Number(data.unitPrice ?? 0),
+
+        decisionNo: data.decisionNo ?? "",
+
+        requiresMachine: Boolean(data.requiresMachine),
+
+        allowSimultaneous: Boolean(data.allowSimultaneous),
+
+        minDurationMinutes: Number(data.minDurationMinutes ?? 0),
+
+        maxDurationMinutes: Number(data.maxDurationMinutes ?? 0),
+
+        nextExecutionDays: Number(data.nextExecutionDays ?? 0),
+
+        machineCodes: Array.isArray(data.machines)
+          ? data.machines.map((machine: MachineOption) => machine.code)
+          : [],
+
+        note: data.note ?? "",
+
+        active: Boolean(data.active),
+      });
+
+      setModalOpen(true);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể tải DVKT.");
     }
   }
-
 
   // ====================================================
   // SAVE
   // ====================================================
 
   async function handleSave() {
-
     try {
-
-      const values =
-        await form.validateFields();
-
+      const values = await form.validateFields();
 
       if (
-        Number(
-          values.maxDurationMinutes ??
-          0
-        ) >
-          0 &&
-        Number(
-          values.maxDurationMinutes ??
-          0
-        ) <
-          Number(
-            values.minDurationMinutes ??
-            0
-          )
+        Number(values.maxDurationMinutes ?? 0) > 0 &&
+        Number(values.maxDurationMinutes ?? 0) < Number(values.minDurationMinutes ?? 0)
       ) {
-
-        message.error(
-          "Max TG thực hiện phải lớn hơn hoặc bằng Min."
-        );
+        message.error("Max TG thực hiện phải lớn hơn hoặc bằng Min.");
 
         return;
       }
 
-
-      if (
-        values.requiresMachine &&
-        (
-          !values.machineCodes ||
-          values.machineCodes.length ===
-            0
-        )
-      ) {
-
-        message.error(
-          "DVKT yêu cầu mã máy nên phải chọn ít nhất 1 máy."
-        );
+      if (values.requiresMachine && (!values.machineCodes || values.machineCodes.length === 0)) {
+        message.error("DVKT yêu cầu mã máy nên phải chọn ít nhất 1 máy.");
 
         return;
       }
 
+      setSaving(true);
 
-      setSaving(
-        true
-      );
+      const isEdit = editingService !== null;
 
+      const endpoint = isEdit
+        ? `/catalog/services/${encodeURIComponent(editingService.code)}`
+        : "/catalog/services";
 
-      const isEdit =
-        editingService !==
-        null;
+      const response = await apiFetch(endpoint, {
+        method: isEdit ? "PUT" : "POST",
 
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-      const endpoint =
-        isEdit
-          ? `/catalog/services/${encodeURIComponent(
-              editingService.code
-            )}`
-          : "/catalog/services";
+        body: JSON.stringify({
+          code: values.code.trim(),
 
+          name: values.name.trim(),
 
-      const response =
-        await apiFetch(
-          endpoint,
-          {
-            method:
-              isEdit
-                ? "PUT"
-                : "POST",
+          groupCode: values.groupCode?.trim() || null,
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          unitPrice: Number(values.unitPrice ?? 0),
 
-            body:
-              JSON.stringify({
-                code:
-                  values.code.trim(),
+          decisionNo: values.decisionNo?.trim() || null,
 
-                name:
-                  values.name.trim(),
+          requiresResult: false,
 
-                groupCode:
-                  values.groupCode
-                    ?.trim() ||
-                  null,
+          requiresMachine: Boolean(values.requiresMachine),
 
-                unitPrice:
-                  Number(
-                    values.unitPrice ??
-                    0
-                  ),
+          allowSimultaneous: Boolean(values.allowSimultaneous),
 
-                decisionNo:
-                  values.decisionNo
-                    ?.trim() ||
-                  null,
+          minDurationMinutes: Number(values.minDurationMinutes ?? 0),
 
-                requiresResult:
-                  false,
+          maxDurationMinutes: Number(values.maxDurationMinutes ?? 0),
 
-                requiresMachine:
-                  Boolean(
-                    values.requiresMachine
-                  ),
+          nextExecutionDays: Number(values.nextExecutionDays ?? 0),
 
-                allowSimultaneous:
-                  Boolean(
-                    values.allowSimultaneous
-                  ),
+          machineCodes: values.requiresMachine ? values.machineCodes : [],
 
-                minDurationMinutes:
-                  Number(
-                    values.minDurationMinutes ??
-                    0
-                  ),
+          note: values.note?.trim() || null,
 
-                maxDurationMinutes:
-                  Number(
-                    values.maxDurationMinutes ??
-                    0
-                  ),
+          active: values.active,
+        }),
+      });
 
-                nextExecutionDays:
-                  Number(
-                    values.nextExecutionDays ??
-                    0
-                  ),
+      const json = await response.json();
 
-                machineCodes:
-                  values.requiresMachine
-                    ? values.machineCodes
-                    : [],
-
-                note:
-                  values.note
-                    ?.trim() ||
-                  null,
-
-                active:
-                  values.active,
-              }),
-          }
-        );
-
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể lưu DVKT."
-        );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể lưu DVKT.");
       }
 
+      message.success(isEdit ? "Cập nhật DVKT thành công." : "Thêm DVKT thành công.");
 
-      message.success(
-        isEdit
-          ? "Cập nhật DVKT thành công."
-          : "Thêm DVKT thành công."
-      );
+      setModalOpen(false);
 
-
-      setModalOpen(
-        false
-      );
-
-
-      setEditingService(
-        null
-      );
-
+      setEditingService(null);
 
       form.resetFields();
 
-
       await loadServices();
-
-    } catch (
-      error
-    ) {
-
-      if (
-        error &&
-        typeof error ===
-          "object" &&
-        "errorFields" in
-          error
-      ) {
-
+    } catch (error) {
+      if (error && typeof error === "object" && "errorFields" in error) {
         return;
       }
 
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể lưu DVKT."
-      );
-
+      message.error(error instanceof Error ? error.message : "Không thể lưu DVKT.");
     } finally {
-
-      setSaving(
-        false
-      );
+      setSaving(false);
     }
   }
-
 
   // ====================================================
   // DISABLE
   // ====================================================
 
-  async function handleDisable(
-    record:
-      ServiceItem
-  ) {
-
+  async function handleDisable(record: ServiceItem) {
     try {
+      const response = await apiFetch(`/catalog/services/${encodeURIComponent(record.code)}`, {
+        method: "DELETE",
+      });
 
-      const response =
-        await apiFetch(
-          `/catalog/services/${encodeURIComponent(
-            record.code
-          )}`,
-          {
-            method:
-              "DELETE",
-          }
-        );
+      const json = await response.json();
 
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể ngừng sử dụng DVKT."
-        );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể ngừng sử dụng DVKT.");
       }
 
-
-      message.success(
-        "Đã ngừng sử dụng DVKT."
-      );
-
+      message.success("Đã ngừng sử dụng DVKT.");
 
       await loadServices();
-
-    } catch (
-      error
-    ) {
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể ngừng DVKT."
-      );
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể ngừng DVKT.");
     }
   }
-
 
   // ====================================================
   // REFRESH
   // ====================================================
 
   function handleRefresh() {
+    setSearchCode("");
 
-    setSearchCode(
-      ""
-    );
+    setSearchName("");
 
+    setSearchDecision("");
 
-    setSearchName(
-      ""
-    );
+    setSearchGroupCode("");
 
-
-    setSearchDecision(
-      ""
-    );
-
-
-    setSearchGroupCode(
-      ""
-    );
-
-
-    setPage(
-      1
-    );
+    setPage(1);
   }
-
 
   // ====================================================
   // OPEN IMPORT
   // ====================================================
 
   function openImportModal() {
+    setImportFileList([]);
 
-    setImportFileList(
-      []
-    );
+    setImportResult(null);
 
+    setImportErrors([]);
 
-    setImportResult(
-      null
-    );
+    setImportMessage("");
 
-
-    setImportErrors(
-      []
-    );
-
-
-    setImportMessage(
-      ""
-    );
-
-
-    setImportModalOpen(
-      true
-    );
+    setImportModalOpen(true);
   }
-
 
   // ====================================================
   // CLOSE IMPORT
   // ====================================================
 
   function closeImportModal() {
-
-    if (
-      importing
-    ) {
-
+    if (importing) {
       return;
     }
 
+    setImportModalOpen(false);
 
-    setImportModalOpen(
-      false
-    );
+    setImportFileList([]);
 
+    setImportResult(null);
 
-    setImportFileList(
-      []
-    );
+    setImportErrors([]);
 
-
-    setImportResult(
-      null
-    );
-
-
-    setImportErrors(
-      []
-    );
-
-
-    setImportMessage(
-      ""
-    );
+    setImportMessage("");
   }
-
 
   // ====================================================
   // IMPORT EXCEL
   // ====================================================
 
   async function handleImportExcel() {
+    const file = importFileList[0]?.originFileObj;
 
-    const file =
-      importFileList[0]
-        ?.originFileObj;
-
-
-    if (
-      !file
-    ) {
-
-      message.warning(
-        "Vui lòng chọn file Excel."
-      );
+    if (!file) {
+      message.warning("Vui lòng chọn file Excel.");
 
       return;
     }
 
-
-    if (
-      !file.name
-        .toLowerCase()
-        .endsWith(
-          ".xlsx"
-        )
-    ) {
-
-      message.error(
-        "Chỉ hỗ trợ file Excel .xlsx."
-      );
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      message.error("Chỉ hỗ trợ file Excel .xlsx.");
 
       return;
     }
-
 
     try {
+      setImporting(true);
 
-      setImporting(
-        true
-      );
+      setImportResult(null);
 
+      setImportErrors([]);
 
-      setImportResult(
-        null
-      );
+      setImportMessage("");
 
+      const formData = new FormData();
 
-      setImportErrors(
-        []
-      );
+      formData.append("file", file);
 
+      const response = await apiFetch("/catalog/services/import", {
+        method: "POST",
 
-      setImportMessage(
-        ""
-      );
+        body: formData,
+      });
 
-
-      const formData =
-        new FormData();
-
-
-      formData.append(
-        "file",
-        file
-      );
-
-
-      const response =
-        await apiFetch(
-          "/catalog/services/import",
-          {
-            method:
-              "POST",
-
-            body:
-              formData,
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
+      let json: any = null;
 
       try {
-
-        json =
-          await response.json();
-
+        json = await response.json();
       } catch {
-
         // Backend không trả JSON.
       }
 
+      if (!response.ok || json?.success !== true) {
+        const errors = Array.isArray(json?.errors) ? json.errors : [];
 
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
+        setImportErrors(errors);
 
-        const errors =
-          Array.isArray(
-            json?.errors
-          )
-            ? json.errors
-            : [];
+        setImportMessage(json?.message || "Import DVKT thất bại.");
 
-
-        setImportErrors(
-          errors
-        );
-
-
-        setImportMessage(
-          json?.message ||
-          "Import DVKT thất bại."
-        );
-
-
-        message.error(
-          json?.message ||
-          "Import DVKT thất bại."
-        );
-
+        message.error(json?.message || "Import DVKT thất bại.");
 
         return;
       }
 
+      const result: ServiceImportResult = {
+        totalRows: Number(json.data?.totalRows ?? 0),
 
-      const result:
-        ServiceImportResult = {
+        inserted: Number(json.data?.inserted ?? 0),
 
-        totalRows:
-          Number(
-            json.data
-              ?.totalRows ??
-            0
-          ),
+        updated: Number(json.data?.updated ?? 0),
 
-        inserted:
-          Number(
-            json.data
-              ?.inserted ??
-            0
-          ),
-
-        updated:
-          Number(
-            json.data
-              ?.updated ??
-            0
-          ),
-
-        skipped:
-          Number(
-            json.data
-              ?.skipped ??
-            0
-          ),
+        skipped: Number(json.data?.skipped ?? 0),
       };
 
+      setImportResult(result);
 
-      setImportResult(
-        result
-      );
+      setImportMessage(json?.message || "Import DVKT thành công.");
 
+      message.success(json?.message || "Import DVKT thành công.");
 
-      setImportMessage(
-        json?.message ||
-        "Import DVKT thành công."
-      );
-
-
-      message.success(
-        json?.message ||
-        "Import DVKT thành công."
-      );
-
-
-      if (
-        page !==
-        1
-      ) {
-
-        setPage(
-          1
-        );
-
+      if (page !== 1) {
+        setPage(1);
       } else {
-
         await loadServices();
       }
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Import DVKT thất bại.";
 
-    } catch (
-      error
-    ) {
+      setImportMessage(text);
 
-      const text =
-        error instanceof
-        Error
-          ? error.message
-          : "Import DVKT thất bại.";
-
-
-      setImportMessage(
-        text
-      );
-
-
-      message.error(
-        text
-      );
-
+      message.error(text);
     } finally {
-
-      setImporting(
-        false
-      );
+      setImporting(false);
     }
   }
-
 
   // ====================================================
   // TABLE COLUMNS
   // ====================================================
 
-  const columns:
-    TableColumnsType<
-      ServiceItem
-    > = [
-
+  const columns: TableColumnsType<ServiceItem> = [
     {
-      title:
-        "STT",
+      title: "STT",
 
-      key:
-        "stt",
+      key: "stt",
 
-      width:
-        60,
+      width: 60,
 
-      align:
-        "center",
+      align: "center",
 
-      fixed:
-        "left",
+      fixed: "left",
 
-      render:
-        (
-          _,
-          __,
-          index
-        ) =>
-          (
-            page -
-            1
-          ) *
-            pageSize +
-          index +
-          1,
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
 
+    {
+      title: "Mã dịch vụ",
+
+      dataIndex: "code",
+
+      key: "code",
+
+      width: 150,
+
+      fixed: "left",
+
+      render: (value: string) => <Text strong>{value || "-"}</Text>,
+    },
 
     {
-      title:
-        "Mã dịch vụ",
+      title: "Tên dịch vụ",
 
-      dataIndex:
-        "code",
+      dataIndex: "name",
 
-      key:
-        "code",
+      key: "name",
 
-      width:
-        150,
+      width: 300,
 
-      fixed:
-        "left",
+      ellipsis: true,
+    },
 
-      render:
-        (
-          value:
-            string
-        ) => (
-          <Text
-            strong
-          >
-            {
-              value ||
-              "-"
-            }
-          </Text>
+    {
+      title: "Mã 5937",
+
+      dataIndex: "groupCode",
+
+      key: "groupCode",
+
+      width: 100,
+
+      align: "center",
+
+      render: (value: string | null) => value ?? "-",
+    },
+
+    {
+      title: "Đơn giá",
+
+      dataIndex: "unitPrice",
+
+      key: "unitPrice",
+
+      width: 120,
+
+      align: "right",
+
+      render: (value: number) => Number(value ?? 0).toLocaleString("vi-VN"),
+    },
+
+    {
+      title: "Quyết định",
+
+      dataIndex: "decisionNo",
+
+      key: "decisionNo",
+
+      width: 220,
+
+      ellipsis: true,
+
+      render: (value: string | null) => value ?? "-",
+    },
+
+    {
+      title: "Mã máy",
+
+      dataIndex: "requiresMachine",
+
+      key: "requiresMachine",
+
+      width: 110,
+
+      align: "center",
+
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="blue" className="services-pill">
+            Bắt buộc
+          </Tag>
+        ) : (
+          <Tag className="services-pill">Không</Tag>
         ),
     },
 
-
     {
-      title:
-        "Tên dịch vụ",
+      title: "DS máy",
 
-      dataIndex:
-        "name",
+      dataIndex: "machines",
 
-      key:
-        "name",
+      key: "machines",
 
-      width:
-        300,
+      width: 210,
 
-      ellipsis:
-        true,
-    },
+      ellipsis: true,
 
-
-    {
-      title:
-        "Mã 5937",
-
-      dataIndex:
-        "groupCode",
-
-      key:
-        "groupCode",
-
-      width:
-        100,
-
-      align:
-        "center",
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ??
-          "-",
-    },
-
-
-    {
-      title:
-        "Đơn giá",
-
-      dataIndex:
-        "unitPrice",
-
-      key:
-        "unitPrice",
-
-      width:
-        120,
-
-      align:
-        "right",
-
-      render:
-        (
-          value:
-            number
-        ) =>
-          Number(
-            value ??
-            0
-          ).toLocaleString(
-            "vi-VN"
-          ),
-    },
-
-
-    {
-      title:
-        "Quyết định",
-
-      dataIndex:
-        "decisionNo",
-
-      key:
-        "decisionNo",
-
-      width:
-        220,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          value:
-            string |
-            null
-        ) =>
-          value ??
-          "-",
-    },
-
-
-    {
-      title:
-        "Mã máy",
-
-      dataIndex:
-        "requiresMachine",
-
-      key:
-        "requiresMachine",
-
-      width:
-        110,
-
-      align:
-        "center",
-
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="blue"
-                className="services-pill"
-              >
-                Bắt buộc
-              </Tag>
-            )
-            : (
-              <Tag
-                className="services-pill"
-              >
-                Không
-              </Tag>
-            ),
-    },
-
-
-    {
-      title:
-        "DS máy",
-
-      dataIndex:
-        "machines",
-
-      key:
-        "machines",
-
-      width:
-        210,
-
-      ellipsis:
-        true,
-
-      render:
-        (
-          machines:
-            MachineOption[]
-        ) => {
-
-        if (
-          !Array.isArray(
-            machines
-          ) ||
-          machines.length ===
-            0
-        ) {
-
+      render: (machines: MachineOption[]) => {
+        if (!Array.isArray(machines) || machines.length === 0) {
           return "-";
         }
 
-
-        const text =
-          machines
-            .map(
-              (
-                machine
-              ) =>
-                machine.code
-            )
-            .join(
-              ", "
-            );
-
+        const text = machines.map((machine) => machine.code).join(", ");
 
         return (
-          <Tooltip
-            title={
-              text
-            }
-          >
-            <Text
-              ellipsis
-            >
-              {
-                text
-              }
-            </Text>
+          <Tooltip title={text}>
+            <Text ellipsis>{text}</Text>
           </Tooltip>
         );
       },
     },
 
+    {
+      title: "Thời gian thực hiện",
+
+      key: "duration",
+
+      width: 170,
+
+      align: "center",
+
+      render: (_, record) => (
+        <Text>
+          {record.minDurationMinutes}
+          {" - "}
+          {record.maxDurationMinutes}
+          {" phút"}
+        </Text>
+      ),
+    },
 
     {
-      title:
-        "Thời gian thực hiện",
+      title: "Số ngày TH tiếp",
 
-      key:
-        "duration",
+      dataIndex: "nextExecutionDays",
 
-      width:
-        170,
+      key: "nextExecutionDays",
 
-      align:
-        "center",
+      width: 130,
 
-      render:
-        (
-          _,
-          record
-        ) => (
-          <Text>
-            {
-              record.minDurationMinutes
-            }
-            {" - "}
-            {
-              record.maxDurationMinutes
-            }
-            {" phút"}
-          </Text>
+      align: "center",
+    },
+
+    {
+      title: "Thực hiện cùng lúc",
+
+      dataIndex: "allowSimultaneous",
+
+      key: "allowSimultaneous",
+
+      width: 145,
+
+      align: "center",
+
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="warning" className="services-pill">
+            Có
+          </Tag>
+        ) : (
+          <Tag color="blue" className="services-pill">
+            Không
+          </Tag>
         ),
     },
 
-
     {
-      title:
-        "Số ngày TH tiếp",
+      title: "Trạng thái",
 
-      dataIndex:
-        "nextExecutionDays",
+      dataIndex: "active",
 
-      key:
-        "nextExecutionDays",
+      key: "active",
 
-      width:
-        130,
+      width: 105,
 
-      align:
-        "center",
+      fixed: "right",
+
+      align: "center",
+
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="success" className="services-pill">
+            Đang dùng
+          </Tag>
+        ) : (
+          <Tag className="services-pill">Ngừng dùng</Tag>
+        ),
     },
 
-
     {
-      title:
-        "Thực hiện cùng lúc",
+      title: "Thao tác",
 
-      dataIndex:
-        "allowSimultaneous",
+      key: "actions",
 
-      key:
-        "allowSimultaneous",
+      width: 100,
 
-      width:
-        145,
+      fixed: "right",
 
-      align:
-        "center",
+      align: "center",
 
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="warning"
-                className="services-pill"
-              >
-                Có
-              </Tag>
-            )
-            : (
-              <Tag
-                color="blue"
-                className="services-pill"
-              >
-                Không
-              </Tag>
-            ),
-    },
+      render: (_, record) => (
+        <Space size={8}>
+          <Tooltip title="Cập nhật">
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <EditOutlined
+                  style={{
+                    color: "#1677ff",
+                  }}
+                />
+              }
+              onClick={() => void openEditModal(record)}
+            />
+          </Tooltip>
 
-
-    {
-      title:
-        "Trạng thái",
-
-      dataIndex:
-        "active",
-
-      key:
-        "active",
-
-      width:
-        105,
-
-      fixed:
-        "right",
-
-      align:
-        "center",
-
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="success"
-                className="services-pill"
-              >
-                Đang dùng
-              </Tag>
-            )
-            : (
-              <Tag
-                className="services-pill"
-              >
-                Ngừng dùng
-              </Tag>
-            ),
-    },
-
-
-    {
-      title:
-        "Thao tác",
-
-      key:
-        "actions",
-
-      width:
-        100,
-
-      fixed:
-        "right",
-
-      align:
-        "center",
-
-      render:
-        (
-          _,
-          record
-        ) => (
-
-          <Space
-            size={
-              8
-            }
-          >
-
-            <Tooltip
-              title="Cập nhật"
+          <Tooltip title={record.active ? "Ngừng sử dụng" : "Đã ngừng sử dụng"}>
+            <Popconfirm
+              title="Ngừng sử dụng DVKT?"
+              description={`${record.code} - ${record.name}`}
+              okText="Đồng ý"
+              cancelText="Hủy"
+              disabled={!record.active}
+              onConfirm={() => void handleDisable(record)}
             >
               <Button
                 type="text"
-
                 size="small"
-
+                disabled={!record.active}
                 icon={
-                  <EditOutlined
+                  <StopOutlined
                     style={{
-                      color:
-                        "#1677ff",
+                      color: record.active ? "#ff4d4f" : "#bfbfbf",
                     }}
                   />
                 }
-
-                onClick={() =>
-                  void openEditModal(
-                    record
-                  )
-                }
               />
-            </Tooltip>
-
-
-            <Tooltip
-              title={
-                record.active
-                  ? "Ngừng sử dụng"
-                  : "Đã ngừng sử dụng"
-              }
-            >
-              <Popconfirm
-                title="Ngừng sử dụng DVKT?"
-
-                description={
-                  `${record.code} - ${record.name}`
-                }
-
-                okText="Đồng ý"
-
-                cancelText="Hủy"
-
-                disabled={
-                  !record.active
-                }
-
-                onConfirm={() =>
-                  void handleDisable(
-                    record
-                  )
-                }
-              >
-                <Button
-                  type="text"
-
-                  size="small"
-
-                  disabled={
-                    !record.active
-                  }
-
-                  icon={
-                    <StopOutlined
-                      style={{
-                        color:
-                          record.active
-                            ? "#ff4d4f"
-                            : "#bfbfbf",
-                      }}
-                    />
-                  }
-                />
-              </Popconfirm>
-            </Tooltip>
-
-          </Space>
-        ),
+            </Popconfirm>
+          </Tooltip>
+        </Space>
+      ),
     },
   ];
-
 
   // ====================================================
   // UI
@@ -2020,306 +953,140 @@ export default function Services() {
 
   return (
     <>
-
-      <div
-        className="services-page"
-      >
-
+      <div className="services-page">
         {/* =================================================
             BREADCRUMB
         ================================================= */}
 
         <Breadcrumb
           className="services-breadcrumb"
-
           items={[
             {
-              title: (
-                <HomeOutlined />
-              ),
+              title: <HomeOutlined />,
             },
 
             {
-              title:
-                "Danh mục",
+              title: "Danh mục",
             },
 
             {
-              title:
-                "Dịch vụ kỹ thuật",
+              title: "Dịch vụ kỹ thuật",
             },
           ]}
         />
-
 
         {/* =================================================
             HEADER
         ================================================= */}
 
-        <div
-          className="services-header"
-        >
-
+        <div className="services-header">
           <div>
-
-            <div
-              className="services-title-row"
-            >
-
-              <MedicineBoxOutlined
-                className="services-title-icon"
-              />
-
+            <div className="services-title-row">
+              <MedicineBoxOutlined className="services-title-icon" />
 
               <Title
-                level={
-                  3
-                }
-
+                level={3}
                 style={{
-                  margin:
-                    0,
+                  margin: 0,
                 }}
               >
                 Dịch vụ kỹ thuật
               </Title>
-
             </div>
 
-
-            <Text
-              type="secondary"
-
-              className="services-subtitle"
-            >
+            <Text type="secondary" className="services-subtitle">
               Quản lý danh mục dịch vụ kỹ thuật và cấu hình kiểm tra
             </Text>
-
           </div>
 
-
-          <Space
-            size={
-              8
-            }
-          >
-
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              onClick={
-                openImportModal
-              }
-            >
+          <Space size={8}>
+            <Button icon={<UploadOutlined />} onClick={openImportModal}>
               Import Excel
             </Button>
 
-
-            <Button
-              type="primary"
-
-              icon={
-                <PlusOutlined />
-              }
-
-              onClick={
-                openAddModal
-              }
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
               Thêm mới
             </Button>
-
           </Space>
-
         </div>
-
 
         {/* =================================================
             FILTER
         ================================================= */}
 
-        <div
-          className="services-filter-grid"
-        >
-
-          <div
-            className="services-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="services-filter-label"
-            >
+        <div className="services-filter-grid">
+          <div className="services-filter-item">
+            <Text strong className="services-filter-label">
               Tên dịch vụ
             </Text>
 
-
             <Input
-              value={
-                searchName
-              }
-
+              value={searchName}
               placeholder="Nhập tên dịch vụ"
-
               allowClear
+              onChange={(event) => {
+                setSearchName(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchName(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="services-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="services-filter-label"
-            >
+          <div className="services-filter-item">
+            <Text strong className="services-filter-label">
               Mã dịch vụ
             </Text>
 
-
             <Input
-              value={
-                searchCode
-              }
-
+              value={searchCode}
               placeholder="Nhập mã dịch vụ"
-
               allowClear
+              onChange={(event) => {
+                setSearchCode(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchCode(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="services-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="services-filter-label"
-            >
+          <div className="services-filter-item">
+            <Text strong className="services-filter-label">
               Quyết định
             </Text>
 
-
             <Input
-              value={
-                searchDecision
-              }
-
+              value={searchDecision}
               placeholder="Nhập quyết định"
-
               allowClear
+              onChange={(event) => {
+                setSearchDecision(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchDecision(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="services-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="services-filter-label"
-            >
+          <div className="services-filter-item">
+            <Text strong className="services-filter-label">
               Mã nhóm 5937
             </Text>
 
-
             <Input
-              value={
-                searchGroupCode
-              }
-
+              value={searchGroupCode}
               placeholder="Mã nhóm"
-
               allowClear
+              onChange={(event) => {
+                setSearchGroupCode(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchGroupCode(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <Button
-            type="primary"
-
-            icon={
-              <ReloadOutlined />
-            }
-
-            onClick={
-              handleRefresh
-            }
-          >
+          <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
             Làm mới
           </Button>
-
         </div>
-
 
         {/* =================================================
             TABLE
@@ -2327,219 +1094,96 @@ export default function Services() {
 
         <Table<ServiceItem>
           className="services-table"
-
           rowKey="code"
-
           size="middle"
-
           tableLayout="fixed"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            items
-          }
-
-          columns={
-            columns
-          }
-
+          loading={loading}
+          dataSource={items}
+          columns={columns}
           scroll={{
-            x:
-              1850,
+            x: 1850,
           }}
-
           pagination={{
-            current:
-              page,
+            current: page,
 
             pageSize,
 
             total,
 
-            showSizeChanger:
-              true,
+            showSizeChanger: true,
 
-            pageSizeOptions: [
-              "10",
-              "50",
-              "100",
-            ],
+            pageSizeOptions: ["10", "50", "100"],
 
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
+            showTotal: (value) => `Tổng số: ${value}`,
 
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
+            onChange: (newPage, newPageSize) => {
+              if (newPageSize !== pageSize) {
+                setPageSize(newPageSize);
 
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
+                setPage(1);
 
-                  setPageSize(
-                    newPageSize
-                  );
+                return;
+              }
 
-
-                  setPage(
-                    1
-                  );
-
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
+              setPage(newPage);
+            },
           }}
-
           locale={{
-            emptyText:
-              "Chưa có dữ liệu dịch vụ kỹ thuật",
+            emptyText: "Chưa có dữ liệu dịch vụ kỹ thuật",
           }}
         />
-
       </div>
-
 
       {/* =================================================
           ADD / EDIT MODAL
       ================================================= */}
 
       <Modal
-        open={
-          modalOpen
-        }
-
-        title={
-          editingService
-            ? "Cập nhật Dịch vụ Kỹ thuật"
-            : "Thêm Dịch vụ Kỹ thuật"
-        }
-
-        width={
-          1000
-        }
-
-        okText={
-          editingService
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
+        open={modalOpen}
+        title={editingService ? "Cập nhật Dịch vụ Kỹ thuật" : "Thêm Dịch vụ Kỹ thuật"}
+        width={1000}
+        okText={editingService ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
+        confirmLoading={saving}
+        onOk={() => void handleSave()}
         onCancel={() => {
-
-          if (
-            saving
-          ) {
-
+          if (saving) {
             return;
           }
 
+          setModalOpen(false);
 
-          setModalOpen(
-            false
-          );
-
-
-          setEditingService(
-            null
-          );
-
+          setEditingService(null);
 
           form.resetFields();
         }}
       >
-
-        <Form
-          form={
-            form
-          }
-
-          layout="vertical"
-
-          requiredMark={
-            false
-          }
-
-          className="services-form"
-        >
-
+        <Form form={form} layout="vertical" requiredMark={false} className="services-form">
           {/* =============================================
               CODE / GROUP
           ============================================= */}
 
-          <div
-            className="services-form-grid services-form-grid-2"
-          >
-
+          <div className="services-form-grid services-form-grid-2">
             <Form.Item
               label="Mã dịch vụ"
-
               name="code"
-
               rules={[
                 {
-                  required:
-                    true,
+                  required: true,
 
-                  whitespace:
-                    true,
+                  whitespace: true,
 
-                  message:
-                    "Vui lòng nhập mã dịch vụ.",
+                  message: "Vui lòng nhập mã dịch vụ.",
                 },
               ]}
             >
-
-              <Input
-                placeholder="Mã dịch vụ"
-
-                disabled={
-                  editingService !==
-                  null
-                }
-              />
-
+              <Input placeholder="Mã dịch vụ" disabled={editingService !== null} />
             </Form.Item>
 
-
-            <Form.Item
-              label="Mã nhóm 5937"
-
-              name="groupCode"
-            >
-
-              <Input
-                placeholder="Mã nhóm 5937"
-              />
-
+            <Form.Item label="Mã nhóm 5937" name="groupCode">
+              <Input placeholder="Mã nhóm 5937" />
             </Form.Item>
-
           </div>
-
 
           {/* =============================================
               NAME
@@ -2547,689 +1191,325 @@ export default function Services() {
 
           <Form.Item
             label="Tên dịch vụ"
-
             name="name"
-
             rules={[
               {
-                required:
-                  true,
+                required: true,
 
-                whitespace:
-                  true,
+                whitespace: true,
 
-                message:
-                  "Vui lòng nhập tên dịch vụ.",
+                message: "Vui lòng nhập tên dịch vụ.",
               },
             ]}
           >
-
-            <Input
-              placeholder="Tên dịch vụ kỹ thuật"
-            />
-
+            <Input placeholder="Tên dịch vụ kỹ thuật" />
           </Form.Item>
-
 
           {/* =============================================
               PRICE / DECISION / NEXT DAYS
           ============================================= */}
 
-          <div
-            className="services-form-grid services-form-grid-3"
-          >
-
+          <div className="services-form-grid services-form-grid-3">
             <Form.Item
               label="Đơn giá"
-
               name="unitPrice"
-
               rules={[
                 {
-                  type:
-                    "number",
+                  type: "number",
 
-                  min:
-                    0,
+                  min: 0,
 
-                  message:
-                    "Đơn giá không hợp lệ.",
+                  message: "Đơn giá không hợp lệ.",
                 },
               ]}
             >
-
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="Quyết định"
-
-              name="decisionNo"
-            >
-
-              <Input
-                placeholder="Số quyết định"
-              />
-
+            <Form.Item label="Quyết định" name="decisionNo">
+              <Input placeholder="Số quyết định" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Số ngày thực hiện tiếp theo"
-
-              name="nextExecutionDays"
-            >
-
+            <Form.Item label="Số ngày thực hiện tiếp theo" name="nextExecutionDays">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
-
           </div>
-
 
           {/* =============================================
               MACHINE / DURATION
           ============================================= */}
 
-          <div
-            className="services-form-grid services-form-grid-4"
-          >
-
-            <Form.Item
-              label="Mã máy"
-
-              name="requiresMachine"
-
-              valuePropName="checked"
-            >
-
-              <Switch
-                checkedChildren="Bắt buộc"
-
-                unCheckedChildren="Không"
-              />
-
+          <div className="services-form-grid services-form-grid-4">
+            <Form.Item label="Mã máy" name="requiresMachine" valuePropName="checked">
+              <Switch checkedChildren="Bắt buộc" unCheckedChildren="Không" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Thực hiện cùng lúc"
-
-              name="allowSimultaneous"
-
-              valuePropName="checked"
-            >
-
-              <Switch
-                checkedChildren="Có"
-
-                unCheckedChildren="Không"
-              />
-
+            <Form.Item label="Thực hiện cùng lúc" name="allowSimultaneous" valuePropName="checked">
+              <Switch checkedChildren="Có" unCheckedChildren="Không" />
             </Form.Item>
 
-
-            <Form.Item
-              label="Min TG thực hiện (phút)"
-
-              name="minDurationMinutes"
-            >
-
+            <Form.Item label="Min TG thực hiện (phút)" name="minDurationMinutes">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
 
-
-            <Form.Item
-              label="Max TG thực hiện (phút)"
-
-              name="maxDurationMinutes"
-            >
-
+            <Form.Item label="Max TG thực hiện (phút)" name="maxDurationMinutes">
               <InputNumber
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
               />
-
             </Form.Item>
-
           </div>
-
 
           {/* =============================================
               MACHINE LIST
           ============================================= */}
 
-          <Form.Item
-            label="Danh mục mã máy"
-
-            name="machineCodes"
-          >
-
+          <Form.Item label="Danh mục mã máy" name="machineCodes">
             <Select
               mode="multiple"
-
               allowClear
-
               showSearch
-
-              disabled={
-                !requiresMachine
-              }
-
+              disabled={!requiresMachine}
               optionFilterProp="label"
-
               placeholder={
-                requiresMachine
-                  ? "Chọn một hoặc nhiều máy"
-                  : "DVKT không yêu cầu mã máy"
+                requiresMachine ? "Chọn một hoặc nhiều máy" : "DVKT không yêu cầu mã máy"
               }
+              options={machineOptions.map((machine) => ({
+                value: machine.code,
 
-              options={
-                machineOptions.map(
-                  (
-                    machine
-                  ) => ({
-                    value:
-                      machine.code,
-
-                    label:
-                      `${machine.code} - ${machine.name}`,
-                  })
-                )
-              }
+                label: `${machine.code} - ${machine.name}`,
+              }))}
             />
-
           </Form.Item>
-
 
           {/* =============================================
               NOTE
           ============================================= */}
 
-          <Form.Item
-            label="Ghi chú"
-
-            name="note"
-          >
-
-            <Input.TextArea
-              rows={
-                2
-              }
-
-              placeholder="Ghi chú"
-            />
-
+          <Form.Item label="Ghi chú" name="note">
+            <Input.TextArea rows={2} placeholder="Ghi chú" />
           </Form.Item>
-
 
           {/* =============================================
               ACTIVE
           ============================================= */}
 
-          <Form.Item
-            label="Đang sử dụng"
-
-            name="active"
-
-            valuePropName="checked"
-          >
-
+          <Form.Item label="Đang sử dụng" name="active" valuePropName="checked">
             <Switch />
-
           </Form.Item>
-
         </Form>
-
       </Modal>
-
 
       {/* =================================================
           IMPORT EXCEL MODAL
       ================================================= */}
 
       <Modal
-        open={
-          importModalOpen
-        }
-
+        open={importModalOpen}
         title="Import Danh mục Dịch vụ Kỹ thuật"
-
-        width={
-          900
-        }
-
+        width={900}
         okText="Import"
-
         cancelText="Đóng"
-
-        confirmLoading={
-          importing
-        }
-
+        confirmLoading={importing}
         okButtonProps={{
-          disabled:
-            importFileList.length ===
-              0 ||
-            importResult !==
-              null,
+          disabled: importFileList.length === 0 || importResult !== null,
         }}
-
-        onOk={() =>
-          void handleImportExcel()
-        }
-
-        onCancel={
-          closeImportModal
-        }
+        onOk={() => void handleImportExcel()}
+        onCancel={closeImportModal}
       >
-
         <div
           style={{
-            marginTop:
-              16,
+            marginTop: 16,
           }}
         >
-
           <Alert
             type="info"
-
             showIcon
-
-            message="Import Danh mục Dịch vụ Kỹ thuật từ Excel"
-
+            title="Import Danh mục Dịch vụ Kỹ thuật từ Excel"
             description={
               <>
-                Hệ thống tự nhận diện sheet có cột{" "}
-                <b>
-                  MA_TUONG_DUONG
-                </b>.
-                {" "}
-
-                File mẫu hiện tại có 791 DVKT.
-                {" "}
-
-                Hệ thống sử dụng{" "}
-                <b>
-                  TEN_DVKT_PHEDUYET
-                </b>{" "}
-                làm tên dịch vụ,{" "}
-
-                <b>
-                  DON_GIA
-                </b>{" "}
-                làm đơn giá và{" "}
-
-                <b>
-                  QUYET_DINH
-                </b>{" "}
-                làm số quyết định.
-                {" "}
-
-                Mã đã tồn tại sẽ được cập nhật,
-                mã mới sẽ được thêm.
-                {" "}
-
-                Các cấu hình riêng của MedGuard như
-                Mã 5937, mã máy, thời gian thực hiện
-                và thực hiện cùng lúc sẽ được giữ nguyên.
-                {" "}
-
-                Nếu file có lỗi thì toàn bộ lần import
-                sẽ bị hủy.
+                Hệ thống tự nhận diện sheet có cột <b>MA_TUONG_DUONG</b>. File mẫu hiện tại có 791
+                DVKT. Hệ thống sử dụng <b>TEN_DVKT_PHEDUYET</b> làm tên dịch vụ, <b>DON_GIA</b> làm
+                đơn giá và <b>QUYET_DINH</b> làm số quyết định. Mã đã tồn tại sẽ được cập nhật, mã
+                mới sẽ được thêm. Các cấu hình riêng của MedGuard như Mã 5937, mã máy, thời gian
+                thực hiện và thực hiện cùng lúc sẽ được giữ nguyên. Nếu file có lỗi thì toàn bộ lần
+                import sẽ bị hủy.
               </>
             }
-
             style={{
-              marginBottom:
-                16,
+              marginBottom: 16,
             }}
           />
 
-
           <Upload
             accept=".xlsx"
-
-            maxCount={
-              1
-            }
-
-            fileList={
-              importFileList
-            }
-
-            beforeUpload={() =>
-              false
-            }
-
-            disabled={
-              importing
-            }
-
+            maxCount={1}
+            fileList={importFileList}
+            beforeUpload={() => false}
+            disabled={importing}
             onRemove={() => {
+              setImportFileList([]);
 
-              setImportFileList(
-                []
-              );
+              setImportResult(null);
 
+              setImportErrors([]);
 
-              setImportResult(
-                null
-              );
-
-
-              setImportErrors(
-                []
-              );
-
-
-              setImportMessage(
-                ""
-              );
-
+              setImportMessage("");
 
               return true;
             }}
+            onChange={(info) => {
+              setImportFileList(info.fileList.slice(-1));
 
-            onChange={(
-              info
-            ) => {
+              setImportResult(null);
 
-              setImportFileList(
-                info.fileList.slice(
-                  -1
-                )
-              );
+              setImportErrors([]);
 
-
-              setImportResult(
-                null
-              );
-
-
-              setImportErrors(
-                []
-              );
-
-
-              setImportMessage(
-                ""
-              );
+              setImportMessage("");
             }}
           >
-
-            <Button
-              icon={
-                <UploadOutlined />
-              }
-
-              disabled={
-                importing
-              }
-            >
+            <Button icon={<UploadOutlined />} disabled={importing}>
               Chọn file Excel
             </Button>
-
           </Upload>
-
 
           {/* =============================================
               SUCCESS
           ============================================= */}
 
           {importResult && (
-
             <Alert
               type="success"
-
               showIcon
-
               className="services-import-alert"
-
-              message={
-                importMessage ||
-                "Import DVKT thành công."
-              }
-
+              title={importMessage || "Import DVKT thành công."}
               description={
-
-                <div
-                  className="services-import-summary"
-                >
-
+                <div className="services-import-summary">
                   <div>
-                    <span>
-                      Tổng số DVKT
-                    </span>
+                    <span>Tổng số DVKT</span>
 
-                    <b>
-                      {
-                        importResult.totalRows
-                      }
-                    </b>
+                    <b>{importResult.totalRows}</b>
                   </div>
 
-
                   <div>
-                    <span>
-                      Thêm mới
-                    </span>
+                    <span>Thêm mới</span>
 
-                    <b>
-                      {
-                        importResult.inserted
-                      }
-                    </b>
+                    <b>{importResult.inserted}</b>
                   </div>
 
-
                   <div>
-                    <span>
-                      Cập nhật
-                    </span>
+                    <span>Cập nhật</span>
 
-                    <b>
-                      {
-                        importResult.updated
-                      }
-                    </b>
+                    <b>{importResult.updated}</b>
                   </div>
 
-
                   <div>
-                    <span>
-                      Bỏ qua
-                    </span>
+                    <span>Bỏ qua</span>
 
-                    <b>
-                      {
-                        importResult.skipped
-                      }
-                    </b>
+                    <b>{importResult.skipped}</b>
                   </div>
-
                 </div>
               }
             />
-
           )}
-
 
           {/* =============================================
               GENERAL ERROR
           ============================================= */}
 
-          {!importResult &&
-            importMessage &&
-            importErrors.length ===
-              0 && (
-
-              <Alert
-                type="error"
-
-                showIcon
-
-                message={
-                  importMessage
-                }
-
-                style={{
-                  marginTop:
-                    20,
-                }}
-              />
-
-            )}
-
+          {!importResult && importMessage && importErrors.length === 0 && (
+            <Alert
+              type="error"
+              showIcon
+              title={importMessage}
+              style={{
+                marginTop: 20,
+              }}
+            />
+          )}
 
           {/* =============================================
               ROW ERRORS
           ============================================= */}
 
-          {importErrors.length >
-            0 && (
-
+          {importErrors.length > 0 && (
             <div
               style={{
-                marginTop:
-                  20,
+                marginTop: 20,
               }}
             >
-
               <Alert
                 type="error"
-
                 showIcon
-
-                message={
-                  importMessage ||
-                  `File có ${importErrors.length} lỗi.`
-                }
-
+                title={importMessage || `File có ${importErrors.length} lỗi.`}
                 description="Không có DVKT nào được import. Hãy sửa các dòng lỗi rồi import lại."
-
                 style={{
-                  marginBottom:
-                    12,
+                  marginBottom: 12,
                 }}
               />
-
 
               <Table<ServiceImportError>
                 className="services-import-table"
-
                 size="small"
-
-                rowKey={(
-                  record,
-                  index
-                ) =>
-                  `${record.row}-${record.field}-${index}`
-                }
-
-                dataSource={
-                  importErrors
-                }
-
+                rowKey={(record, index) => `${record.row}-${record.field}-${index}`}
+                dataSource={importErrors}
                 pagination={{
-                  pageSize:
-                    10,
+                  pageSize: 10,
 
-                  showSizeChanger:
-                    false,
+                  showSizeChanger: false,
 
-                  showTotal:
-                    (
-                      value
-                    ) =>
-                      `Tổng lỗi: ${value}`,
+                  showTotal: (value) => `Tổng lỗi: ${value}`,
                 }}
-
                 scroll={{
-                  y:
-                    320,
+                  y: 320,
                 }}
-
                 columns={[
                   {
-                    title:
-                      "Dòng",
+                    title: "Dòng",
 
-                    dataIndex:
-                      "row",
+                    dataIndex: "row",
 
-                    width:
-                      80,
+                    width: 80,
 
-                    align:
-                      "center",
+                    align: "center",
                   },
 
                   {
-                    title:
-                      "Cột",
+                    title: "Cột",
 
-                    dataIndex:
-                      "field",
+                    dataIndex: "field",
 
-                    width:
-                      220,
+                    width: 220,
                   },
 
                   {
-                    title:
-                      "Lỗi",
+                    title: "Lỗi",
 
-                    dataIndex:
-                      "message",
+                    dataIndex: "message",
                   },
                 ]}
               />
-
             </div>
-
           )}
-
         </div>
-
       </Modal>
-
 
       {/* =================================================
           STYLE
@@ -3471,7 +1751,6 @@ export default function Services() {
           }
         `}
       </style>
-
     </>
   );
 }

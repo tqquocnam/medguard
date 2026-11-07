@@ -1,4 +1,5 @@
 import {
+  CheckCircleOutlined,
   LockOutlined,
   LogoutOutlined,
   PlusOutlined,
@@ -7,2585 +8,1085 @@ import {
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-
 import {
+  Alert,
+  Avatar,
   Button,
   Card,
   Form,
   Input,
   Modal,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tag,
   Typography,
   message,
 } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import type {
-  ColumnsType,
-} from "antd/es/table";
-
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import {
-  useNavigate,
-} from "react-router-dom";
-
-import {
-  useAuth,
-} from "../auth/AuthContext";
-
-import {
-  apiFetch,
-} from "../api/apiClient";
-
+import { apiFetch } from "../api/apiClient";
+import { useAuth } from "../auth/AuthContext";
 
 interface AccountUser {
   id: string;
-
   username: string;
-
-  full_name?:
-    string |
-    null;
-
-  role:
-    | "ADMIN"
-    | "USER"
-    | string;
-
-  active:
-    boolean;
-
-  last_login_at?:
-    string |
-    null;
-
-  created_at?:
-    string |
-    null;
+  full_name?: string | null;
+  role?: string;
+  branch_id?: string | null;
+  active: boolean;
+  last_login_at?: string | null;
+  created_at?: string | null;
 }
-
 
 interface CreateUserForm {
-  username:
-    string;
-
-  fullName?:
-    string;
-
-  password:
-    string;
-
-  role:
-    | "ADMIN"
-    | "USER";
+  username: string;
+  fullName?: string;
+  password: string;
 }
-
 
 interface ChangePasswordForm {
-  oldPassword:
-    string;
-
-  newPassword:
-    string;
-
-  confirmPassword:
-    string;
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 }
-
 
 interface ResetPasswordForm {
-  password:
-    string;
-
-  confirmPassword:
-    string;
+  password: string;
+  confirmPassword: string;
 }
 
+interface ApiResponse<T> {
+  success?: boolean;
+  message?: string;
+  data?: T;
+}
+
+async function request<T>(
+  path: string,
+  fallbackMessage: string,
+  options?: RequestInit,
+): Promise<ApiResponse<T>> {
+  const response = await apiFetch(path, options);
+
+  const json = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+
+  if (!response.ok || json?.success !== true) {
+    throw new Error(json?.message || fallbackMessage);
+  }
+
+  return json;
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("vi-VN");
+}
+
+const jsonHeaders = {
+  "Content-Type": "application/json",
+};
 
 export default function Account() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [messageApi, contextHolder] = message.useMessage();
 
+  const [users, setUsers] = useState<AccountUser[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [updatingAccountId, setUpdatingAccountId] = useState<string | null>(null);
 
-  const {
-    user,
-    logout,
-  } =
-    useAuth();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<AccountUser | null>(null);
 
+  const [createForm] = Form.useForm<CreateUserForm>();
+  const [changePasswordForm] = Form.useForm<ChangePasswordForm>();
+  const [resetPasswordForm] = Form.useForm<ResetPasswordForm>();
 
-  const [
-    users,
-    setUsers,
-  ] =
-    useState<
-      AccountUser[]
-    >([]);
+  const branchId = user?.branchId || "";
+  const branchName = user?.branchName || "";
 
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      false
-    );
-
-
-  const [
-    createOpen,
-    setCreateOpen,
-  ] =
-    useState(
-      false
-    );
-
-
-  const [
-    changePasswordOpen,
-    setChangePasswordOpen,
-  ] =
-    useState(
-      false
-    );
-
-
-  const [
-    resetPasswordUser,
-    setResetPasswordUser,
-  ] =
-    useState<
-      AccountUser |
-      null
-    >(
-      null
-    );
-
-
-  const [
-    createForm,
-  ] =
-    Form.useForm<
-      CreateUserForm
-    >();
-
-
-  const [
-    changePasswordForm,
-  ] =
-    Form.useForm<
-      ChangePasswordForm
-    >();
-
-
-  const [
-    resetPasswordForm,
-  ] =
-    Form.useForm<
-      ResetPasswordForm
-    >();
-
-
-  const isAdmin =
-    user?.role ===
-    "ADMIN";
-
-
-  function formatDate(
-    value?:
-      string |
-      null
-  ) {
-    if (
-      !value
-    ) {
-      return "-";
-    }
-
-
-    const date =
-      new Date(
-        value
-      );
-
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return value;
-    }
-
-
-    return date.toLocaleString(
-      "vi-VN"
-    );
-  }
-
-
-  async function readJson(
-    response:
-      Response
-  ) {
-    try {
-      return await response.json();
-    } catch {
-      return null;
-    }
-  }
-
-
-  async function loadUsers() {
-    if (
-      !isAdmin
-    ) {
-      return;
-    }
-
-
-    try {
-      setLoading(
-        true
-      );
-
-
-      const response =
-        await apiFetch(
-          "/auth/users",
-          {
-            method:
-              "GET",
-          }
-        );
-
-
-      const json =
-        await readJson(
-          response
-        );
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể tải danh sách tài khoản."
-        );
+  const loadUsers = useCallback(
+    async (signal?: AbortSignal): Promise<void> => {
+      if (!user?.id || !branchId) {
+        setUsers([]);
+        return;
       }
 
+      setLoading(true);
 
-      setUsers(
-        Array.isArray(
-          json?.data
-        )
-          ? json.data
-          : []
-      );
+      try {
+        const json = await request<AccountUser[]>(
+          "/auth/users",
+          "Không thể tải danh sách tài khoản.",
+          {
+            method: "GET",
+            cache: "no-store",
+            signal,
+          },
+        );
 
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải danh sách tài khoản."
-      );
-
-    } finally {
-      setLoading(
-        false
-      );
-    }
-  }
-
-
-  useEffect(
-    () => {
-      void loadUsers();
+        if (!signal?.aborted) {
+          setUsers(Array.isArray(json.data) ? json.data : []);
+        }
+      } catch (error) {
+        if (!signal?.aborted) {
+          setUsers([]);
+          void messageApi.error(errorMessage(error, "Không thể tải danh sách tài khoản."));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
     },
-    [
-      isAdmin,
-    ]
+    [user?.id, branchId, messageApi],
   );
 
+  useEffect(() => {
+    const controller = new AbortController();
 
-  const accountSummary =
-    useMemo(
-      () => {
-        const total =
-          users.length;
+    setUsers([]);
+    setCreateOpen(false);
+    setChangePasswordOpen(false);
+    setResetPasswordUser(null);
 
+    void loadUsers(controller.signal);
 
-        const active =
-          users.filter(
-            (
-              item
-            ) =>
-              item.active
-          ).length;
+    return () => controller.abort();
+  }, [loadUsers]);
 
+  const summary = useMemo(() => {
+    const active = users.filter((account) => account.active).length;
 
-        const locked =
-          users.filter(
-            (
-              item
-            ) =>
-              !item.active
-          ).length;
+    return {
+      total: users.length,
+      active,
+      locked: users.length - active,
+    };
+  }, [users]);
 
+  async function handleCreateUser(values: CreateUserForm): Promise<void> {
+    if (!branchId) {
+      void messageApi.error("Chưa xác định chi nhánh đăng nhập.");
+      return;
+    }
 
-        const admins =
-          users.filter(
-            (
-              item
-            ) =>
-              item.role ===
-              "ADMIN"
-          ).length;
+    setCreating(true);
 
-
-        return {
-          total,
-          active,
-          locked,
-          admins,
-        };
-      },
-      [
-        users,
-      ]
-    );
-
-
-  async function handleCreateUser(
-    values:
-      CreateUserForm
-  ) {
     try {
-      setLoading(
-        true
-      );
+      await request("/auth/users", "Không thể tạo tài khoản.", {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          username: values.username.trim(),
+          fullName: values.fullName?.trim() || undefined,
+          password: values.password,
+          role: "ADMIN",
+        }),
+      });
 
-
-      const response =
-        await apiFetch(
-          "/auth/users",
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify(
-                values
-              ),
-          }
-        );
-
-
-      const json =
-        await readJson(
-          response
-        );
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể tạo tài khoản."
-        );
-      }
-
-
-      message.success(
-        "Tạo tài khoản thành công."
-      );
-
-
-      setCreateOpen(
-        false
-      );
-
-
+      void messageApi.success("Tạo tài khoản thành công.");
+      setCreateOpen(false);
       createForm.resetFields();
 
-
       await loadUsers();
-
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể tạo tài khoản."
-      );
-
+    } catch (error) {
+      void messageApi.error(errorMessage(error, "Không thể tạo tài khoản."));
     } finally {
-      setLoading(
-        false
-      );
+      setCreating(false);
     }
   }
 
-
-  async function handleActive(
-    account:
-      AccountUser
-  ) {
-    try {
-      const response =
-        await apiFetch(
-          `/auth/users/${account.id}/active`,
-          {
-            method:
-              "PATCH",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                active:
-                  !account.active,
-              }),
-          }
-        );
-
-
-      const json =
-        await readJson(
-          response
-        );
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể cập nhật tài khoản."
-        );
-      }
-
-
-      message.success(
-        json?.message ||
-        "Đã cập nhật tài khoản."
-      );
-
-
-      await loadUsers();
-
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể cập nhật tài khoản."
-      );
-    }
-  }
-
-
-  async function handleRole(
-    account:
-      AccountUser,
-
-    role:
-      string
-  ) {
-    try {
-      const response =
-        await apiFetch(
-          `/auth/users/${account.id}/role`,
-          {
-            method:
-              "PATCH",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                role,
-              }),
-          }
-        );
-
-
-      const json =
-        await readJson(
-          response
-        );
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể cập nhật quyền."
-        );
-      }
-
-
-      message.success(
-        "Cập nhật quyền thành công."
-      );
-
-
-      await loadUsers();
-
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể cập nhật quyền."
-      );
-    }
-  }
-
-
-  async function handleResetPassword(
-    values:
-      ResetPasswordForm
-  ) {
-    if (
-      !resetPasswordUser
-    ) {
+  async function handleActive(account: AccountUser): Promise<void> {
+    if (account.id === user?.id) {
+      void messageApi.error("Bạn không thể khóa tài khoản đang đăng nhập.");
       return;
     }
 
+    setUpdatingAccountId(account.id);
 
-    if (
-      values.password !==
-      values.confirmPassword
-    ) {
-      message.error(
-        "Xác nhận mật khẩu không khớp."
+    try {
+      await request(
+        `/auth/users/${account.id}/active`,
+        "Không thể cập nhật trạng thái tài khoản.",
+        {
+          method: "PATCH",
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            active: !account.active,
+          }),
+        },
       );
 
+      void messageApi.success(account.active ? "Đã khóa tài khoản." : "Đã mở lại tài khoản.");
+
+      await loadUsers();
+    } catch (error) {
+      void messageApi.error(errorMessage(error, "Không thể cập nhật trạng thái tài khoản."));
+    } finally {
+      setUpdatingAccountId(null);
+    }
+  }
+
+  async function handleResetPassword(values: ResetPasswordForm): Promise<void> {
+    if (!resetPasswordUser) return;
+
+    if (values.password !== values.confirmPassword) {
+      void messageApi.error("Xác nhận mật khẩu không khớp.");
       return;
     }
 
+    setResettingPassword(true);
 
     try {
-      setLoading(
-        true
+      await request(
+        `/auth/users/${resetPasswordUser.id}/reset-password`,
+        "Không thể đặt lại mật khẩu.",
+        {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            password: values.password,
+          }),
+        },
       );
 
-
-      const response =
-        await apiFetch(
-          `/auth/users/${resetPasswordUser.id}/reset-password`,
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                password:
-                  values.password,
-              }),
-          }
-        );
-
-
-      const json =
-        await readJson(
-          response
-        );
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể đặt lại mật khẩu."
-        );
-      }
-
-
-      message.success(
-        "Đặt lại mật khẩu thành công."
-      );
-
-
-      setResetPasswordUser(
-        null
-      );
-
-
-      resetPasswordForm
-        .resetFields();
-
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Không thể đặt lại mật khẩu."
-      );
-
+      void messageApi.success("Đặt lại mật khẩu thành công.");
+      setResetPasswordUser(null);
+      resetPasswordForm.resetFields();
+    } catch (error) {
+      void messageApi.error(errorMessage(error, "Không thể đặt lại mật khẩu."));
     } finally {
-      setLoading(
-        false
-      );
+      setResettingPassword(false);
     }
   }
 
-
-  async function handleChangePassword(
-    values:
-      ChangePasswordForm
-  ) {
-    if (
-      values.newPassword !==
-      values.confirmPassword
-    ) {
-      message.error(
-        "Xác nhận mật khẩu mới không khớp."
-      );
-
+  async function handleChangePassword(values: ChangePasswordForm): Promise<void> {
+    if (values.newPassword !== values.confirmPassword) {
+      void messageApi.error("Xác nhận mật khẩu mới không khớp.");
       return;
     }
 
+    setChangingPassword(true);
 
     try {
-      setLoading(
-        true
-      );
+      await request("/auth/change-password", "Không thể đổi mật khẩu.", {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          oldPassword: values.oldPassword,
+          newPassword: values.newPassword,
+        }),
+      });
 
-
-      const response =
-        await apiFetch(
-          "/auth/change-password",
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                oldPassword:
-                  values.oldPassword,
-
-                newPassword:
-                  values.newPassword,
-              }),
-          }
-        );
-
-
-      const json =
-        await readJson(
-          response
-        );
-
-
-      if (
-        !response.ok ||
-        json?.success !==
-          true
-      ) {
-        throw new Error(
-          json?.message ||
-          "Đổi mật khẩu thất bại."
-        );
-      }
-
-
-      message.success(
-        "Đổi mật khẩu thành công."
-      );
-
-
-      setChangePasswordOpen(
-        false
-      );
-
-
-      changePasswordForm
-        .resetFields();
-
-    } catch (
-      error
-    ) {
-      message.error(
-        error instanceof Error
-          ? error.message
-          : "Đổi mật khẩu thất bại."
-      );
-
+      void messageApi.success("Đổi mật khẩu thành công.");
+      setChangePasswordOpen(false);
+      changePasswordForm.resetFields();
+    } catch (error) {
+      void messageApi.error(errorMessage(error, "Không thể đổi mật khẩu."));
     } finally {
-      setLoading(
-        false
-      );
+      setChangingPassword(false);
     }
   }
 
+  async function handleLogout(): Promise<void> {
+    setLoggingOut(true);
 
-  async function handleLogout() {
-    await logout();
-
-
-    message.success(
-      "Đã đăng xuất."
-    );
-
-
-    navigate(
-      "/login",
-      {
-        replace:
-          true,
-      }
-    );
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      void messageApi.error(errorMessage(error, "Không thể đăng xuất."));
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
+  const columns: ColumnsType<AccountUser> = [
+    {
+      title: "Tài khoản",
+      dataIndex: "username",
+      width: 210,
+      fixed: "left",
+      render: (value: string, record) => (
+        <div className="account-user-cell">
+          <Avatar size={34} icon={<UserOutlined />} className="account-user-avatar" />
 
-  const columns:
-    ColumnsType<
-      AccountUser
-    > = [
-      {
-        title:
-          "Tài khoản",
+          <div>
+            <Typography.Text strong>{value}</Typography.Text>
 
-        dataIndex:
-          "username",
+            {record.id === user?.id && (
+              <div className="account-current-label">Tài khoản hiện tại</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Họ và tên",
+      dataIndex: "full_name",
+      width: 200,
+      render: (value?: string | null) => value || "—",
+    },
+    {
+      title: "Quyền",
+      key: "permission",
+      width: 170,
+      render: () => (
+        <Tag color="blue" icon={<SafetyOutlined />}>
+          Quản trị chi nhánh
+        </Tag>
+      ),
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "active",
+      width: 130,
+      align: "center",
+      render: (active: boolean) => (
+        <Tag color={active ? "success" : "error"} className="account-status-tag">
+          {active ? "Hoạt động" : "Đã khóa"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Đăng nhập cuối",
+      dataIndex: "last_login_at",
+      width: 180,
+      render: formatDate,
+    },
+    {
+      title: "Ngày tạo",
+      dataIndex: "created_at",
+      width: 180,
+      render: formatDate,
+    },
+    {
+      title: "Thao tác",
+      key: "actions",
+      fixed: "right",
+      width: 240,
+      render: (_: unknown, record) => (
+        <Space size={6}>
+          <Button
+            size="small"
+            icon={<LockOutlined />}
+            onClick={() => {
+              resetPasswordForm.resetFields();
+              setResetPasswordUser(record);
+            }}
+          >
+            Đặt mật khẩu
+          </Button>
 
-        width:
-          180,
-
-        fixed:
-          "left",
-
-        render:
-          (
-            value:
-              string,
-
-            record:
-              AccountUser
-          ) => (
-            <div
-              className="account-user-cell"
-            >
-              <div
-                className={
-                  record.role ===
-                  "ADMIN"
-                    ? "account-avatar account-avatar-admin"
-                    : "account-avatar"
-                }
-              >
-                {
-                  record.role ===
-                  "ADMIN"
-                    ? (
-                      <SafetyOutlined />
-                    )
-                    : (
-                      <UserOutlined />
-                    )
-                }
-              </div>
-
-
-              <div>
-                <Typography.Text
-                  strong
-
-                  style={{
-                    display:
-                      "block",
-
-                    color:
-                      "#172033",
-                  }}
-                >
-                  {value}
-                </Typography.Text>
-
-
-                {
-                  record.id ===
-                    user?.id &&
-                  (
-                    <Typography.Text
-                      type="secondary"
-
-                      style={{
-                        fontSize:
-                          10,
-                      }}
-                    >
-                      Tài khoản hiện tại
-                    </Typography.Text>
-                  )
-                }
-              </div>
-            </div>
-          ),
-      },
-
-      {
-        title:
-          "Họ tên",
-
-        dataIndex:
-          "full_name",
-
-        width:
-          210,
-
-        render:
-          (
-            value:
-              string |
-              null
-          ) =>
-            value ||
-            "-",
-      },
-
-      {
-        title:
-          "Quyền",
-
-        dataIndex:
-          "role",
-
-        width:
-          145,
-
-        render:
-          (
-            value:
-              string,
-
-            record:
-              AccountUser
-          ) => (
-            <Select
-              value={
-                value
+          {record.id !== user?.id && (
+            <Popconfirm
+              title={record.active ? "Khóa tài khoản?" : "Mở lại tài khoản?"}
+              description={
+                record.active
+                  ? `${record.username} sẽ không thể đăng nhập.`
+                  : `Cho phép ${record.username} đăng nhập trở lại.`
               }
-
-              style={{
-                width:
-                  110,
-              }}
-
-              disabled={
-                record.id ===
-                user?.id
-              }
-
-              options={[
-                {
-                  value:
-                    "USER",
-
-                  label:
-                    "USER",
-                },
-
-                {
-                  value:
-                    "ADMIN",
-
-                  label:
-                    "ADMIN",
-                },
-              ]}
-
-              onChange={(
-                nextRole
-              ) =>
-                void handleRole(
-                  record,
-                  nextRole
-                )
-              }
-            />
-          ),
-      },
-
-      {
-        title:
-          "Trạng thái",
-
-        dataIndex:
-          "active",
-
-        width:
-          125,
-
-        align:
-          "center",
-
-        render:
-          (
-            active:
-              boolean
-          ) =>
-            active
-              ? (
-                <Tag
-                  color="success"
-                  className="account-status-tag"
-                >
-                  Hoạt động
-                </Tag>
-              )
-              : (
-                <Tag
-                  color="error"
-                  className="account-status-tag"
-                >
-                  Đã khóa
-                </Tag>
-              ),
-      },
-
-      {
-        title:
-          "Đăng nhập cuối",
-
-        dataIndex:
-          "last_login_at",
-
-        width:
-          180,
-
-        render:
-          formatDate,
-      },
-
-      {
-        title:
-          "Ngày tạo",
-
-        dataIndex:
-          "created_at",
-
-        width:
-          180,
-
-        render:
-          formatDate,
-      },
-
-      {
-        title:
-          "Thao tác",
-
-        key:
-          "actions",
-
-        fixed:
-          "right",
-
-        width:
-          235,
-
-        render:
-          (
-            _:
-              unknown,
-
-            record:
-              AccountUser
-          ) => (
-            <Space
-              size={
-                6
-              }
+              okText={record.active ? "Khóa" : "Mở lại"}
+              cancelText="Hủy"
+              disabled={updatingAccountId !== null}
+              onConfirm={() => handleActive(record)}
             >
               <Button
                 size="small"
-
-                icon={
-                  <LockOutlined />
-                }
-
-                style={{
-                  borderRadius:
-                    7,
-
-                  fontWeight:
-                    600,
-                }}
-
-                onClick={() => {
-                  resetPasswordForm
-                    .resetFields();
-
-
-                  setResetPasswordUser(
-                    record
-                  );
-                }}
+                danger={record.active}
+                loading={updatingAccountId === record.id}
+                disabled={updatingAccountId !== null && updatingAccountId !== record.id}
               >
-                Đặt mật khẩu
+                {record.active ? "Khóa" : "Mở"}
               </Button>
-
-
-              {
-                record.id !==
-                  user?.id &&
-                (
-                  <Popconfirm
-                    title={
-                      record.active
-                        ? "Khóa tài khoản?"
-                        : "Mở lại tài khoản?"
-                    }
-
-                    description={
-                      record.active
-                        ? `Tài khoản ${record.username} sẽ không thể đăng nhập.`
-                        : `Cho phép ${record.username} đăng nhập lại?`
-                    }
-
-                    okText="Đồng ý"
-
-                    cancelText="Hủy"
-
-                    onConfirm={() =>
-                      void handleActive(
-                        record
-                      )
-                    }
-                  >
-                    <Button
-                      size="small"
-
-                      danger={
-                        record.active
-                      }
-
-                      style={{
-                        borderRadius:
-                          7,
-
-                        fontWeight:
-                          600,
-                      }}
-                    >
-                      {
-                        record.active
-                          ? "Khóa"
-                          : "Mở"
-                      }
-                    </Button>
-                  </Popconfirm>
-                )
-              }
-            </Space>
-          ),
-      },
-    ];
-
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    },
+  ];
 
   return (
     <>
-      <div
-        className="account-page"
-      >
-        <div
-          className="account-page-header"
-        >
+      {contextHolder}
+
+      <div className="account-page">
+        <div className="account-page-header">
           <div>
-            <Typography.Title
-              level={
-                3
-              }
-
-              style={{
-                margin:
-                  0,
-
-                color:
-                  "#172033",
-
-                fontWeight:
-                  800,
-              }}
-            >
-              <UserOutlined
-                style={{
-                  marginRight:
-                    10,
-
-                  color:
-                    "#1677ff",
-                }}
-              />
-
+            <Typography.Title level={3} className="account-page-title">
+              <UserOutlined />
               Tài khoản
             </Typography.Title>
 
-
-            <Typography.Text
-              type="secondary"
-
-              style={{
-                display:
-                  "block",
-
-                marginTop:
-                  4,
-              }}
-            >
-              Quản lý thông tin đăng nhập, mật khẩu và phân quyền người dùng
+            <Typography.Text type="secondary">
+              Quản lý tài khoản và mật khẩu trong chi nhánh của bạn
             </Typography.Text>
           </div>
+
+          <Tag color="blue" className="account-branch-tag">
+            Chi nhánh {branchId || "—"}
+          </Tag>
         </div>
 
+        <Card className="account-profile-card">
+          <div className="account-profile-main">
+            <Avatar size={56} icon={<UserOutlined />} className="account-profile-avatar" />
 
-        <Card
-          className="account-profile-card"
-        >
-          <div
-            className="account-profile-main"
-          >
-            <div
-              className="account-profile-avatar"
-            >
-              <UserOutlined />
-            </div>
-
-
-            <div
-              className="account-profile-info"
-            >
-              <div
-                className="account-profile-name"
-              >
-                {
-                  user?.username
-                }
+            <div className="account-profile-info">
+              <div className="account-profile-name">
+                {user?.fullName || user?.username || "Tài khoản"}
               </div>
 
+              <div className="account-profile-description">
+                @{user?.username}
+                {branchName ? ` · ${branchName}` : ""}
+              </div>
 
-              <div
-                className="account-profile-meta"
-              >
-                {
-                  user?.role ===
-                  "ADMIN"
-                    ? (
-                      <Tag
-                        color="red"
+              <div className="account-profile-meta">
+                <Tag color="blue" icon={<SafetyOutlined />}>
+                  Quản trị chi nhánh
+                </Tag>
 
-                        icon={
-                          <SafetyOutlined />
-                        }
-
-                        className="account-role-tag"
-                      >
-                        ADMIN
-                      </Tag>
-                    )
-                    : (
-                      <Tag
-                        color="blue"
-
-                        className="account-role-tag"
-                      >
-                        USER
-                      </Tag>
-                    )
-                }
-
-
-                <Tag
-                  color="success"
-
-                  className="account-role-tag"
-                >
+                <Tag color="success" icon={<CheckCircleOutlined />}>
                   Đang đăng nhập
                 </Tag>
               </div>
             </div>
 
-
-            <div
-              className="account-profile-actions"
-            >
+            <Space wrap className="account-profile-actions">
               <Button
-                icon={
-                  <LockOutlined />
-                }
-
+                icon={<LockOutlined />}
                 onClick={() => {
-                  changePasswordForm
-                    .resetFields();
-
-
-                  setChangePasswordOpen(
-                    true
-                  );
-                }}
-
-                style={{
-                  borderRadius:
-                    8,
-
-                  fontWeight:
-                    600,
+                  changePasswordForm.resetFields();
+                  setChangePasswordOpen(true);
                 }}
               >
                 Đổi mật khẩu
               </Button>
 
-
               <Button
                 danger
-
-                icon={
-                  <LogoutOutlined />
-                }
-
-                onClick={() =>
-                  void handleLogout()
-                }
-
-                style={{
-                  borderRadius:
-                    8,
-
-                  fontWeight:
-                    600,
-                }}
+                icon={<LogoutOutlined />}
+                loading={loggingOut}
+                onClick={() => void handleLogout()}
               >
                 Đăng xuất
               </Button>
-            </div>
+            </Space>
           </div>
         </Card>
 
-
-        {
-          isAdmin &&
-          (
-            <>
-              <div
-                className="account-stat-grid"
-              >
-                <Card
-                  className="account-stat-card account-stat-total"
-                >
-                  <div
-                    className="account-stat-icon"
-                  >
-                    <TeamOutlined />
-                  </div>
-
-                  <div>
-                    <div
-                      className="account-stat-label"
-                    >
-                      Tổng tài khoản
-                    </div>
-
-                    <div
-                      className="account-stat-value"
-                    >
-                      {
-                        accountSummary.total
-                      }
-                    </div>
-                  </div>
-                </Card>
-
-
-                <Card
-                  className="account-stat-card account-stat-active"
-                >
-                  <div
-                    className="account-stat-icon"
-                  >
-                    <UserOutlined />
-                  </div>
-
-                  <div>
-                    <div
-                      className="account-stat-label"
-                    >
-                      Đang hoạt động
-                    </div>
-
-                    <div
-                      className="account-stat-value"
-                    >
-                      {
-                        accountSummary.active
-                      }
-                    </div>
-                  </div>
-                </Card>
-
-
-                <Card
-                  className="account-stat-card account-stat-admin"
-                >
-                  <div
-                    className="account-stat-icon"
-                  >
-                    <SafetyOutlined />
-                  </div>
-
-                  <div>
-                    <div
-                      className="account-stat-label"
-                    >
-                      Quản trị viên
-                    </div>
-
-                    <div
-                      className="account-stat-value"
-                    >
-                      {
-                        accountSummary.admins
-                      }
-                    </div>
-                  </div>
-                </Card>
-
-
-                <Card
-                  className="account-stat-card account-stat-locked"
-                >
-                  <div
-                    className="account-stat-icon"
-                  >
-                    <LockOutlined />
-                  </div>
-
-                  <div>
-                    <div
-                      className="account-stat-label"
-                    >
-                      Đã khóa
-                    </div>
-
-                    <div
-                      className="account-stat-value"
-                    >
-                      {
-                        accountSummary.locked
-                      }
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-
-              <Card
-                className="account-table-card"
-
-                styles={{
-                  body: {
-                    padding:
-                      0,
-                  },
-                }}
-              >
-                <div
-                  className="account-table-header"
-                >
-                  <div>
-                    <Typography.Text
-                      strong
-
-                      style={{
-                        fontSize:
-                          15,
-                      }}
-                    >
-                      Quản lý tài khoản
-                    </Typography.Text>
-
-
-                    <Typography.Text
-                      type="secondary"
-
-                      style={{
-                        display:
-                          "block",
-
-                        marginTop:
-                          2,
-
-                        fontSize:
-                          12,
-                      }}
-                    >
-                      Tạo tài khoản, phân quyền và quản lý trạng thái đăng nhập
-                    </Typography.Text>
-                  </div>
-
-
-                  <Space
-                    size={
-                      8
-                    }
-                  >
-                    <Button
-                      icon={
-                        <ReloadOutlined />
-                      }
-
-                      loading={
-                        loading
-                      }
-
-                      onClick={() =>
-                        void loadUsers()
-                      }
-
-                      style={{
-                        borderRadius:
-                          8,
-
-                        fontWeight:
-                          600,
-                      }}
-                    >
-                      Làm mới
-                    </Button>
-
-
-                    <Button
-                      type="primary"
-
-                      icon={
-                        <PlusOutlined />
-                      }
-
-                      onClick={() => {
-                        createForm
-                          .resetFields();
-
-
-                        createForm
-                          .setFieldsValue({
-                            role:
-                              "USER",
-                          });
-
-
-                        setCreateOpen(
-                          true
-                        );
-                      }}
-
-                      style={{
-                        borderRadius:
-                          8,
-
-                        fontWeight:
-                          700,
-
-                        boxShadow:
-                          "0 4px 12px rgba(22,119,255,0.2)",
-                      }}
-                    >
-                      Tạo tài khoản
-                    </Button>
-                  </Space>
-                </div>
-
-
-                <Table<AccountUser>
-                  rowKey="id"
-
-                  loading={
-                    loading
-                  }
-
-                  dataSource={
-                    users
-                  }
-
-                  columns={
-                    columns
-                  }
-
-                  size="middle"
-
-                  rowClassName={(
-                    record
-                  ) =>
-                    !record.active
-                      ? "account-row-locked"
-                      : ""
-                  }
-
-                  pagination={{
-                    pageSize:
-                      10,
-
-                    pageSizeOptions: [
-                      "10",
-                      "50",
-                      "100",
-                    ],
-
-                    showSizeChanger:
-                      true,
-
-                    showTotal:
-                      (
-                        total
-                      ) =>
-                        `Tổng số: ${total}`,
-                  }}
-
-                  scroll={{
-                    x:
-                      1050,
-                  }}
-                />
-              </Card>
-            </>
-          )
-        }
-
-
-        <Modal
-          className="account-form-modal"
-
-          title={
+        <div className="account-stat-grid">
+          <Card className="account-stat-card account-stat-total">
+            <div className="account-stat-icon">
+              <TeamOutlined />
+            </div>
             <div>
-              <div
-                className="account-modal-title"
-              >
-                Tạo tài khoản
-              </div>
+              <div className="account-stat-label">Tổng tài khoản</div>
+              <div className="account-stat-value">{summary.total}</div>
+            </div>
+          </Card>
 
-              <div
-                className="account-modal-description"
-              >
-                Tạo người dùng mới cho hệ thống MedGuard
+          <Card className="account-stat-card account-stat-active">
+            <div className="account-stat-icon">
+              <CheckCircleOutlined />
+            </div>
+            <div>
+              <div className="account-stat-label">Đang hoạt động</div>
+              <div className="account-stat-value">{summary.active}</div>
+            </div>
+          </Card>
+
+          <Card className="account-stat-card account-stat-locked">
+            <div className="account-stat-icon">
+              <LockOutlined />
+            </div>
+            <div>
+              <div className="account-stat-label">Đã khóa</div>
+              <div className="account-stat-value">{summary.locked}</div>
+            </div>
+          </Card>
+        </div>
+
+        <Card className="account-table-card" styles={{ body: { padding: 0 } }}>
+          <div className="account-table-header">
+            <div>
+              <Typography.Text strong className="account-table-title">
+                Danh sách tài khoản
+              </Typography.Text>
+
+              <div className="account-table-description">
+                Chi nhánh {branchId || "—"} · Các tài khoản có cùng quyền quản trị trong chi nhánh
               </div>
             </div>
-          }
 
-          open={
-            createOpen
-          }
-
-          onCancel={() =>
-            setCreateOpen(
-              false
-            )
-          }
-
-          footer={
-            null
-          }
-
-          destroyOnHidden
-        >
-          <Form<CreateUserForm>
-            form={
-              createForm
-            }
-
-            layout="vertical"
-
-            onFinish={
-              handleCreateUser
-            }
-
-            style={{
-              marginTop:
-                18,
-            }}
-          >
-            <Form.Item
-              label="Tài khoản"
-
-              name="username"
-
-              rules={[
-                {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập tài khoản.",
-                },
-
-                {
-                  min:
-                    3,
-
-                  message:
-                    "Tài khoản phải có ít nhất 3 ký tự.",
-                },
-              ]}
-            >
-              <Input
-                prefix={
-                  <UserOutlined />
-                }
-
-                placeholder="Ví dụ: bacsi01"
-              />
-            </Form.Item>
-
-
-            <Form.Item
-              label="Họ và tên"
-
-              name="fullName"
-            >
-              <Input
-                placeholder="Nguyễn Văn A"
-              />
-            </Form.Item>
-
-
-            <Form.Item
-              label="Mật khẩu"
-
-              name="password"
-
-              rules={[
-                {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập mật khẩu.",
-                },
-
-                {
-                  min:
-                    6,
-
-                  message:
-                    "Mật khẩu phải có ít nhất 6 ký tự.",
-                },
-              ]}
-            >
-              <Input.Password
-                prefix={
-                  <LockOutlined />
-                }
-
-                placeholder="Mật khẩu"
-              />
-            </Form.Item>
-
-
-            <Form.Item
-              label="Quyền"
-
-              name="role"
-
-              initialValue="USER"
-            >
-              <Select
-                options={[
-                  {
-                    value:
-                      "USER",
-
-                    label:
-                      "USER",
-                  },
-
-                  {
-                    value:
-                      "ADMIN",
-
-                    label:
-                      "ADMIN",
-                  },
-                ]}
-              />
-            </Form.Item>
-
-
-            <Space
-              style={{
-                width:
-                  "100%",
-
-                justifyContent:
-                  "flex-end",
-              }}
-            >
-              <Button
-                onClick={() =>
-                  setCreateOpen(
-                    false
-                  )
-                }
-              >
-                Hủy
+            <Space wrap>
+              <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void loadUsers()}>
+                Làm mới
               </Button>
-
 
               <Button
                 type="primary"
-
-                htmlType="submit"
-
-                loading={
-                  loading
-                }
+                icon={<PlusOutlined />}
+                disabled={!branchId}
+                onClick={() => {
+                  createForm.resetFields();
+                  setCreateOpen(true);
+                }}
               >
                 Tạo tài khoản
               </Button>
             </Space>
+          </div>
+
+          <Table<AccountUser>
+            rowKey="id"
+            loading={loading}
+            dataSource={users}
+            columns={columns}
+            size="middle"
+            rowClassName={(record) => (record.active ? "" : "account-row-locked")}
+            locale={{ emptyText: "Chưa có tài khoản trong chi nhánh" }}
+            pagination={{
+              defaultPageSize: 10,
+              pageSizeOptions: ["10", "20", "50", "100"],
+              showSizeChanger: true,
+              showTotal: (total) => `Tổng số: ${total} tài khoản`,
+            }}
+            scroll={{ x: 1310 }}
+          />
+        </Card>
+
+        <Modal
+          title="Tạo tài khoản"
+          className="account-form-modal"
+          open={createOpen}
+          footer={null}
+          closable={!creating}
+          mask={{ closable: !creating }}
+          keyboard={!creating}
+          onCancel={() => {
+            if (!creating) setCreateOpen(false);
+          }}
+        >
+          <Form<CreateUserForm>
+            form={createForm}
+            layout="vertical"
+            onFinish={handleCreateUser}
+            disabled={creating}
+            className="account-form"
+          >
+            <Alert
+              type="info"
+              showIcon
+              title={`Tài khoản thuộc chi nhánh ${branchId || "—"}`}
+              description="Tài khoản mới có quyền quản trị trong chi nhánh này."
+              className="account-form-note"
+            />
+
+            <Form.Item
+              label="Tên đăng nhập"
+              name="username"
+              rules={[
+                {
+                  required: true,
+                  whitespace: true,
+                  message: "Vui lòng nhập tên đăng nhập.",
+                },
+              ]}
+            >
+              <Input prefix={<UserOutlined />} placeholder="Ví dụ: bacsi01" autoComplete="off" />
+            </Form.Item>
+
+            <Form.Item label="Họ và tên" name="fullName">
+              <Input placeholder="Nguyễn Văn A" autoComplete="name" />
+            </Form.Item>
+
+            <Form.Item
+              label="Mật khẩu"
+              name="password"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng nhập mật khẩu.",
+                },
+                {
+                  min: 6,
+                  message: "Mật khẩu phải có ít nhất 6 ký tự.",
+                },
+              ]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="Nhập mật khẩu"
+                autoComplete="new-password"
+              />
+            </Form.Item>
+
+            <div className="account-form-actions">
+              <Button onClick={() => setCreateOpen(false)}>Hủy</Button>
+
+              <Button type="primary" htmlType="submit" loading={creating}>
+                Tạo tài khoản
+              </Button>
+            </div>
           </Form>
         </Modal>
 
-
         <Modal
+          title="Đổi mật khẩu"
           className="account-form-modal"
-
-          title={
-            <div>
-              <div
-                className="account-modal-title"
-              >
-                Đổi mật khẩu
-              </div>
-
-              <div
-                className="account-modal-description"
-              >
-                Cập nhật mật khẩu đăng nhập hiện tại
-              </div>
-            </div>
-          }
-
-          open={
-            changePasswordOpen
-          }
-
-          onCancel={() =>
-            setChangePasswordOpen(
-              false
-            )
-          }
-
-          footer={
-            null
-          }
-
-          destroyOnHidden
+          open={changePasswordOpen}
+          footer={null}
+          closable={!changingPassword}
+          mask={{ closable: !changingPassword }}
+          keyboard={!changingPassword}
+          onCancel={() => {
+            if (!changingPassword) setChangePasswordOpen(false);
+          }}
         >
           <Form<ChangePasswordForm>
-            form={
-              changePasswordForm
-            }
-
+            form={changePasswordForm}
             layout="vertical"
-
-            onFinish={
-              handleChangePassword
-            }
-
-            style={{
-              marginTop:
-                18,
-            }}
+            onFinish={handleChangePassword}
+            disabled={changingPassword}
+            className="account-form"
           >
             <Form.Item
               label="Mật khẩu hiện tại"
-
               name="oldPassword"
-
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập mật khẩu hiện tại.",
+                  required: true,
+                  message: "Vui lòng nhập mật khẩu hiện tại.",
                 },
               ]}
             >
-              <Input.Password
-                prefix={
-                  <LockOutlined />
-                }
-              />
+              <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
             </Form.Item>
-
 
             <Form.Item
               label="Mật khẩu mới"
-
               name="newPassword"
-
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập mật khẩu mới.",
+                  required: true,
+                  message: "Vui lòng nhập mật khẩu mới.",
                 },
-
                 {
-                  min:
-                    6,
-
-                  message:
-                    "Mật khẩu phải có ít nhất 6 ký tự.",
+                  min: 6,
+                  message: "Mật khẩu phải có ít nhất 6 ký tự.",
                 },
               ]}
             >
-              <Input.Password
-                prefix={
-                  <LockOutlined />
-                }
-              />
+              <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
             </Form.Item>
-
 
             <Form.Item
               label="Nhập lại mật khẩu mới"
-
               name="confirmPassword"
-
+              dependencies={["newPassword"]}
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập lại mật khẩu.",
+                  required: true,
+                  message: "Vui lòng nhập lại mật khẩu mới.",
                 },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue("newPassword") === value) {
+                      return Promise.resolve();
+                    }
+
+                    return Promise.reject(new Error("Xác nhận mật khẩu mới không khớp."));
+                  },
+                }),
               ]}
             >
-              <Input.Password
-                prefix={
-                  <LockOutlined />
-                }
-              />
+              <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
             </Form.Item>
 
-
-            <Button
-              type="primary"
-
-              htmlType="submit"
-
-              block
-
-              loading={
-                loading
-              }
-            >
-              Đổi mật khẩu
+            <Button type="primary" htmlType="submit" block loading={changingPassword}>
+              Lưu mật khẩu mới
             </Button>
           </Form>
         </Modal>
 
-
         <Modal
+          title="Đặt lại mật khẩu"
           className="account-form-modal"
-
-          title={
-            <div>
-              <div
-                className="account-modal-title"
-              >
-                Đặt lại mật khẩu
-              </div>
-
-              <div
-                className="account-modal-description"
-              >
-                Tài khoản:{" "}
-
-                <strong>
-                  {
-                    resetPasswordUser
-                      ?.username ??
-                    ""
-                  }
-                </strong>
-              </div>
-            </div>
-          }
-
-          open={
-            resetPasswordUser !==
-            null
-          }
-
-          onCancel={() =>
-            setResetPasswordUser(
-              null
-            )
-          }
-
-          footer={
-            null
-          }
-
-          destroyOnHidden
+          open={resetPasswordUser !== null}
+          footer={null}
+          closable={!resettingPassword}
+          mask={{ closable: !resettingPassword }}
+          keyboard={!resettingPassword}
+          onCancel={() => {
+            if (!resettingPassword) setResetPasswordUser(null);
+          }}
         >
           <Form<ResetPasswordForm>
-            form={
-              resetPasswordForm
-            }
-
+            form={resetPasswordForm}
             layout="vertical"
-
-            onFinish={
-              handleResetPassword
-            }
-
-            style={{
-              marginTop:
-                18,
-            }}
+            onFinish={handleResetPassword}
+            disabled={resettingPassword}
+            className="account-form"
           >
+            <Alert
+              type="info"
+              showIcon
+              title={`Tài khoản: ${resetPasswordUser?.username || "—"}`}
+              className="account-form-note"
+            />
+
             <Form.Item
               label="Mật khẩu mới"
-
               name="password"
-
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập mật khẩu.",
+                  required: true,
+                  message: "Vui lòng nhập mật khẩu.",
                 },
-
                 {
-                  min:
-                    6,
-
-                  message:
-                    "Mật khẩu phải có ít nhất 6 ký tự.",
+                  min: 6,
+                  message: "Mật khẩu phải có ít nhất 6 ký tự.",
                 },
               ]}
             >
-              <Input.Password
-                prefix={
-                  <LockOutlined />
-                }
-              />
+              <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
             </Form.Item>
-
 
             <Form.Item
               label="Nhập lại mật khẩu"
-
               name="confirmPassword"
-
+              dependencies={["password"]}
               rules={[
                 {
-                  required:
-                    true,
-
-                  message:
-                    "Vui lòng nhập lại mật khẩu.",
+                  required: true,
+                  message: "Vui lòng nhập lại mật khẩu.",
                 },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue("password") === value) {
+                      return Promise.resolve();
+                    }
+
+                    return Promise.reject(new Error("Xác nhận mật khẩu không khớp."));
+                  },
+                }),
               ]}
             >
-              <Input.Password
-                prefix={
-                  <LockOutlined />
-                }
-              />
+              <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
             </Form.Item>
 
-
-            <Button
-              type="primary"
-
-              htmlType="submit"
-
-              block
-
-              loading={
-                loading
-              }
-            >
+            <Button type="primary" htmlType="submit" block loading={resettingPassword}>
               Đặt lại mật khẩu
             </Button>
           </Form>
         </Modal>
       </div>
 
+      <style>{`
+        .account-page {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          min-width: 0;
+        }
 
-      <style>
-        {`
-          .account-page {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-          }
+        .account-page-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
 
-          .account-page-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-          }
+        .account-page-title.ant-typography {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 0 0 5px;
+          color: #172033;
+          font-weight: 800;
+        }
 
-          .account-profile-card,
-          .account-stat-card,
-          .account-table-card {
-            border:
-              1px solid
-              #edf0f5;
+        .account-page-title > .anticon {
+          color: #1677ff;
+        }
 
-            border-radius:
-              14px;
+        .account-branch-tag {
+          margin: 0;
+          padding: 5px 12px;
+          border-radius: 8px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
 
-            box-shadow:
-              0
-              4px
-              18px
-              rgba(
-                15,
-                23,
-                42,
-                0.04
-              );
-          }
+        .account-profile-card,
+        .account-stat-card,
+        .account-table-card {
+          border: 1px solid #e8edf4;
+          border-radius: 14px;
+          box-shadow: 0 4px 18px rgba(15, 23, 42, 0.035);
+        }
 
-          .account-profile-card
-          .ant-card-body {
-            padding: 20px;
-          }
+        .account-profile-card .ant-card-body {
+          padding: 22px;
+        }
 
+        .account-profile-main {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .account-profile-avatar {
+          flex-shrink: 0;
+          border-radius: 16px;
+          background: #eaf3ff;
+          color: #1677ff;
+        }
+
+        .account-profile-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .account-profile-name {
+          color: #172033;
+          font-size: 20px;
+          font-weight: 750;
+          overflow-wrap: anywhere;
+        }
+
+        .account-profile-description {
+          margin-top: 3px;
+          color: #64748b;
+          font-size: 12px;
+          overflow-wrap: anywhere;
+        }
+
+        .account-profile-meta {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 10px;
+        }
+
+        .account-profile-meta .ant-tag {
+          margin: 0;
+          border-radius: 6px;
+        }
+
+        .account-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .account-stat-card .ant-card-body {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 18px;
+        }
+
+        .account-stat-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
+          flex-shrink: 0;
+          border-radius: 12px;
+          font-size: 20px;
+        }
+
+        .account-stat-label {
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .account-stat-value {
+          margin-top: 3px;
+          color: #172033;
+          font-size: 26px;
+          font-weight: 800;
+          line-height: 1.2;
+        }
+
+        .account-stat-total {
+          border-left: 4px solid #1677ff;
+        }
+
+        .account-stat-total .account-stat-icon {
+          color: #1677ff;
+          background: #eaf3ff;
+        }
+
+        .account-stat-active {
+          border-left: 4px solid #52c41a;
+        }
+
+        .account-stat-active .account-stat-icon {
+          color: #389e0d;
+          background: #f0fae9;
+        }
+
+        .account-stat-locked {
+          border-left: 4px solid #ff4d4f;
+        }
+
+        .account-stat-locked .account-stat-icon {
+          color: #ff4d4f;
+          background: #fff1f0;
+        }
+
+        .account-table-card {
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .account-table-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 18px;
+          border-bottom: 1px solid #edf0f5;
+        }
+
+        .account-table-title {
+          color: #172033;
+          font-size: 15px;
+        }
+
+        .account-table-description {
+          margin-top: 4px;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .account-table-card .ant-table-thead > tr > th {
+          color: #475569;
+          background: #f8fafc;
+          font-size: 12px;
+          font-weight: 650;
+        }
+
+        .account-table-card .ant-table-tbody > tr > td {
+          color: #334155;
+          font-size: 12px;
+        }
+
+        .account-table-card .ant-table-tbody > tr:hover > td {
+          background: #f5f9ff !important;
+        }
+
+        .account-user-cell {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .account-user-avatar {
+          flex-shrink: 0;
+          color: #1677ff;
+          background: #eaf3ff;
+          border-radius: 10px;
+        }
+
+        .account-current-label {
+          margin-top: 2px;
+          color: #94a3b8;
+          font-size: 11px;
+        }
+
+        .account-status-tag {
+          margin: 0;
+          padding: 2px 8px;
+          border-radius: 20px;
+          font-size: 11px;
+        }
+
+        .account-row-locked > td {
+          background: #fffafa;
+        }
+
+        .account-table-card .ant-pagination {
+          padding: 0 16px;
+        }
+
+        .account-page .ant-btn {
+          border-radius: 8px;
+        }
+
+        .account-form-modal .ant-modal-content {
+          border-radius: 16px;
+        }
+
+        .account-form {
+          margin-top: 20px;
+        }
+
+        .account-form-note {
+          margin-bottom: 20px;
+        }
+
+        .account-form-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+
+        @media (max-width: 900px) {
           .account-profile-main {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-          }
-
-          .account-profile-avatar {
-            width: 56px;
-            height: 56px;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            flex-shrink: 0;
-
-            border-radius:
-              16px;
-
-            color:
-              #1677ff;
-
-            background:
-              linear-gradient(
-                135deg,
-                #e6f4ff,
-                #f0f7ff
-              );
-
-            font-size:
-              24px;
-
-            box-shadow:
-              inset
-              0
-              0
-              0
-              1px
-              #d6e4ff;
-          }
-
-          .account-profile-info {
-            flex: 1;
-          }
-
-          .account-profile-name {
-            color:
-              #172033;
-
-            font-size:
-              20px;
-
-            font-weight:
-              800;
-          }
-
-          .account-profile-meta {
-            display: flex;
-
-            gap: 6px;
-
             flex-wrap: wrap;
-
-            margin-top:
-              7px;
-          }
-
-          .account-role-tag {
-            margin: 0;
-
-            border-radius:
-              999px;
-
-            font-size:
-              11px;
-
-            font-weight:
-              700;
           }
 
           .account-profile-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-
-          .account-stat-grid {
-            display: grid;
-
-            grid-template-columns:
-              repeat(
-                4,
-                minmax(
-                  160px,
-                  1fr
-                )
-              );
-
-            gap: 14px;
-          }
-
-          .account-stat-card {
-            transition:
-              all
-              0.2s
-              ease;
-          }
-
-          .account-stat-card:hover {
-            transform:
-              translateY(
-                -2px
-              );
-
-            box-shadow:
-              0
-              8px
-              24px
-              rgba(
-                15,
-                23,
-                42,
-                0.08
-              );
-          }
-
-          .account-stat-card
-          .ant-card-body {
-            display: flex;
-
-            align-items: center;
-
-            gap: 13px;
-
-            padding:
-              16px
-              17px;
-          }
-
-          .account-stat-icon {
-            width: 40px;
-            height: 40px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            flex-shrink: 0;
-
-            border-radius:
-              11px;
-
-            font-size:
-              18px;
-          }
-
-          .account-stat-label {
-            color:
-              #64748b;
-
-            font-size:
-              12px;
-
-            font-weight:
-              500;
-          }
-
-          .account-stat-value {
-            margin-top:
-              2px;
-
-            color:
-              #172033;
-
-            font-size:
-              23px;
-
-            line-height:
-              1.2;
-
-            font-weight:
-              800;
-          }
-
-          .account-stat-total {
-            border-left:
-              4px solid
-              #1677ff;
-          }
-
-          .account-stat-total
-          .account-stat-icon {
-            color:
-              #1677ff;
-
-            background:
-              #e6f4ff;
-          }
-
-          .account-stat-active {
-            border-left:
-              4px solid
-              #52c41a;
-          }
-
-          .account-stat-active
-          .account-stat-icon {
-            color:
-              #52c41a;
-
-            background:
-              #f6ffed;
-          }
-
-          .account-stat-admin {
-            border-left:
-              4px solid
-              #722ed1;
-          }
-
-          .account-stat-admin
-          .account-stat-icon {
-            color:
-              #722ed1;
-
-            background:
-              #f9f0ff;
-          }
-
-          .account-stat-locked {
-            border-left:
-              4px solid
-              #ff4d4f;
-          }
-
-          .account-stat-locked
-          .account-stat-icon {
-            color:
-              #ff4d4f;
-
-            background:
-              #fff1f0;
-          }
-
-          .account-table-card {
-            overflow:
-              hidden;
+            width: 100%;
           }
 
           .account-table-header {
-            display: flex;
+            align-items: flex-start;
+            flex-direction: column;
+          }
+        }
 
-            align-items: center;
-
-            justify-content:
-              space-between;
-
-            gap: 12px;
-
-            padding:
-              14px
-              16px;
-
-            border-bottom:
-              1px solid
-              #edf0f5;
+        @media (max-width: 600px) {
+          .account-page-header {
+            align-items: flex-start;
+            flex-direction: column;
           }
 
-          .account-table-card
-          .ant-table-thead
-          > tr
-          > th {
-            background:
-              #f8fafc !important;
-
-            color:
-              #334155 !important;
-
-            font-size:
-              12px;
-
-            font-weight:
-              700 !important;
-
-            border-bottom:
-              1px solid
-              #e8edf3 !important;
+          .account-stat-grid {
+            grid-template-columns: 1fr;
           }
 
-          .account-table-card
-          .ant-table-tbody
-          > tr
-          > td {
-            color:
-              #334155;
-
-            font-size:
-              12px;
-
-            transition:
-              background
-              0.18s
-              ease;
+          .account-profile-card .ant-card-body {
+            padding: 16px;
           }
 
-          .account-table-card
-          .ant-table-tbody
-          > tr:hover
-          > td {
-            background:
-              #f5f9ff !important;
+          .account-profile-name {
+            font-size: 18px;
           }
-
-          .account-row-locked
-          > td {
-            background:
-              #fffafa;
-          }
-
-          .account-row-locked
-          > td:first-child {
-            box-shadow:
-              inset
-              3px
-              0
-              0
-              #ff7875;
-          }
-
-          .account-user-cell {
-            display: flex;
-
-            align-items: center;
-
-            gap: 9px;
-          }
-
-          .account-avatar {
-            width: 30px;
-            height: 30px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            flex-shrink: 0;
-
-            border-radius:
-              9px;
-
-            color:
-              #1677ff;
-
-            background:
-              #e6f4ff;
-          }
-
-          .account-avatar-admin {
-            color:
-              #722ed1;
-
-            background:
-              #f9f0ff;
-          }
-
-          .account-status-tag {
-            margin: 0;
-
-            padding:
-              2px
-              8px;
-
-            border-radius:
-              999px;
-
-            font-size:
-              11px;
-
-            font-weight:
-              700;
-          }
-
-          .account-table-card
-          .ant-pagination {
-            padding:
-              0
-              16px
-              12px;
-          }
-
-          .account-form-modal
-          .ant-modal-content {
-            border-radius:
-              16px;
-
-            overflow:
-              hidden;
-          }
-
-          .account-modal-title {
-            color:
-              #172033;
-
-            font-size:
-              19px;
-
-            font-weight:
-              800;
-          }
-
-          .account-modal-description {
-            margin-top:
-              3px;
-
-            color:
-              #64748b;
-
-            font-size:
-              12px;
-
-            font-weight:
-              400;
-          }
-
-          @media
-          (
-            max-width:
-              1000px
-          ) {
-            .account-stat-grid {
-              grid-template-columns:
-                repeat(
-                  2,
-                  minmax(
-                    160px,
-                    1fr
-                  )
-                );
-            }
-          }
-
-          @media
-          (
-            max-width:
-              700px
-          ) {
-            .account-profile-main,
-            .account-table-header {
-              align-items:
-                flex-start;
-
-              flex-direction:
-                column;
-            }
-
-            .account-profile-actions {
-              width: 100%;
-
-              flex-wrap:
-                wrap;
-            }
-
-            .account-stat-grid {
-              grid-template-columns:
-                1fr;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   );
 }

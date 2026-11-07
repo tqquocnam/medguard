@@ -471,7 +471,7 @@ export default function DrugIcdInteractions() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải danh mục tương tác thuốc - ICD"
+          title="Không thể tải danh mục tương tác thuốc - ICD"
           description={error}
           action={
             <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>

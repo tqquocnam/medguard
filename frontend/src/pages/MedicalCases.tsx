@@ -27,19 +27,11 @@ import {
 
 import { useQuery } from "@apollo/client/react";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type {
-  CSSProperties,
-} from "react";
+import type { CSSProperties } from "react";
 
-import {
-  useSearchParams,
-} from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import dayjs from "dayjs";
 
@@ -48,11 +40,7 @@ import { gql } from "@apollo/client";
 // Phân trang cần ORDER BY có khóa duy nhất: nếu chỉ sort ngày vào,
 // các hồ sơ cùng ngày có thể đổi chỗ giữa các lần gọi LIMIT/OFFSET.
 const GET_MEDICAL_CASES_STABLE = gql`
-  query GetMedicalCasesStable(
-    $limit: Int!
-    $offset: Int!
-    $where: core_medical_cases_bool_exp!
-  ) {
+  query GetMedicalCasesStable($limit: Int!, $offset: Int!, $where: core_medical_cases_bool_exp!) {
     core_medical_cases(
       limit: $limit
       offset: $offset
@@ -91,13 +79,9 @@ const GET_MEDICAL_CASES_STABLE = gql`
   }
 `;
 
-import CaseCheckResultsModal
-  from "../components/CaseCheckResultsModal";
+import CaseCheckResultsModal from "../components/CaseCheckResultsModal";
 
-import {
-  apiFetch,
-} from "../api/apiClient";
-
+import { apiFetch } from "../api/apiClient";
 
 // Danh mục bác sĩ công khám được backend tổng hợp từ XML3 (MA_NHOM=13).
 type ExamDoctorItem = {
@@ -140,10 +124,8 @@ interface MedicalCase {
   error_count?: number;
 }
 
-
 interface QueryResult {
-  core_medical_cases:
-    MedicalCase[];
+  core_medical_cases: MedicalCase[];
 
   core_medical_cases_aggregate: {
     aggregate: {
@@ -158,7 +140,6 @@ interface QueryResult {
   };
 }
 
-
 interface CheckProgress {
   processedCases: number;
   totalCases: number;
@@ -167,166 +148,104 @@ interface CheckProgress {
   status: string;
 }
 
-
 // ======================================================
 // FORMAT DATE
 // ======================================================
 
-function formatDate(
-  value?: string
-) {
-  if (
-    !value
-  ) {
+function formatDate(value?: string) {
+  if (!value) {
     return "";
   }
 
-  return dayjs(
-    value
-  ).format(
-    "DD/MM/YYYY HH:mm"
-  );
+  return dayjs(value).format("DD/MM/YYYY HH:mm");
 }
-
 
 // ======================================================
 // FORMAT MONEY
 // ======================================================
 
-function formatMoney(
-  value?: number
-) {
-  return new Intl.NumberFormat(
-    "vi-VN"
-  ).format(
-    Number(
-      value || 0
-    )
-  );
+function formatMoney(value?: number) {
+  return new Intl.NumberFormat("vi-VN").format(Number(value || 0));
 }
-
 
 // ======================================================
 // GENDER
 // ======================================================
 
-function renderGender(
-  value?: string
-) {
-  if (
-    String(
-      value
-    ) === "1"
-  ) {
+function renderGender(value?: string) {
+  if (String(value) === "1") {
     return "Nam";
   }
 
-  if (
-    String(
-      value
-    ) === "2"
-  ) {
+  if (String(value) === "2") {
     return "Nữ";
   }
 
-  return (
-    value ||
-    ""
-  );
+  return value || "";
 }
-
 
 // ======================================================
 // STYLE
 // ======================================================
 
-const pageStyle:
-  CSSProperties = {
-    display:
-      "flex",
+const pageStyle: CSSProperties = {
+  display: "flex",
 
-    flexDirection:
-      "column",
+  flexDirection: "column",
 
-    // Gọn hơn bản cũ
-    gap:
-      10,
+  // Gọn hơn bản cũ
+  gap: 10,
 
-    /*
-     * MainLayout:
-     *
-     * Header: 64px
-     * Content padding: 24 + 24
-     * Container padding: 24 + 24
-     *
-     * Tổng = 160px
-     */
-    height:
-      "calc(100vh - 160px)",
+  /*
+   * MainLayout:
+   *
+   * Header: 64px
+   * Content padding: 24 + 24
+   * Container padding: 24 + 24
+   *
+   * Tổng = 160px
+   */
+  height: "calc(100vh - 160px)",
 
-    minHeight:
-      0,
+  minHeight: 0,
 
-    overflow:
-      "hidden",
-  };
+  overflow: "hidden",
+};
 
+const panelStyle: CSSProperties = {
+  borderRadius: 14,
 
-const panelStyle:
-  CSSProperties = {
-    borderRadius:
-      14,
+  border: "1px solid #edf0f5",
 
-    border:
-      "1px solid #edf0f5",
+  boxShadow: "0 4px 18px rgba(15, 23, 42, 0.05)",
 
-    boxShadow:
-      "0 4px 18px rgba(15, 23, 42, 0.05)",
+  background: "#ffffff",
+};
 
-    background:
-      "#ffffff",
-  };
+const statusTagStyle: CSSProperties = {
+  display: "inline-flex",
 
+  alignItems: "center",
 
-const statusTagStyle:
-  CSSProperties = {
-    display:
-      "inline-flex",
+  justifyContent: "center",
 
-    alignItems:
-      "center",
+  gap: 5,
 
-    justifyContent:
-      "center",
+  minWidth: 86,
 
-    gap:
-      5,
+  margin: 0,
 
-    minWidth:
-      86,
+  padding: "4px 10px",
 
-    margin:
-      0,
+  borderRadius: 999,
 
-    padding:
-      "4px 10px",
+  fontSize: 13,
 
-    borderRadius:
-      999,
+  fontWeight: 700,
 
-    fontSize:
-      13,
+  cursor: "pointer",
+};
 
-    fontWeight:
-      700,
-
-    cursor:
-      "pointer",
-  };
-
-
-  
- 
 // const MEDGUARD_QUOTES = [
 //   // TÌNH YÊU - SÂU LẮNG
 //   "Có những người đi ngang đời ta, nhưng để lại thương nhớ rất lâu.",
@@ -422,101 +341,50 @@ const statusTagStyle:
 
 // ];
 
-
-
 // ======================================================
 // COMPONENT
 // ======================================================
 
-
 export default function MedicalCases() {
-
-  const [
-    searchParams,
-  ] =
-    useSearchParams();
-
+  const [searchParams] = useSearchParams();
 
   // ====================================================
   // FIX TRANG - CHỈ TABLE ĐƯỢC SCROLL
   // ====================================================
 
-  const tableAreaRef =
-    useRef<
-      HTMLDivElement |
-      null
-    >(
-      null
-    );
+  const tableAreaRef = useRef<HTMLDivElement | null>(null);
 
-
-  const [
-    tableScrollY,
-    setTableScrollY,
-  ] =
-    useState(
-      220
-    );
-
+  const [tableScrollY, setTableScrollY] = useState(220);
 
   // ====================================================
   // KHÓA SCROLL BODY
   // ====================================================
 
-  useEffect(
-    () => {
+  useEffect(() => {
+    const html = document.documentElement;
 
-      const html =
-        document.documentElement;
+    const body = document.body;
 
-      const body =
-        document.body;
+    const oldHtmlOverflow = html.style.overflow;
 
+    const oldBodyOverflow = body.style.overflow;
 
-      const oldHtmlOverflow =
-        html.style.overflow;
+    html.style.overflow = "hidden";
 
-      const oldBodyOverflow =
-        body.style.overflow;
+    body.style.overflow = "hidden";
 
+    return () => {
+      html.style.overflow = oldHtmlOverflow;
 
-      html.style.overflow =
-        "hidden";
-
-      body.style.overflow =
-        "hidden";
-
-
-      return () => {
-
-        html.style.overflow =
-          oldHtmlOverflow;
-
-        body.style.overflow =
-          oldBodyOverflow;
-
-      };
-
-    },
-    []
-  );
-
+      body.style.overflow = oldBodyOverflow;
+    };
+  }, []);
 
   // ====================================================
   // MODAL KẾT QUẢ
   // ====================================================
 
-  const [
-    resultCase,
-    setResultCase,
-  ] =
-    useState<
-      MedicalCase |
-      null
-    >(
-      null
-    );
-
+  const [resultCase, setResultCase] = useState<MedicalCase | null>(null);
 
   // Hồ sơ vừa đóng modal: lưu theo ID, không phụ thuộc vị trí dòng.
   const [lastViewedCase, setLastViewedCase] = useState<MedicalCase | null>(null);
@@ -527,7 +395,7 @@ export default function MedicalCases() {
     if (record.status === "OK") return;
 
     const body = tableAreaRef.current?.querySelector<HTMLElement>(
-      ".medguard-case-table-fixed .ant-table-body"
+      ".medguard-case-table-fixed .ant-table-body",
     );
     if (body) {
       lastTableScroll.current.top = body.scrollTop;
@@ -545,7 +413,7 @@ export default function MedicalCases() {
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         const body = tableAreaRef.current?.querySelector<HTMLElement>(
-          ".medguard-case-table-fixed .ant-table-body"
+          ".medguard-case-table-fixed .ant-table-body",
         );
         if (body) {
           body.scrollTop = lastTableScroll.current.top;
@@ -559,183 +427,84 @@ export default function MedicalCases() {
   // PAYMENT DATE
   // ====================================================
 
-  const [
-    paymentDate,
-    setPaymentDate,
-  ] =
-    useState<
-      string |
-      undefined
-    >(
-      undefined
-    );
+  const [paymentDate, setPaymentDate] = useState<string | undefined>(undefined);
 
+  const [clearingPaymentDate, setClearingPaymentDate] = useState(false);
 
-  const [
-    clearingPaymentDate,
-    setClearingPaymentDate,
-  ] =
-    useState(
-      false
-    );
+  const clearPaymentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-
-  const clearPaymentTimer =
-    useRef<
-      ReturnType<
-        typeof setTimeout
-      > |
-      null
-    >(
-      null
-    );
-
-
-  useEffect(
-    () => {
-
-      return () => {
-
-        if (
-          clearPaymentTimer.current
-        ) {
-          clearTimeout(
-            clearPaymentTimer.current
-          );
-        }
-
-      };
-
-    },
-    []
-  );
-
+  useEffect(() => {
+    return () => {
+      if (clearPaymentTimer.current) {
+        clearTimeout(clearPaymentTimer.current);
+      }
+    };
+  }, []);
 
   // ====================================================
   // CHECKING
   // ====================================================
 
-  const [
-    checking,
-    setChecking,
-  ] =
-    useState(
-      false
-    );
+  const [checking, setChecking] = useState(false);
 
-// const [quoteIndex, setQuoteIndex] = useState(() =>
-//   Math.floor(Math.random() * MEDGUARD_QUOTES.length)
-// );
+  // const [quoteIndex, setQuoteIndex] = useState(() =>
+  //   Math.floor(Math.random() * MEDGUARD_QUOTES.length)
+  // );
 
-// useEffect(() => {
-//   if (!checking) return;
+  // useEffect(() => {
+  //   if (!checking) return;
 
-//   // Chọn ngẫu nhiên một câu khi bắt đầu kiểm tra.
-//   setQuoteIndex(
-//     Math.floor(Math.random() * MEDGUARD_QUOTES.length)
-//   );
+  //   // Chọn ngẫu nhiên một câu khi bắt đầu kiểm tra.
+  //   setQuoteIndex(
+  //     Math.floor(Math.random() * MEDGUARD_QUOTES.length)
+  //   );
 
-//   const timer = window.setInterval(() => {
-//     setQuoteIndex((previous) => {
-//       const offset =
-//         1 +
-//         Math.floor(
-//           Math.random() * (MEDGUARD_QUOTES.length - 1)
-//         );
+  //   const timer = window.setInterval(() => {
+  //     setQuoteIndex((previous) => {
+  //       const offset =
+  //         1 +
+  //         Math.floor(
+  //           Math.random() * (MEDGUARD_QUOTES.length - 1)
+  //         );
 
-//       return (previous + offset) % MEDGUARD_QUOTES.length;
-//     });
-//   }, 5000);
+  //       return (previous + offset) % MEDGUARD_QUOTES.length;
+  //     });
+  //   }, 5000);
 
-//   return () => window.clearInterval(timer);
-// }, [checking]);
+  //   return () => window.clearInterval(timer);
+  // }, [checking]);
 
+  const [checkProgress, setCheckProgress] = useState<CheckProgress>({
+    processedCases: 0,
 
-  const [
-    checkProgress,
-    setCheckProgress,
-  ] =
-    useState<
-      CheckProgress
-    >({
-      processedCases:
-        0,
+    totalCases: 0,
 
-      totalCases:
-        0,
+    remainingCases: 0,
 
-      remainingCases:
-        0,
+    percent: 0,
 
-      percent:
-        0,
+    status: "IDLE",
+  });
 
-      status:
-        "IDLE",
-    });
-
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] =
-    useState(
-      false
-    );
-
+  const [refreshing, setRefreshing] = useState(false);
 
   // ====================================================
   // PAGINATION
   // ====================================================
 
-  const [
-    page,
-    setPage,
-  ] =
-    useState(
-      1
-    );
+  const [page, setPage] = useState(1);
 
-
-  const [
-    pageSize,
-    setPageSize,
-  ] =
-    useState(
-      10
-    );
-
+  const [pageSize, setPageSize] = useState(10);
 
   // ====================================================
   // FILTER
   // ====================================================
 
-  const [
-    maBn,
-    setMaBn,
-  ] =
-    useState(
-      ""
-    );
+  const [maBn, setMaBn] = useState("");
 
+  const [hoTen, setHoTen] = useState("");
 
-  const [
-    hoTen,
-    setHoTen,
-  ] =
-    useState(
-      ""
-    );
-
-
-  const [
-    status,
-    setStatus,
-  ] =
-    useState(
-      "ALL"
-    );
-
+  const [status, setStatus] = useState("ALL");
 
   // Hai chiều lọc độc lập: loại KCB BHYT và nhóm nghiệp vụ.
   const [examDoctorCode, setExamDoctorCode] = useState<string | undefined>();
@@ -770,10 +539,12 @@ export default function MedicalCases() {
       }
     }
     void loadExamDoctors();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const examDoctorByCode = new Map(examDoctors.map(d => [d.code, d]));
+  const examDoctorByCode = new Map(examDoctors.map((d) => [d.code, d]));
   const examDoctorByMaLk = new Map<string, ExamDoctorItem[]>();
   for (const doctor of examDoctors) {
     for (const maLk of doctor.maLks) {
@@ -786,169 +557,79 @@ export default function MedicalCases() {
   const [kcbType, setKcbType] = useState<string>("ALL");
   const [treatmentGroup, setTreatmentGroup] = useState<string>("ALL");
 
-  const urlYear =
-    searchParams.get(
-      "year"
-    );
+  const urlYear = searchParams.get("year");
 
+  const urlMonth = searchParams.get("month");
 
-  const urlMonth =
-    searchParams.get(
-      "month"
-    );
-
-
-  const [
-    year,
-    setYear,
-  ] =
-    useState<
-      number |
-      undefined
-    >(
-      urlYear &&
-      !Number.isNaN(
-        Number(
-          urlYear
-        )
-      )
-        ? Number(
-            urlYear
-          )
-        : dayjs().year()
-    );
-
-
-  
-const [month, setMonth] = useState<number | undefined>(() => {
-  const currentMonth = dayjs().month() + 1;
-
-  if (urlMonth) {
-    const parsedMonth = Number(urlMonth);
-
-    if (
-      Number.isInteger(parsedMonth) &&
-      parsedMonth >= 1 &&
-      parsedMonth <= 12
-    ) {
-      return parsedMonth;
-    }
-  }
-
-  return currentMonth;
-});
-
-
-
-  useEffect(
-    () => {
-
-      const yearParam =
-        searchParams.get(
-          "year"
-        );
-
-
-      const monthParam =
-        searchParams.get(
-          "month"
-        );
-
-
-      if (
-        yearParam
-      ) {
-
-        const nextYear =
-          Number(
-            yearParam
-          );
-
-
-        if (
-          !Number.isNaN(
-            nextYear
-          )
-        ) {
-          setYear(
-            nextYear
-          );
-        }
-
-      }
-
-
-      
-if (monthParam) {
-  const nextMonth = Number(monthParam);
-
-  if (
-    Number.isInteger(nextMonth) &&
-    nextMonth >= 1 &&
-    nextMonth <= 12
-  ) {
-    setMonth(nextMonth);
-  } else {
-    setMonth(dayjs().month() + 1);
-  }
-} else {
-  setMonth(dayjs().month() + 1);
-}
-
-
-
-      setPage(
-        1
-      );
-
-    },
-    [
-      searchParams,
-    ]
+  const [year, setYear] = useState<number | undefined>(
+    urlYear && !Number.isNaN(Number(urlYear)) ? Number(urlYear) : dayjs().year(),
   );
 
+  const [month, setMonth] = useState<number | undefined>(() => {
+    const currentMonth = dayjs().month() + 1;
+
+    if (urlMonth) {
+      const parsedMonth = Number(urlMonth);
+
+      if (Number.isInteger(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12) {
+        return parsedMonth;
+      }
+    }
+
+    return currentMonth;
+  });
+
+  useEffect(() => {
+    const yearParam = searchParams.get("year");
+
+    const monthParam = searchParams.get("month");
+
+    if (yearParam) {
+      const nextYear = Number(yearParam);
+
+      if (!Number.isNaN(nextYear)) {
+        setYear(nextYear);
+      }
+    }
+
+    if (monthParam) {
+      const nextMonth = Number(monthParam);
+
+      if (Number.isInteger(nextMonth) && nextMonth >= 1 && nextMonth <= 12) {
+        setMonth(nextMonth);
+      } else {
+        setMonth(dayjs().month() + 1);
+      }
+    } else {
+      setMonth(dayjs().month() + 1);
+    }
+
+    setPage(1);
+  }, [searchParams]);
 
   // ====================================================
   // GRAPHQL WHERE
   // ====================================================
 
-  const where:
-    Record<
-      string,
-      unknown
-    > = {};
+  const where: Record<string, unknown> = {};
 
-
-  if (
-    maBn.trim()
-  ) {
+  if (maBn.trim()) {
     where.ma_bn = {
-      _ilike:
-        `%${maBn.trim()}%`,
+      _ilike: `%${maBn.trim()}%`,
     };
   }
 
-
-  if (
-    hoTen.trim()
-  ) {
+  if (hoTen.trim()) {
     where.ho_ten = {
-      _ilike:
-        `%${hoTen.trim()}%`,
+      _ilike: `%${hoTen.trim()}%`,
     };
   }
 
-
-  if (
-    status !==
-    "ALL"
-  ) {
+  if (status !== "ALL") {
     where.status = {
-      _eq:
-        status,
+      _eq: status,
     };
   }
-
 
   // Lọc trên DB trước khi phân trang/tính tổng, không lọc trên 10 dòng hiện tại.
   if (kcbType !== "ALL") {
@@ -966,102 +647,45 @@ if (monthParam) {
     };
   }
 
-  if (
-    year
-  ) {
+  if (year) {
     where.nam_qt = {
-      _eq:
-        year,
+      _eq: year,
     };
   }
 
-
-  if (
-    month
-  ) {
+  if (month) {
     where.thang_qt = {
-      _eq:
-        month,
+      _eq: month,
     };
   }
 
+  if (paymentDate) {
+    const startDate = dayjs(paymentDate).startOf("day").format("YYYY-MM-DDTHH:mm:ss");
 
-  if (
-    paymentDate
-  ) {
-
-    const startDate =
-      dayjs(
-        paymentDate
-      )
-        .startOf(
-          "day"
-        )
-        .format(
-          "YYYY-MM-DDTHH:mm:ss"
-        );
-
-
-    const endDate =
-      dayjs(
-        paymentDate
-      )
-        .add(
-          1,
-          "day"
-        )
-        .startOf(
-          "day"
-        )
-        .format(
-          "YYYY-MM-DDTHH:mm:ss"
-        );
-
+    const endDate = dayjs(paymentDate).add(1, "day").startOf("day").format("YYYY-MM-DDTHH:mm:ss");
 
     where.ngay_ttoan = {
-      _gte:
-        startDate,
+      _gte: startDate,
 
-      _lt:
-        endDate,
+      _lt: endDate,
     };
   }
-
 
   // ====================================================
   // QUERY
   // ====================================================
 
-  const {
-    data,
-    loading,
-    error,
-    refetch,
-  } =
-    useQuery<
-      QueryResult
-    >(
-      GET_MEDICAL_CASES_STABLE,
-      {
-        variables: {
-          limit:
-            pageSize,
+  const { data, loading, error, refetch } = useQuery<QueryResult>(GET_MEDICAL_CASES_STABLE, {
+    variables: {
+      limit: pageSize,
 
-          offset:
-            (
-              page -
-              1
-            ) *
-            pageSize,
+      offset: (page - 1) * pageSize,
 
-          where,
-        },
+      where,
+    },
 
-        fetchPolicy:
-          "network-only",
-      }
-    );
-
+    fetchPolicy: "network-only",
+  });
 
   // ====================================================
   // CHIỀU CAO TABLE: TÍNH THEO KHUNG HIỂN THỊ THỰC TẾ
@@ -1074,27 +698,26 @@ if (monthParam) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const area = tableAreaRef.current;
-        const content = area?.querySelector<HTMLElement>(
-          ".medguard-case-table-content"
-        );
+        const content = area?.querySelector<HTMLElement>(".medguard-case-table-content");
         const body = content?.querySelector<HTMLElement>(".ant-table-body");
         const head = content?.querySelector<HTMLElement>(".ant-table-header");
         if (!area || !content) return;
 
         // AntD gắn scroll.y vào .ant-table-body; vị trí bắt đầu
         // phần body không thay đổi khi nội dung bảng được cập nhật.
-        const top = body?.getBoundingClientRect().top ??
-          (content.getBoundingClientRect().top + (head?.offsetHeight ?? 47));
+        const top =
+          body?.getBoundingClientRect().top ??
+          content.getBoundingClientRect().top + (head?.offsetHeight ?? 47);
         const bottom = content.getBoundingClientRect().bottom;
         const nextHeight = Math.max(48, Math.floor(bottom - top - 12));
-        setTableScrollY(old => old === nextHeight ? old : nextHeight);
+        setTableScrollY((old) => (old === nextHeight ? old : nextHeight));
       });
     };
 
     const observer = new ResizeObserver(measure);
     if (tableAreaRef.current) observer.observe(tableAreaRef.current);
     const content = tableAreaRef.current?.querySelector<HTMLElement>(
-      ".medguard-case-table-content"
+      ".medguard-case-table-content",
     );
     if (content) observer.observe(content);
     window.addEventListener("resize", measure);
@@ -1106,571 +729,270 @@ if (monthParam) {
     };
   }, [loading, page, pageSize]);
 
-
   // ====================================================
   // RUN CHECKS
   // ====================================================
 
   async function handleRunChecks() {
-
     try {
-
-      if (
-        !year
-      ) {
-        message.warning(
-          "Vui lòng chọn năm cần kiểm tra."
-        );
+      if (!year) {
+        message.warning("Vui lòng chọn năm cần kiểm tra.");
 
         return;
       }
-
 
       // Gửi bộ lọc vào backend, không chỉ lọc các dòng trên giao diện.
       // Không gửi ALL thành giá trị nhóm.
 
       if (kcbType !== "ALL") {
-        message.warning("Kiểm tra theo loại KCB BHYT chưa được hỗ trợ tại backend. Hãy chọn Tất cả loại KCB.");
+        message.warning(
+          "Kiểm tra theo loại KCB BHYT chưa được hỗ trợ tại backend. Hãy chọn Tất cả loại KCB.",
+        );
         return;
       }
 
-      setChecking(
-        true
-      );
-
+      setChecking(true);
 
       setCheckProgress({
-        processedCases:
-          0,
+        processedCases: 0,
 
-        totalCases:
-          0,
+        totalCases: 0,
 
-        remainingCases:
-          0,
+        remainingCases: 0,
 
-        percent:
-          0,
+        percent: 0,
 
-        status:
-          "RUNNING",
+        status: "RUNNING",
       });
 
+      const response = await apiFetch("/checks/run", {
+        method: "POST",
 
-      const response =
-        await apiFetch(
-          "/checks/run",
-          {
-            method:
-              "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+        body: JSON.stringify({
+          year,
 
-            body:
-              JSON.stringify({
-                year,
+          month: month ?? null,
 
-                month:
-                  month ??
-                  null,
+          paymentDate: paymentDate ?? null,
+          treatmentGroup: treatmentGroup !== "ALL" ? treatmentGroup : null,
+        }),
+      });
 
-                paymentDate:
-                  paymentDate ??
-                  null,
-                treatmentGroup: treatmentGroup !== "ALL" ? treatmentGroup : null,
-              }),
-          }
-        );
-
-
-      let json:
-        any =
-        null;
-
+      let json: any = null;
 
       try {
-        json =
-          await response.json();
+        json = await response.json();
       } catch {
-        json =
-          null;
+        json = null;
       }
 
-
-      if (
-        !response.ok ||
-        !json?.success
-      ) {
-        throw new Error(
-          json?.message ||
-          "Không thể bắt đầu kiểm tra dữ liệu."
-        );
+      if (!response.ok || !json?.success) {
+        throw new Error(json?.message || "Không thể bắt đầu kiểm tra dữ liệu.");
       }
 
+      const validation = json?.data?.validation;
 
-      const validation =
-        json
-          ?.data
-          ?.validation;
+      const checkRunId = validation?.checkRunId;
 
-
-      const checkRunId =
-        validation
-          ?.checkRunId;
-
-
-      if (
-        !checkRunId
-      ) {
-        throw new Error(
-          "Backend không trả về checkRunId."
-        );
+      if (!checkRunId) {
+        throw new Error("Backend không trả về checkRunId.");
       }
 
-
-      const totalCases =
-        Number(
-          validation
-            ?.totalCases ??
-          0
-        );
-
+      const totalCases = Number(validation?.totalCases ?? 0);
 
       setCheckProgress({
-        processedCases:
-          0,
+        processedCases: 0,
 
         totalCases,
 
-        remainingCases:
-          totalCases,
+        remainingCases: totalCases,
 
-        percent:
-          0,
+        percent: 0,
 
-        status:
-          "RUNNING",
+        status: "RUNNING",
       });
 
+      await new Promise<void>((resolve, reject) => {
+        let stopped = false;
 
-      await new Promise<
-        void
-      >(
-        (
-          resolve,
-          reject
-        ) => {
+        const poll = async () => {
+          if (stopped) {
+            return;
+          }
 
-          let stopped =
-            false;
+          try {
+            const progressResponse = await apiFetch(`/checks/runs/${checkRunId}/progress`);
 
+            let progressJson: any = null;
 
-          const poll =
-            async () => {
+            try {
+              progressJson = await progressResponse.json();
+            } catch {
+              progressJson = null;
+            }
 
-              if (
-                stopped
-              ) {
-                return;
-              }
+            if (!progressResponse.ok || !progressJson?.success) {
+              throw new Error(progressJson?.message || "Không lấy được tiến độ kiểm tra.");
+            }
 
+            const progress = progressJson?.data?.progress;
 
-              try {
+            if (!progress) {
+              window.setTimeout(poll, 400);
 
-                const progressResponse =
-                  await apiFetch(
-                    `/checks/runs/${checkRunId}/progress`
-                  );
+              return;
+            }
 
+            setCheckProgress({
+              processedCases: Number(progress.processedCases ?? 0),
 
-                let progressJson:
-                  any =
-                  null;
+              totalCases: Number(progress.totalCases ?? 0),
 
+              remainingCases: Number(progress.remainingCases ?? 0),
 
-                try {
-                  progressJson =
-                    await progressResponse.json();
-                } catch {
-                  progressJson =
-                    null;
-                }
+              percent: Number(progress.percent ?? 0),
 
+              status: String(progress.status ?? "RUNNING"),
+            });
 
-                if (
-                  !progressResponse.ok ||
-                  !progressJson?.success
-                ) {
-                  throw new Error(
-                    progressJson?.message ||
-                    "Không lấy được tiến độ kiểm tra."
-                  );
-                }
+            if (progress.status === "DONE") {
+              stopped = true;
 
+              setCheckProgress({
+                processedCases: Number(progress.totalCases ?? 0),
 
-                const progress =
-                  progressJson
-                    ?.data
-                    ?.progress;
+                totalCases: Number(progress.totalCases ?? 0),
 
+                remainingCases: 0,
 
-                if (
-                  !progress
-                ) {
-                  window.setTimeout(
-                    poll,
-                    400
-                  );
+                percent: 100,
 
-                  return;
-                }
+                status: "DONE",
+              });
 
+              resolve();
 
-                setCheckProgress({
-                  processedCases:
-                    Number(
-                      progress
-                        .processedCases ??
-                      0
-                    ),
+              return;
+            }
 
-                  totalCases:
-                    Number(
-                      progress
-                        .totalCases ??
-                      0
-                    ),
+            if (progress.status === "ERROR") {
+              stopped = true;
 
-                  remainingCases:
-                    Number(
-                      progress
-                        .remainingCases ??
-                      0
-                    ),
+              reject(new Error("Quá trình kiểm tra dữ liệu bị lỗi."));
 
-                  percent:
-                    Number(
-                      progress
-                        .percent ??
-                      0
-                    ),
+              return;
+            }
 
-                  status:
-                    String(
-                      progress
-                        .status ??
-                      "RUNNING"
-                    ),
-                });
+            window.setTimeout(poll, 400);
+          } catch (error) {
+            stopped = true;
 
+            reject(error);
+          }
+        };
 
-                if (
-                  progress.status ===
-                  "DONE"
-                ) {
+        void poll();
+      });
 
-                  stopped =
-                    true;
-
-
-                  setCheckProgress({
-                    processedCases:
-                      Number(
-                        progress
-                          .totalCases ??
-                        0
-                      ),
-
-                    totalCases:
-                      Number(
-                        progress
-                          .totalCases ??
-                        0
-                      ),
-
-                    remainingCases:
-                      0,
-
-                    percent:
-                      100,
-
-                    status:
-                      "DONE",
-                  });
-
-
-                  resolve();
-
-                  return;
-                }
-
-
-                if (
-                  progress.status ===
-                  "ERROR"
-                ) {
-
-                  stopped =
-                    true;
-
-
-                  reject(
-                    new Error(
-                      "Quá trình kiểm tra dữ liệu bị lỗi."
-                    )
-                  );
-
-                  return;
-                }
-
-
-                window.setTimeout(
-                  poll,
-                  400
-                );
-
-              } catch (
-                error
-              ) {
-
-                stopped =
-                  true;
-
-
-                reject(
-                  error
-                );
-
-              }
-
-            };
-
-
-          void poll();
-
-        }
-      );
-
-
-      message.success(
-        "Kiểm tra dữ liệu hoàn tất."
-      );
-
+      message.success("Kiểm tra dữ liệu hoàn tất.");
 
       await refetch();
+    } catch (error) {
+      console.error("Run checks error:", error);
 
-    } catch (
-      error
-    ) {
-
-      console.error(
-        "Run checks error:",
-        error
-      );
-
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Kiểm tra dữ liệu thất bại."
-      );
-
+      message.error(error instanceof Error ? error.message : "Kiểm tra dữ liệu thất bại.");
     } finally {
-
-      setChecking(
-        false
-      );
-
+      setChecking(false);
     }
   }
-
 
   // ====================================================
   // QUERY ERROR
   // ====================================================
 
-  if (
-    error
-  ) {
-    return (
-      <Alert
-        type="error"
-
-        showIcon
-
-        message="Không tải được hồ sơ"
-
-        description={
-          error.message
-        }
-      />
-    );
+  if (error) {
+    return <Alert type="error" showIcon title="Không tải được hồ sơ" description={error.message} />;
   }
-
 
   // ====================================================
   // DATA
   // ====================================================
 
-  const cases =
-    data
-      ?.core_medical_cases ??
-    [];
+  const cases = data?.core_medical_cases ?? [];
 
+  const aggregate = data?.core_medical_cases_aggregate?.aggregate;
 
-  const aggregate =
-    data
-      ?.core_medical_cases_aggregate
-      ?.aggregate;
+  const total = aggregate?.count ?? 0;
 
+  const totalAmount = aggregate?.sum?.t_tongchi ?? 0;
 
-  const total =
-    aggregate
-      ?.count ??
-    0;
+  const totalBhyt = aggregate?.sum?.t_bhtt ?? 0;
 
-
-  const totalAmount =
-    aggregate
-      ?.sum
-      ?.t_tongchi ??
-    0;
-
-
-  const totalBhyt =
-    aggregate
-      ?.sum
-      ?.t_bhtt ??
-    0;
-
-
-  const totalPatient =
-    aggregate
-      ?.sum
-      ?.t_bntt ??
-    0;
-
+  const totalPatient = aggregate?.sum?.t_bntt ?? 0;
 
   // ====================================================
   // RESET
   // ====================================================
 
   function handleReset() {
-
-    if (
-      refreshing
-    ) {
+    if (refreshing) {
       return;
     }
 
+    setRefreshing(true);
 
-    setRefreshing(
-      true
-    );
+    setTimeout(() => {
+      setMaBn("");
 
+      setHoTen("");
 
-    setTimeout(
-      () => {
+      setStatus("ALL");
+      setKcbType("ALL");
+      setTreatmentGroup("ALL");
+      setExamDoctorCode(undefined);
 
-        setMaBn(
-          ""
-        );
+      setYear(dayjs().year());
+      setMonth(dayjs().month() + 1);
 
+      setPaymentDate(undefined);
 
-        setHoTen(
-          ""
-        );
+      setPage(1);
 
-
-        setStatus(
-          "ALL"
-        );
-        setKcbType("ALL");
-        setTreatmentGroup("ALL");
-        setExamDoctorCode(undefined);
-
-
-        setYear(dayjs().year());
-setMonth(dayjs().month() + 1);
-
-
-        setPaymentDate(
-          undefined
-        );
-
-
-        setPage(
-          1
-        );
-
-
-        setRefreshing(
-          false
-        );
-
-      },
-      800
-    );
+      setRefreshing(false);
+    }, 800);
   }
-
 
   // ====================================================
   // STATUS
   // ====================================================
 
   function renderCaseStatus(
-    statusValue:
-      string |
-      undefined,
+    statusValue: string | undefined,
 
-    record:
-      MedicalCase
+    record: MedicalCase,
   ) {
-
-    if (
-      statusValue ===
-      "ERROR"
-    ) {
+    if (statusValue === "ERROR") {
       return (
         <Tag
-          icon={
-            <CloseCircleFilled />
-          }
-
+          icon={<CloseCircleFilled />}
           color="error"
-
-          style={
-            statusTagStyle
-          }
-
-          onClick={() =>
-            openCaseResults(
-              record
-            )
-          }
+          style={statusTagStyle}
+          onClick={() => openCaseResults(record)}
         >
           Lỗi
         </Tag>
       );
     }
 
-
-    if (
-      statusValue ===
-      "OK"
-    ) {
+    if (statusValue === "OK") {
       return (
         <Tag
-          icon={
-            <CheckCircleFilled />
-          }
-
+          icon={<CheckCircleFilled />}
           color="success"
-
           style={{
             ...statusTagStyle,
             cursor: "default",
@@ -1682,83 +1004,45 @@ setMonth(dayjs().month() + 1);
       );
     }
 
-
-    if (
-      statusValue ===
-      "WARNING"
-    ) {
+    if (statusValue === "WARNING") {
       return (
         <Tag
-          icon={
-            <ExclamationCircleFilled />
-          }
-
+          icon={<ExclamationCircleFilled />}
           color="warning"
-
-          style={
-            statusTagStyle
-          }
-
-          onClick={() =>
-            openCaseResults(
-              record
-            )
-          }
+          style={statusTagStyle}
+          onClick={() => openCaseResults(record)}
         >
           Cảnh báo
         </Tag>
       );
     }
 
-
-    if (
-      statusValue ===
-      "INCOMPLETE"
-    ) {
+    if (statusValue === "INCOMPLETE") {
       return (
         <Tag
-          icon={
-            <InfoCircleFilled />
-          }
-
+          icon={<InfoCircleFilled />}
           color="gold"
-
           style={{
             ...statusTagStyle,
 
-            minWidth:
-              140,
+            minWidth: 140,
           }}
-
-          onClick={() =>
-            openCaseResults(
-              record
-            )
-          }
+          onClick={() => openCaseResults(record)}
         >
           Chưa đủ cấu hình
         </Tag>
       );
     }
 
-
-    if (
-      statusValue ===
-      "CHECKING"
-    ) {
+    if (statusValue === "CHECKING") {
       return (
         <Tag
-          icon={
-            <LoadingOutlined />
-          }
-
+          icon={<LoadingOutlined />}
           color="processing"
-
           style={{
             ...statusTagStyle,
 
-            cursor:
-              "default",
+            cursor: "default",
           }}
         >
           Đang kiểm tra
@@ -1766,27 +1050,19 @@ setMonth(dayjs().month() + 1);
       );
     }
 
-
     return (
       <Tag
-        icon={
-          <InfoCircleFilled />
-        }
-
+        icon={<InfoCircleFilled />}
         style={{
           ...statusTagStyle,
 
-          color:
-            "#64748b",
+          color: "#64748b",
 
-          background:
-            "#f8fafc",
+          background: "#f8fafc",
 
-          borderColor:
-            "#e2e8f0",
+          borderColor: "#e2e8f0",
 
-          cursor:
-            "default",
+          cursor: "default",
         }}
       >
         Chưa kiểm tra
@@ -1794,151 +1070,96 @@ setMonth(dayjs().month() + 1);
     );
   }
 
-
   // ====================================================
   // STATUS FILTER LABEL
   // ====================================================
 
-  function statusFilterLabel(
-    type:
-      "OK" |
-      "ERROR"
-  ) {
-
-    if (
-      type ===
-      "OK"
-    ) {
+  function statusFilterLabel(type: "OK" | "ERROR") {
+    if (type === "OK") {
       return (
-        <Space
-          size={
-            7
-          }
-        >
+        <Space size={7}>
           <CheckCircleFilled
             style={{
-              color:
-                "#52c41a",
+              color: "#52c41a",
             }}
           />
 
-          <span>
-            Tốt
-          </span>
+          <span>Tốt</span>
         </Space>
       );
     }
 
-
     return (
-      <Space
-        size={
-          7
-        }
-      >
+      <Space size={7}>
         <CloseCircleFilled
           style={{
-            color:
-              "#ff4d4f",
+            color: "#ff4d4f",
           }}
         />
 
-        <span>
-          Lỗi
-        </span>
+        <span>Lỗi</span>
       </Space>
     );
   }
-
 
   // ====================================================
   // JSX
   // ====================================================
 
   return (
-    <div
-      style={
-        pageStyle
-      }
-    >
-
+    <div style={pageStyle}>
       {/* ==================================================
           HEADER
       ================================================== */}
 
       <div
         style={{
-          flexShrink:
-            0,
+          flexShrink: 0,
         }}
       >
-
         <Typography.Title
-          level={
-            3
-          }
-
+          level={3}
           style={{
-            margin:
-              0,
+            margin: 0,
 
-            display:
-              "flex",
+            display: "flex",
 
-            alignItems:
-              "center",
+            alignItems: "center",
 
-            gap:
-              8,
+            gap: 8,
 
-            fontSize:
-              21,
+            fontSize: 21,
 
-            lineHeight:
-              1.25,
+            lineHeight: 1.25,
 
-            fontWeight:
-              800,
+            fontWeight: 800,
 
-            color:
-              "#172033",
+            color: "#172033",
           }}
         >
-
           <FileSearchOutlined
             style={{
-              color:
-                "#1677ff",
+              color: "#1677ff",
 
-              fontSize:
-                20,
+              fontSize: 20,
             }}
           />
-
           Danh sách hồ sơ
-
         </Typography.Title>
-
 
         <Typography.Text
           type="secondary"
-
           style={{
-            display:
-              "block",
+            display: "block",
 
-            marginTop:
-              2,
+            marginTop: 2,
 
-            fontSize:
-              12,
+            fontSize: 12,
           }}
         >
           Theo dõi và kiểm tra dữ liệu hồ sơ khám chữa bệnh BHYT
         </Typography.Text>
-
       </div>
-
 
       {/* ==================================================
           THỐNG KÊ
@@ -1946,324 +1167,246 @@ setMonth(dayjs().month() + 1);
 
       <div
         className="medguard-stat-grid"
-
         style={{
-          display:
-            "grid",
+          display: "grid",
 
-          gridTemplateColumns:
-            "repeat(4, minmax(170px, 1fr))",
+          gridTemplateColumns: "repeat(4, minmax(170px, 1fr))",
 
-          gap:
-            10,
+          gap: 10,
 
-          flexShrink:
-            0,
+          flexShrink: 0,
         }}
       >
-
         {/* TỔNG HỒ SƠ */}
 
         <Card
           styles={{
             body: {
-              padding:
-                "10px 14px",
+              padding: "10px 14px",
             },
           }}
-
           style={{
             ...panelStyle,
 
-            borderLeft:
-              "4px solid #ff4d4f",
+            borderLeft: "4px solid #ff4d4f",
           }}
         >
-
           <Typography.Text
             type="secondary"
-
             style={{
-              fontSize:
-                12,
+              fontSize: 12,
             }}
           >
             Tổng hồ sơ
           </Typography.Text>
 
-
           <div
             style={{
-              marginTop:
-                2,
+              marginTop: 2,
 
-              fontSize:
-                20,
+              fontSize: 20,
 
-              lineHeight:
-                1.2,
+              lineHeight: 1.2,
 
-              fontWeight:
-                800,
+              fontWeight: 800,
 
-              color:
-                "#d4380d",
+              color: "#d4380d",
             }}
           >
             {total}
           </div>
-
         </Card>
-
 
         {/* TỔNG CHI */}
 
         <Card
           styles={{
             body: {
-              padding:
-                "10px 14px",
+              padding: "10px 14px",
             },
           }}
-
           style={{
             ...panelStyle,
 
-            borderLeft:
-              "4px solid #1677ff",
+            borderLeft: "4px solid #1677ff",
           }}
         >
-
           <Typography.Text
             type="secondary"
-
             style={{
-              fontSize:
-                12,
+              fontSize: 12,
             }}
           >
             Tổng chi
           </Typography.Text>
 
-
           <div
             style={{
-              marginTop:
-                2,
+              marginTop: 2,
 
-              fontSize:
-                19,
+              fontSize: 19,
 
-              lineHeight:
-                1.2,
+              lineHeight: 1.2,
 
-              fontWeight:
-                800,
+              fontWeight: 800,
 
-              color:
-                "#1677ff",
+              color: "#1677ff",
             }}
           >
-            {
-              formatMoney(
-                totalAmount
-              )
-            }
+            {formatMoney(totalAmount)}
           </div>
-
         </Card>
-
 
         {/* TỔNG BHYT */}
 
         <Card
           styles={{
             body: {
-              padding:
-                "10px 14px",
+              padding: "10px 14px",
             },
           }}
-
           style={{
             ...panelStyle,
 
-            borderLeft:
-              "4px solid #faad14",
+            borderLeft: "4px solid #faad14",
           }}
         >
-
           <Typography.Text
             type="secondary"
-
             style={{
-              fontSize:
-                12,
+              fontSize: 12,
             }}
           >
             Tổng BHYT
           </Typography.Text>
 
-
           <div
             style={{
-              marginTop:
-                2,
+              marginTop: 2,
 
-              fontSize:
-                19,
+              fontSize: 19,
 
-              lineHeight:
-                1.2,
+              lineHeight: 1.2,
 
-              fontWeight:
-                800,
+              fontWeight: 800,
 
-              color:
-                "#d48806",
+              color: "#d48806",
             }}
           >
-            {
-              formatMoney(
-                totalBhyt
-              )
-            }
+            {formatMoney(totalBhyt)}
           </div>
-
         </Card>
-
 
         {/* TỔNG BNTT */}
 
         <Card
           styles={{
             body: {
-              padding:
-                "10px 14px",
+              padding: "10px 14px",
             },
           }}
-
           style={{
             ...panelStyle,
 
-            borderLeft:
-              "4px solid #52c41a",
+            borderLeft: "4px solid #52c41a",
           }}
         >
-
           <Typography.Text
             type="secondary"
-
             style={{
-              fontSize:
-                12,
+              fontSize: 12,
             }}
           >
             Tổng BNTT
           </Typography.Text>
 
-
           <div
             style={{
-              marginTop:
-                2,
+              marginTop: 2,
 
-              fontSize:
-                19,
+              fontSize: 19,
 
-              lineHeight:
-                1.2,
+              lineHeight: 1.2,
 
-              fontWeight:
-                800,
+              fontWeight: 800,
 
-              color:
-                "#389e0d",
+              color: "#389e0d",
             }}
           >
-            {
-              formatMoney(
-                totalPatient
-              )
-            }
+            {formatMoney(totalPatient)}
           </div>
-
         </Card>
-
       </div>
-
 
       {/* ==================================================
           FILTER
       ================================================== */}
 
-{/* ==================================================
+      {/* ==================================================
     MEDGUARD - MODERN FILTER PANEL
 ================================================== */}
 
-<Card
-  className="medguard-filter-panel"
-  style={{
-    ...panelStyle,
-    flexShrink: 0,
-    border: "1px solid #e3ebf6",
-    borderRadius: 16,
-    boxShadow: "0 4px 18px rgba(15,23,42,0.035)",
-  }}
-  styles={{
-    body: {
-      padding: "13px 16px 12px",
-    },
-  }}
->
-  {/* HEADER */}
-  <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 5,
-    flexWrap: "wrap",
-  }}
->
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div
+      <Card
+        className="medguard-filter-panel"
         style={{
-          width: 26,
-          height: 26,
-          borderRadius: 7,
-          background: "#eff6ff",
-          color: "#1677ff",
-          display: "grid",
-          placeItems: "center",
-          fontSize: 17,
+          ...panelStyle,
+          flexShrink: 0,
+          border: "1px solid #e3ebf6",
+          borderRadius: 16,
+          boxShadow: "0 4px 18px rgba(15,23,42,0.035)",
+        }}
+        styles={{
+          body: {
+            padding: "13px 16px 12px",
+          },
         }}
       >
-        <SearchOutlined />
-      </div>
-
-      <div>
-        <Typography.Text
-          strong
+        {/* HEADER */}
+        <div
           style={{
-            display: "block",
-            fontSize: 14,
-            color: "#14233b",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 5,
+            flexWrap: "wrap",
           }}
         >
-          Bộ lọc hồ sơ
-        </Typography.Text>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 7,
+                background: "#eff6ff",
+                color: "#1677ff",
+                display: "grid",
+                placeItems: "center",
+                fontSize: 17,
+              }}
+            >
+              <SearchOutlined />
+            </div>
 
-        <Typography.Text
-          type="secondary"
-          style={{ display: "block", fontSize: 11 }}
-        >
-          Tra cứu hồ sơ theo bệnh nhân, bác sĩ và thời gian
-        </Typography.Text>
-      </div>
-    </div>
+            <div>
+              <Typography.Text
+                strong
+                style={{
+                  display: "block",
+                  fontSize: 14,
+                  color: "#14233b",
+                }}
+              >
+                Bộ lọc hồ sơ
+              </Typography.Text>
 
-    {/* {examDoctorCode && (
+              <Typography.Text type="secondary" style={{ display: "block", fontSize: 11 }}>
+                Tra cứu hồ sơ theo bệnh nhân, bác sĩ và thời gian
+              </Typography.Text>
+            </div>
+          </div>
+
+          {/* {examDoctorCode && (
       <Tag
         color="blue"
         style={{
@@ -2277,327 +1420,299 @@ setMonth(dayjs().month() + 1);
           examDoctorCode}
       </Tag>
     )} */}
-  </div>
-
-  {examDoctorError && (
-    <Alert
-      type="warning"
-      showIcon
-      style={{ marginBottom: 12, borderRadius: 10 }}
-      message="Không tải được danh sách bác sĩ công khám"
-      description="Kiểm tra kết nối API bác sĩ công khám."
-    />
-  )}
-
-  {/* HÀNG 1 - BỘ LỌC CHÍNH */}
-  <div
-    className="medguard-filter-grid"
-    style={{
-      display: "grid",
-      gridTemplateColumns:
-        "minmax(120px, 0.85fr) minmax(160px, 1.1fr) minmax(220px, 1.6fr) minmax(180px, 1.2fr) minmax(155px, 1fr)",
-      gap: 10,
-      alignItems: "end",
-    }}
-  >
-    <div className="medguard-filter-field">
-      <div className="medguard-filter-label">Mã bệnh nhân</div>
-      <Input
-        size="large"
-        value={maBn}
-        allowClear
-        prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-        placeholder="Nhập mã BN"
-        onChange={(e) => {
-          setMaBn(e.target.value);
-          setPage(1);
-        }}
-      />
-    </div>
-
-    <div className="medguard-filter-field">
-      <div className="medguard-filter-label">Tên bệnh nhân</div>
-      <Input
-        size="large"
-        value={hoTen}
-        allowClear
-        prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-        placeholder="Tìm họ và tên"
-        onChange={(e) => {
-          setHoTen(e.target.value);
-          setPage(1);
-        }}
-      />
-    </div>
-
-    <div className="medguard-filter-field">
-      <div className="medguard-filter-label">
-        <span>Bác sĩ công khám</span>
-        
-      </div>
-
-      <Select
-        size="large"
-        aria-label="Bác sĩ công khám"
-        style={{ width: "100%" }}
-        allowClear
-        showSearch
-        optionFilterProp="label"
-        loading={examDoctorLoading}
-        disabled={examDoctorLoading || !!examDoctorError}
-        placeholder="Tất cả bác sĩ công khám"
-        value={examDoctorCode}
-        onChange={(code: string | undefined) => {
-          setExamDoctorCode(code);
-          setPage(1);
-        }}
-        options={examDoctors.map((d) => ({
-          value: d.code,
-          label: `${d.name?.trim() || d.code}`,
-        }))}
-      />
-    </div>
-
-    <div className="medguard-filter-field">
-      <div className="medguard-filter-label">Nhóm hồ sơ</div>
-      <Select
-        size="large"
-        value={treatmentGroup}
-        style={{ width: "100%" }}
-        onChange={(value: string) => {
-          setTreatmentGroup(value);
-          setPage(1);
-        }}
-        options={[
-          { value: "ALL", label: "Tất cả nhóm KCB" },
-          { value: "GENERAL", label: "Khám bệnh ngoại trú" },
-          { value: "YHCT", label: "Bệnh án ngoại trú" },
-        ]}
-      />
-    </div>
-
-    <div className="medguard-filter-field">
-      <div className="medguard-filter-label">Trạng thái</div>
-      <Select
-        size="large"
-        value={status}
-        style={{ width: "100%" }}
-        onChange={(value: string) => {
-          setStatus(value);
-          setPage(1);
-        }}
-        options={[
-          { value: "ALL", label: "Tất cả trạng thái" },
-          { value: "OK", label: statusFilterLabel("OK") },
-          { value: "ERROR", label: statusFilterLabel("ERROR") },
-        ]}
-      />
-    </div>
-  </div>
-
-  {/* HÀNG 2 - THỜI GIAN VÀ THAO TÁC */}
-  <div className="medguard-filter-actions-row">
-    <div className="medguard-filter-date-fields">
-      <div className="medguard-filter-field">
-        <div className="medguard-filter-label">Năm</div>
-        <Select
-          size="large"
-          allowClear
-          placeholder="Năm"
-          style={{ width: "100%" }}
-          value={year}
-          onChange={(value) => {
-            setYear(value);
-            setPage(1);
-          }}
-          options={[
-            { value: 2026, label: "2026" },
-            { value: 2025, label: "2025" },
-            { value: 2024, label: "2024" },
-          ]}
-        />
-      </div>
-
-      <div className="medguard-filter-field">
-        <div className="medguard-filter-label">Tháng</div>
-        <Select
-          size="large"
-          allowClear
-          placeholder="Tất cả tháng"
-          style={{ width: "100%" }}
-          value={month}
-          onChange={(value) => {
-            setMonth(value);
-            setPage(1);
-          }}
-          options={Array.from({ length: 12 }, (_, i) => ({
-            value: i + 1,
-            label: `Tháng ${i + 1}`,
-          }))}
-        />
-      </div>
-
-      <div className="medguard-filter-field">
-        <div className="medguard-filter-label">
-          Ngày thanh toán
         </div>
-        <DatePicker
-          size="large"
-          value={paymentDate ? dayjs(paymentDate) : null}
-          format="DD/MM/YYYY"
-          placeholder="Chọn ngày"
-          allowClear
-          disabled={clearingPaymentDate}
+
+        {examDoctorError && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12, borderRadius: 10 }}
+            title="Không tải được danh sách bác sĩ công khám"
+            description="Kiểm tra kết nối API bác sĩ công khám."
+          />
+        )}
+
+        {/* HÀNG 1 - BỘ LỌC CHÍNH */}
+        <div
+          className="medguard-filter-grid"
           style={{
-            width: "100%",
-            opacity: clearingPaymentDate ? 0.6 : 1,
+            display: "grid",
+            gridTemplateColumns:
+              "minmax(120px, 0.85fr) minmax(160px, 1.1fr) minmax(220px, 1.6fr) minmax(180px, 1.2fr) minmax(155px, 1fr)",
+            gap: 10,
+            alignItems: "end",
           }}
-          onChange={(date) => {
-            if (clearPaymentTimer.current) {
-              clearTimeout(clearPaymentTimer.current);
-              clearPaymentTimer.current = null;
-            }
+        >
+          <div className="medguard-filter-field">
+            <div className="medguard-filter-label">Mã bệnh nhân</div>
+            <Input
+              size="large"
+              value={maBn}
+              allowClear
+              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+              placeholder="Nhập mã BN"
+              onChange={(e) => {
+                setMaBn(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
 
-            if (date) {
-              setClearingPaymentDate(false);
-              setPaymentDate(date.format("YYYY-MM-DD"));
-            } else {
-              setClearingPaymentDate(false);
-              setPaymentDate(undefined);
-            }
+          <div className="medguard-filter-field">
+            <div className="medguard-filter-label">Tên bệnh nhân</div>
+            <Input
+              size="large"
+              value={hoTen}
+              allowClear
+              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+              placeholder="Tìm họ và tên"
+              onChange={(e) => {
+                setHoTen(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
 
-            setPage(1);
-          }}
-        />
-      </div>
-    </div>
+          <div className="medguard-filter-field">
+            <div className="medguard-filter-label">
+              <span>Bác sĩ công khám</span>
+            </div>
 
-    <div className="medguard-filter-buttons">
-      <Button
-        size="large"
-        icon={<ReloadOutlined />}
-        disabled={refreshing}
-        loading={refreshing}
-        onClick={handleReset}
-        style={{
-          borderRadius: 10,
-          fontWeight: 600,
-          minWidth: 115,
-          height: 40,
-        }}
-      >
-        Làm mới
-      </Button>
+            <Select
+              size="large"
+              aria-label="Bác sĩ công khám"
+              style={{ width: "100%" }}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              loading={examDoctorLoading}
+              disabled={examDoctorLoading || !!examDoctorError}
+              placeholder="Tất cả bác sĩ công khám"
+              value={examDoctorCode}
+              onChange={(code: string | undefined) => {
+                setExamDoctorCode(code);
+                setPage(1);
+              }}
+              options={examDoctors.map((d) => ({
+                value: d.code,
+                label: `${d.name?.trim() || d.code}`,
+              }))}
+            />
+          </div>
 
-      <Button
-        size="large"
-        type="primary"
-        icon={
-          checking
-            ? <LoadingOutlined />
-            : <SafetyCertificateOutlined />
-        }
-        loading={checking}
-        onClick={handleRunChecks}
-        style={{
-          borderRadius: 10,
-          fontWeight: 700,
-          height: 40,
-          minWidth: 170,
-          background: "#1677ff",
-          boxShadow: "0 4px 12px rgba(22,119,255,0.18)",
-        }}
-      >
-        {checking ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
-      </Button>
-    </div>
-  </div>
+          <div className="medguard-filter-field">
+            <div className="medguard-filter-label">Nhóm hồ sơ</div>
+            <Select
+              size="large"
+              value={treatmentGroup}
+              style={{ width: "100%" }}
+              onChange={(value: string) => {
+                setTreatmentGroup(value);
+                setPage(1);
+              }}
+              options={[
+                { value: "ALL", label: "Tất cả nhóm KCB" },
+                { value: "GENERAL", label: "Khám bệnh ngoại trú" },
+                { value: "YHCT", label: "Bệnh án ngoại trú" },
+              ]}
+            />
+          </div>
 
-  {/* THÔNG TIN BỘ LỌC */}
-  {examDoctorCode && (
-    <div className="medguard-filter-active">
-      <InfoCircleFilled style={{ color: "#1677ff" }} />
+          <div className="medguard-filter-field">
+            <div className="medguard-filter-label">Trạng thái</div>
+            <Select
+              size="large"
+              value={status}
+              style={{ width: "100%" }}
+              onChange={(value: string) => {
+                setStatus(value);
+                setPage(1);
+              }}
+              options={[
+                { value: "ALL", label: "Tất cả trạng thái" },
+                { value: "OK", label: statusFilterLabel("OK") },
+                { value: "ERROR", label: statusFilterLabel("ERROR") },
+              ]}
+            />
+          </div>
+        </div>
 
-      <span>
-        Đang xem hồ sơ có công khám của BS{" "}
-        <strong>
-          {examDoctorByCode.get(examDoctorCode)?.name ||
-            examDoctorCode}
-        </strong>
-      </span>
+        {/* HÀNG 2 - THỜI GIAN VÀ THAO TÁC */}
+        <div className="medguard-filter-actions-row">
+          <div className="medguard-filter-date-fields">
+            <div className="medguard-filter-field">
+              <div className="medguard-filter-label">Năm</div>
+              <Select
+                size="large"
+                allowClear
+                placeholder="Năm"
+                style={{ width: "100%" }}
+                value={year}
+                onChange={(value) => {
+                  setYear(value);
+                  setPage(1);
+                }}
+                options={[
+                  { value: 2026, label: "2026" },
+                  { value: 2025, label: "2025" },
+                  { value: 2024, label: "2024" },
+                ]}
+              />
+            </div>
 
-      <span style={{ color: "#64748b" }}>
-        • {total.toLocaleString("vi-VN")} hồ sơ theo bộ lọc
-      </span>
+            <div className="medguard-filter-field">
+              <div className="medguard-filter-label">Tháng</div>
+              <Select
+                size="large"
+                allowClear
+                placeholder="Tất cả tháng"
+                style={{ width: "100%" }}
+                value={month}
+                onChange={(value) => {
+                  setMonth(value);
+                  setPage(1);
+                }}
+                options={Array.from({ length: 12 }, (_, i) => ({
+                  value: i + 1,
+                  label: `Tháng ${i + 1}`,
+                }))}
+              />
+            </div>
 
-      <Button
-        type="link"
-        size="small"
-        onClick={() => {
-          setExamDoctorCode(undefined);
-          setPage(1);
-        }}
-      >
-        Bỏ lọc bác sĩ
-      </Button>
-    </div>
-  )}
-</Card>
+            <div className="medguard-filter-field">
+              <div className="medguard-filter-label">Ngày thanh toán</div>
+              <DatePicker
+                size="large"
+                value={paymentDate ? dayjs(paymentDate) : null}
+                format="DD/MM/YYYY"
+                placeholder="Chọn ngày"
+                allowClear
+                disabled={clearingPaymentDate}
+                style={{
+                  width: "100%",
+                  opacity: clearingPaymentDate ? 0.6 : 1,
+                }}
+                onChange={(date) => {
+                  if (clearPaymentTimer.current) {
+                    clearTimeout(clearPaymentTimer.current);
+                    clearPaymentTimer.current = null;
+                  }
 
+                  if (date) {
+                    setClearingPaymentDate(false);
+                    setPaymentDate(date.format("YYYY-MM-DD"));
+                  } else {
+                    setClearingPaymentDate(false);
+                    setPaymentDate(undefined);
+                  }
 
+                  setPage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="medguard-filter-buttons">
+            <Button
+              size="large"
+              icon={<ReloadOutlined />}
+              disabled={refreshing}
+              loading={refreshing}
+              onClick={handleReset}
+              style={{
+                borderRadius: 10,
+                fontWeight: 600,
+                minWidth: 115,
+                height: 40,
+              }}
+            >
+              Làm mới
+            </Button>
+
+            <Button
+              size="large"
+              type="primary"
+              icon={checking ? <LoadingOutlined /> : <SafetyCertificateOutlined />}
+              loading={checking}
+              onClick={handleRunChecks}
+              style={{
+                borderRadius: 10,
+                fontWeight: 700,
+                height: 40,
+                minWidth: 170,
+                background: "#1677ff",
+                boxShadow: "0 4px 12px rgba(22,119,255,0.18)",
+              }}
+            >
+              {checking ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
+            </Button>
+          </div>
+        </div>
+
+        {/* THÔNG TIN BỘ LỌC */}
+        {examDoctorCode && (
+          <div className="medguard-filter-active">
+            <InfoCircleFilled style={{ color: "#1677ff" }} />
+
+            <span>
+              Đang xem hồ sơ có công khám của BS{" "}
+              <strong>{examDoctorByCode.get(examDoctorCode)?.name || examDoctorCode}</strong>
+            </span>
+
+            <span style={{ color: "#64748b" }}>
+              • {total.toLocaleString("vi-VN")} hồ sơ theo bộ lọc
+            </span>
+
+            <Button
+              type="link"
+              size="small"
+              onClick={() => {
+                setExamDoctorCode(undefined);
+                setPage(1);
+              }}
+            >
+              Bỏ lọc bác sĩ
+            </Button>
+          </div>
+        )}
+      </Card>
 
       {/* ==================================================
           TABLE
       ================================================== */}
 
       <div
-        ref={
-          tableAreaRef
-        }
-
+        ref={tableAreaRef}
         style={{
-          flex:
-            1,
+          flex: 1,
 
-          minHeight:
-            0,
+          minHeight: 0,
 
-          overflow:
-            "hidden",
+          overflow: "hidden",
         }}
       >
-
         <Card
           style={{
             ...panelStyle,
 
-            height:
-              "100%",
+            height: "100%",
 
-            overflow:
-              "hidden",
+            overflow: "hidden",
           }}
-
           styles={{
             body: {
-              padding:
-                0,
+              padding: 0,
 
-              height:
-                "100%",
+              height: "100%",
 
-              display:
-                "flex",
+              display: "flex",
 
-              flexDirection:
-                "column",
+              flexDirection: "column",
 
-              overflow:
-                "hidden",
+              overflow: "hidden",
             },
           }}
         >
-
           {/* ==============================================
               HEADER TABLE
           ============================================== */}
@@ -2605,72 +1720,52 @@ setMonth(dayjs().month() + 1);
           <div
             className="medguard-case-table-header"
             style={{
-              padding:
-                "10px 14px",
+              padding: "10px 14px",
 
-              display:
-                "flex",
+              display: "flex",
 
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
 
-              alignItems:
-                "center",
+              alignItems: "center",
 
-              borderBottom:
-                "1px solid #f0f0f0",
+              borderBottom: "1px solid #f0f0f0",
 
-              flexShrink:
-                0,
+              flexShrink: 0,
             }}
           >
-
             <div>
-
               <Typography.Text
                 strong
-
                 style={{
-                  fontSize:
-                    14,
+                  fontSize: 14,
                 }}
               >
                 Hồ sơ khám chữa bệnh
               </Typography.Text>
 
-
               <Typography.Text
                 type="secondary"
-
                 style={{
-                  marginLeft:
-                    8,
+                  marginLeft: 8,
 
-                  fontSize:
-                    11,
+                  fontSize: 11,
                 }}
               >
                 {total} hồ sơ
               </Typography.Text>
-
             </div>
-
 
             <Typography.Text
               type="secondary"
-
               style={{
-                fontSize:
-                  11,
+                fontSize: 11,
               }}
             >
               {lastViewedCase
                 ? `Vừa xem: ${lastViewedCase.ma_bn || "—"} - ${lastViewedCase.ho_ten || ""}`
                 : "Hồ sơ có lỗi hoặc cảnh báo có thể bấm để xem chi tiết"}
             </Typography.Text>
-
           </div>
-
 
           {/* ==============================================
               CHỈ PHẦN TABLE ĐƯỢC CUỘN
@@ -2685,34 +1780,19 @@ setMonth(dayjs().month() + 1);
               position: "relative",
             }}
           >
-
-            <Table<
-              MedicalCase
-            >
+            <Table<MedicalCase>
               className="medguard-case-table-fixed"
-
               // Bắt AntD tạo body mới khi chuyển trang, tránh giữ vị trí scroll cũ.
               key={`${page}-${pageSize}`}
               rowKey="id"
-
-              loading={
-                loading
-              }
-
-              dataSource={
-                cases
-              }
-
+              loading={loading}
+              dataSource={cases}
               size="middle"
-
               scroll={{
-                x:
-                  1750,
+                x: 1750,
 
-                y:
-                  tableScrollY,
+                y: tableScrollY,
               }}
-
               rowClassName={(record) => {
                 const classes: string[] = [];
                 if (record.status === "ERROR") classes.push("medguard-row-error");
@@ -2720,105 +1800,63 @@ setMonth(dayjs().month() + 1);
                 if (record.id === lastViewedCase?.id) classes.push("medguard-row-last-viewed");
                 return classes.join(" ");
               }}
-
               pagination={false}
-
               columns={[
-
                 // =========================================
                 // TRẠNG THÁI
                 // =========================================
 
                 {
-                  title:
-                    "Trạng thái",
+                  title: "Trạng thái",
 
-                  dataIndex:
-                    "status",
+                  dataIndex: "status",
 
-                  width:
-                    145,
+                  width: 145,
 
-                  fixed:
-                    "left",
+                  fixed: "left",
 
-                  render:
-                    (
-                      value,
-                      record
-                    ) =>
-                      renderCaseStatus(
-                        value,
-                        record
-                      ),
+                  render: (value, record) => renderCaseStatus(value, record),
                 },
-
 
                 // =========================================
                 // MÃ BN
                 // =========================================
 
                 {
-                  title:
-                    "Mã BN",
+                  title: "Mã BN",
 
-                  dataIndex:
-                    "ma_bn",
+                  dataIndex: "ma_bn",
 
-                  width:
-                    110,
+                  width: 110,
 
-                  render:
-                    (
-                      value
-                    ) => (
-
-                      <Typography.Text
-                        strong
-                      >
-                        {value}
-                      </Typography.Text>
-
-                    ),
+                  render: (value) => <Typography.Text strong>{value}</Typography.Text>,
                 },
-
 
                 // =========================================
                 // HỌ TÊN
                 // =========================================
 
                 {
-                  title:
-                    "Họ và tên",
+                  title: "Họ và tên",
 
-                  dataIndex:
-                    "ho_ten",
+                  dataIndex: "ho_ten",
 
-                  width:
-                    190,
+                  width: 190,
 
-                  render:
-                    (
-                      value,
-                      record
-                    ) => (
-
-                      record.status === "OK" ? (
-                        <Typography.Text style={{ fontWeight: 600, color: "#334155" }}>
-                          {value}
-                        </Typography.Text>
-                      ) : (
-                        <Typography.Link
-                          style={{ fontWeight: 600 }}
-                          onClick={() => openCaseResults(record)}
-                        >
-                          {value}
-                        </Typography.Link>
-                      )
-
+                  render: (value, record) =>
+                    record.status === "OK" ? (
+                      <Typography.Text style={{ fontWeight: 600, color: "#334155" }}>
+                        {value}
+                      </Typography.Text>
+                    ) : (
+                      <Typography.Link
+                        style={{ fontWeight: 600 }}
+                        onClick={() => openCaseResults(record)}
+                      >
+                        {value}
+                      </Typography.Link>
                     ),
                 },
-
 
                 {
                   title: "Bác sĩ công khám",
@@ -2828,7 +1866,7 @@ setMonth(dayjs().month() + 1);
                     const doctors = examDoctorByMaLk.get(record.ma_lk || "") || [];
                     return doctors.length ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        {doctors.map(d => (
+                        {doctors.map((d) => (
                           <Typography.Text key={d.code} style={{ fontSize: 12 }}>
                             {d.name?.trim() || d.code}
                           </Typography.Text>
@@ -2846,211 +1884,140 @@ setMonth(dayjs().month() + 1);
                 // =========================================
 
                 {
-                  title:
-                    "Mã thẻ",
+                  title: "Mã thẻ",
 
-                  dataIndex:
-                    "ma_the_bhyt",
+                  dataIndex: "ma_the_bhyt",
 
-                  width:
-                    170,
+                  width: 170,
                 },
-
 
                 // =========================================
                 // GIỚI TÍNH
                 // =========================================
 
                 {
-                  title:
-                    "Giới tính",
+                  title: "Giới tính",
 
-                  dataIndex:
-                    "gioi_tinh",
+                  dataIndex: "gioi_tinh",
 
-                  width:
-                    90,
+                  width: 90,
 
-                  render:
-                    renderGender,
+                  render: renderGender,
                 },
-
 
                 // =========================================
                 // LOẠI KCB
                 // =========================================
 
                 {
-                  title:
-                    "Loại KCB",
+                  title: "Loại KCB",
 
-                  dataIndex:
-                    "ma_loai_kcb",
+                  dataIndex: "ma_loai_kcb",
 
-                  width:
-                    100,
+                  width: 100,
                 },
-
 
                 // =========================================
                 // NGÀY VÀO
                 // =========================================
 
                 {
-                  title:
-                    "Ngày vào",
+                  title: "Ngày vào",
 
-                  dataIndex:
-                    "ngay_vao",
+                  dataIndex: "ngay_vao",
 
-                  width:
-                    160,
+                  width: 160,
 
-                  render:
-                    formatDate,
+                  render: formatDate,
                 },
-
 
                 // =========================================
                 // NGÀY RA
                 // =========================================
 
                 {
-                  title:
-                    "Ngày ra",
+                  title: "Ngày ra",
 
-                  dataIndex:
-                    "ngay_ra",
+                  dataIndex: "ngay_ra",
 
-                  width:
-                    160,
+                  width: 160,
 
-                  render:
-                    formatDate,
+                  render: formatDate,
                 },
-
 
                 // =========================================
                 // TỔNG CHI
                 // =========================================
 
                 {
-                  title:
-                    "Tổng chi",
+                  title: "Tổng chi",
 
-                  dataIndex:
-                    "t_tongchi",
+                  dataIndex: "t_tongchi",
 
-                  align:
-                    "right",
+                  align: "right",
 
-                  width:
-                    130,
+                  width: 130,
 
-                  render:
-                    (
-                      value
-                    ) => (
-
-                      <Typography.Text
-                        strong
-                      >
-                        {
-                          formatMoney(
-                            value
-                          )
-                        }
-                      </Typography.Text>
-
-                    ),
+                  render: (value) => <Typography.Text strong>{formatMoney(value)}</Typography.Text>,
                 },
-
 
                 // =========================================
                 // BỆNH NHÂN TT
                 // =========================================
 
                 {
-                  title:
-                    "Bệnh nhân TT",
+                  title: "Bệnh nhân TT",
 
-                  dataIndex:
-                    "t_bntt",
+                  dataIndex: "t_bntt",
 
-                  align:
-                    "right",
+                  align: "right",
 
-                  width:
-                    130,
+                  width: 130,
 
-                  render:
-                    formatMoney,
+                  render: formatMoney,
                 },
-
 
                 // =========================================
                 // BẢO HIỂM TT
                 // =========================================
 
                 {
-                  title:
-                    "Bảo hiểm TT",
+                  title: "Bảo hiểm TT",
 
-                  dataIndex:
-                    "t_bhtt",
+                  dataIndex: "t_bhtt",
 
-                  align:
-                    "right",
+                  align: "right",
 
-                  width:
-                    130,
+                  width: 130,
 
-                  render:
-                    (
-                      value
-                    ) => (
+                  render: (value) => (
+                    <Typography.Text
+                      style={{
+                        color: "#1677ff",
 
-                      <Typography.Text
-                        style={{
-                          color:
-                            "#1677ff",
-
-                          fontWeight:
-                            600,
-                        }}
-                      >
-                        {
-                          formatMoney(
-                            value
-                          )
-                        }
-                      </Typography.Text>
-
-                    ),
+                        fontWeight: 600,
+                      }}
+                    >
+                      {formatMoney(value)}
+                    </Typography.Text>
+                  ),
                 },
-
 
                 // =========================================
                 // NGÀY THANH TOÁN
                 // =========================================
 
                 {
-                  title:
-                    "Ngày thanh toán",
+                  title: "Ngày thanh toán",
 
-                  dataIndex:
-                    "ngay_ttoan",
+                  dataIndex: "ngay_ttoan",
 
-                  width:
-                    170,
+                  width: 170,
 
-                  render:
-                    formatDate,
+                  render: formatDate,
                 },
-
               ]}
             />
-
           </div>
 
           <div className="medguard-case-pagination-footer">
@@ -3060,7 +2027,7 @@ setMonth(dayjs().month() + 1);
               total={total}
               showSizeChanger
               pageSizeOptions={["10", "50", "100"]}
-              showTotal={value => `Tổng số: ${value}`}
+              showTotal={(value) => `Tổng số: ${value}`}
               responsive
               onChange={(newPage, newPageSize) => {
                 if (newPageSize !== pageSize) {
@@ -3072,11 +2039,8 @@ setMonth(dayjs().month() + 1);
               }}
             />
           </div>
-
         </Card>
-
       </div>
-
 
       {/* ==================================================
           STYLE
@@ -3786,7 +2750,7 @@ setMonth(dayjs().month() + 1);
             }
 
           }
-            
+
 /* ==================================================
    MEDGUARD - MODERN FILTER UI
 ================================================== */
@@ -3913,7 +2877,7 @@ setMonth(dayjs().month() + 1);
     width: 100%;
   }
 }
-  
+
 /* ============================================
    MEDGUARD - COMPACT FILTER
    Thu gọn bộ lọc, tăng chiều cao TABLE
@@ -4005,7 +2969,7 @@ setMonth(dayjs().month() + 1);
   padding-top: 9px !important;
   padding-bottom: 9px !important;
 }
-  
+
 @keyframes medguard-quote-fade {
   from {
     opacity: 0;
@@ -4024,179 +2988,93 @@ setMonth(dayjs().month() + 1);
         `}
       </style>
 
-
       {/* ==================================================
           MODAL CHI TIẾT
       ================================================== */}
 
       <CaseCheckResultsModal
-        open={
-          resultCase !==
-          null
-        }
-
-        caseId={
-          resultCase
-            ?.id ??
-          null
-        }
-
-        patientCode={
-          resultCase
-            ?.ma_bn ??
-          ""
-        }
-
-        patientName={
-          resultCase
-            ?.ho_ten ??
-          ""
-        }
-
+        open={resultCase !== null}
+        caseId={resultCase?.id ?? null}
+        patientCode={resultCase?.ma_bn ?? ""}
+        patientName={resultCase?.ho_ten ?? ""}
         treatmentGroup={resultCase?.treatment_group}
-
         onClose={closeCaseResults}
       />
-
 
       {/* ==================================================
           OVERLAY CHECKING
       ================================================== */}
 
-      {
-        checking && (
-
-          <div
-            className="medguard-checking-screen"
-          >
-
-            <div
-              className="medguard-checking-card"
-            >
-
+      {checking && (
+        <div className="medguard-checking-screen">
+          <div className="medguard-checking-card">
+            <div className="medguard-checking-orbit">
               <div
-                className="medguard-checking-orbit"
-              >
-
-                <div
-                  className="
+                className="
                     medguard-checking-ring
                     medguard-checking-ring-a
                   "
-                />
+              />
 
-
-                <div
-                  className="
+              <div
+                className="
                     medguard-checking-ring
                     medguard-checking-ring-b
                   "
-                />
+              />
 
-
-                <div
-                  className="medguard-checking-core"
-                >
-                  <SafetyCertificateOutlined />
-                </div>
-
+              <div className="medguard-checking-core">
+                <SafetyCertificateOutlined />
               </div>
+            </div>
 
+            <div className="medguard-checking-title">Đang kiểm tra dữ liệu</div>
 
+            <div className="medguard-checking-subtitle">Hệ thống đang đối chiếu hồ sơ BHYT</div>
+
+            <div className="medguard-checking-count">
+              <span className="medguard-checking-count-current">
+                {checkProgress.processedCases}
+              </span>
+
+              <span>/</span>
+
+              <span>{checkProgress.totalCases}</span>
+
+              <span>hồ sơ</span>
+            </div>
+
+            <div className="medguard-checking-percent">
+              {Math.max(
+                0,
+
+                Math.min(
+                  100,
+
+                  checkProgress.percent,
+                ),
+              )}
+              %
+            </div>
+
+            <div className="medguard-checking-progress">
               <div
-                className="medguard-checking-title"
-              >
-                Đang kiểm tra dữ liệu
-              </div>
-
-
-              <div
-                className="medguard-checking-subtitle"
-              >
-                Hệ thống đang đối chiếu hồ sơ BHYT
-              </div>
-
-
-              <div
-                className="medguard-checking-count"
-              >
-
-                <span
-                  className="medguard-checking-count-current"
-                >
-                  {
-                    checkProgress
-                      .processedCases
-                  }
-                </span>
-
-
-                <span>
-                  /
-                </span>
-
-
-                <span>
-                  {
-                    checkProgress
-                      .totalCases
-                  }
-                </span>
-
-
-                <span>
-                  hồ sơ
-                </span>
-
-              </div>
-
-
-              <div
-                className="medguard-checking-percent"
-              >
-                {
-                  Math.max(
+                className="medguard-checking-progress-bar"
+                style={{
+                  width: `${Math.max(
                     0,
 
                     Math.min(
                       100,
 
-                      checkProgress
-                        .percent
-                    )
-                  )
-                }
-                %
-              </div>
+                      checkProgress.percent,
+                    ),
+                  )}%`,
+                }}
+              />
+            </div>
 
-
-              <div
-                className="medguard-checking-progress"
-              >
-
-                <div
-                  className="medguard-checking-progress-bar"
-
-                  style={{
-                    width:
-                      `${Math.max(
-                        0,
-
-                        Math.min(
-                          100,
-
-                          checkProgress
-                            .percent
-                        )
-                      )}%`,
-                  }}
-                />
-
-              </div>
-
-
-             
-{/* <div
+            {/* <div
   className="medguard-checking-remaining"
   style={{
     padding: "8px 14px",
@@ -4222,30 +3100,16 @@ setMonth(dayjs().month() + 1);
   </span>
 </div> */}
 
-
-
-              <div
-                className="medguard-checking-dots"
-              >
-                <span />
-                <span />
-                <span />
-              </div>
-
-
-              <div
-                className="medguard-checking-note"
-              >
-                Vui lòng chờ trong giây lát
-              </div>
-
+            <div className="medguard-checking-dots">
+              <span />
+              <span />
+              <span />
             </div>
 
+            <div className="medguard-checking-note">Vui lòng chờ trong giây lát</div>
           </div>
-
-        )
-      }
-
+        </div>
+      )}
     </div>
   );
 }

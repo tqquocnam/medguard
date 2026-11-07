@@ -272,7 +272,8 @@ export default function EntForeignBody() {
         <Alert
           type="error"
           showIcon
-          message={loadError}
+          title="Lỗi tải cấu hình"
+          description={loadError}
           action={
             <Button size="small" onClick={() => void loadRule()}>
               Thử lại
@@ -338,7 +339,7 @@ export default function EntForeignBody() {
             />
           </div>
 
-          {error && <Alert showIcon type="error" message={error} />}
+          {error && <Alert showIcon type="error" title={error} />}
 
           <div className="ent-compact-rule-note">
             <WarningOutlined style={{ color: "#d48806", fontSize: 17 }} />

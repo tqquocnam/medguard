@@ -1,0 +1,709 @@
+diff --git a/backend/migrations/20261107_branch_isolation.sql b/backend/migrations/20261107_branch_isolation.sql
+new file mode 100644
+index 0000000..85b08bd
+--- /dev/null
++++ b/backend/migrations/20261107_branch_isolation.sql
+@@ -0,0 +1,209 @@
++-- Run with the backend stopped, using the database owner/admin.
++-- Requires the earlier branch_id / branch_rule_settings preparation migration.
++BEGIN;
++SET LOCAL lock_timeout = '10s';
++
++CREATE OR REPLACE FUNCTION auth.current_branch_id()
++RETURNS VARCHAR(5) LANGUAGE SQL STABLE AS $$
++  SELECT NULLIF(current_setting('medguard.branch_id', true), '')::VARCHAR(5)
++$$;
++
++DO $$
++DECLARE t RECORD; missing BIGINT;
++BEGIN
++  FOR t IN SELECT schemaname, tablename FROM pg_tables
++    WHERE schemaname IN ('catalog', 'core', 'validation')
++      AND NOT (schemaname = 'validation' AND tablename = 'rules')
++  LOOP
++    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
++      WHERE table_schema = t.schemaname AND table_name = t.tablename AND column_name = 'branch_id') THEN
++      RAISE EXCEPTION 'Thiếu branch_id ở %.%. Chạy migration chuẩn bị trước.', t.schemaname, t.tablename;
++    END IF;
++    EXECUTE format('SELECT count(*) FROM %I.%I WHERE branch_id IS NULL', t.schemaname, t.tablename) INTO missing;
++    IF missing > 0 THEN
++      RAISE EXCEPTION 'Có % dòng chưa gán chi nhánh tại %.%. Dừng, không tự gán dữ liệu.', missing, t.schemaname, t.tablename;
++    END IF;
++    EXECUTE format('ALTER TABLE %I.%I ALTER COLUMN branch_id SET NOT NULL', t.schemaname, t.tablename);
++    EXECUTE format('ALTER TABLE %I.%I ALTER COLUMN branch_id SET DEFAULT auth.current_branch_id()', t.schemaname, t.tablename);
++  END LOOP;
++END $$;
++
++-- Rebuild business foreign keys with branch ownership included.
++CREATE TEMP TABLE branch_foreign_keys ON COMMIT DROP AS
++SELECT c.conname, c.conrelid, c.confrelid, cn.nspname AS child_schema,
++  ct.relname AS child_table, pn.nspname AS parent_schema, pt.relname AS parent_table,
++  c.confupdtype, c.confdeltype, c.condeferrable, c.condeferred,
++  (SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord)
++   FROM unnest(c.conkey) WITH ORDINALITY k(num, ord)
++   JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.num
++   WHERE a.attname <> 'branch_id') AS child_columns,
++  (SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord)
++   FROM unnest(c.confkey) WITH ORDINALITY k(num, ord)
++   JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = k.num
++   WHERE a.attname <> 'branch_id') AS parent_columns
++FROM pg_constraint c
++JOIN pg_class ct ON ct.oid = c.conrelid
++JOIN pg_namespace cn ON cn.oid = ct.relnamespace
++JOIN pg_class pt ON pt.oid = c.confrelid
++JOIN pg_namespace pn ON pn.oid = pt.relnamespace
++WHERE c.contype = 'f'
++  AND cn.nspname IN ('core','catalog','validation')
++  AND pn.nspname IN ('core','catalog','validation')
++  AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.conrelid AND a.attname = 'branch_id' AND NOT a.attisdropped)
++  AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.confrelid AND a.attname = 'branch_id' AND NOT a.attisdropped);
++
++DO $$
++DECLARE f RECORD;
++BEGIN
++  FOR f IN SELECT * FROM branch_foreign_keys LOOP
++    EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I', f.child_schema, f.child_table, f.conname);
++    EXECUTE format('CREATE UNIQUE INDEX IF NOT EXISTS %I ON %I.%I (branch_id, %s)',
++      'uq_branch_fk_' || f.confrelid || '_' || substr(md5(f.parent_columns),1,8),
++      f.parent_schema, f.parent_table, f.parent_columns);
++  END LOOP;
++END $$;
++
++-- Natural codes can be reused by different branches.
++DO $$
++DECLARE t RECORD; c RECORD; cols TEXT;
++BEGIN
++  FOR t IN SELECT * FROM (VALUES
++    ('departments'), ('machines'), ('services'), ('staff'), ('service_groups'), ('icd_codes'), ('service_machines')
++  ) AS x(name) LOOP
++    FOR c IN SELECT con.oid, con.conname, con.conkey FROM pg_constraint con
++      WHERE con.conrelid = format('catalog.%I', t.name)::regclass AND con.contype = 'p'
++    LOOP
++      IF NOT EXISTS (SELECT 1 FROM unnest(c.conkey) k JOIN pg_attribute a
++        ON a.attrelid = format('catalog.%I', t.name)::regclass AND a.attnum = k
++        WHERE a.attname = 'branch_id') THEN
++        SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord) INTO cols
++        FROM unnest(c.conkey) WITH ORDINALITY k(num,ord)
++        JOIN pg_attribute a ON a.attrelid = format('catalog.%I',t.name)::regclass AND a.attnum = k.num;
++        EXECUTE format('ALTER TABLE catalog.%I DROP CONSTRAINT %I', t.name, c.conname);
++        EXECUTE format('ALTER TABLE catalog.%I ADD CONSTRAINT %I PRIMARY KEY (branch_id, %s)', t.name, c.conname, cols);
++      END IF;
++    END LOOP;
++  END LOOP;
++END $$;
++
++ALTER TABLE catalog.icd_warning_rules DROP CONSTRAINT IF EXISTS icd_warning_rules_icd_code_error_code_key;
++ALTER TABLE catalog.icd_warning_rules ADD CONSTRAINT icd_warning_rules_icd_code_error_code_key UNIQUE (branch_id, icd_code, error_code);
++ALTER TABLE catalog.medical_staff_aliases DROP CONSTRAINT IF EXISTS medical_staff_aliases_alias_code_key;
++ALTER TABLE catalog.medical_staff_aliases ADD CONSTRAINT medical_staff_aliases_alias_code_key UNIQUE (branch_id, alias_code);
++ALTER TABLE catalog.service_group_members DROP CONSTRAINT IF EXISTS service_group_members_group_code_service_code_key;
++ALTER TABLE catalog.service_group_members ADD CONSTRAINT service_group_members_group_code_service_code_key UNIQUE (branch_id, group_code, service_code);
++ALTER TABLE catalog.examination_services DROP CONSTRAINT IF EXISTS uq_examination_services_code;
++ALTER TABLE catalog.examination_services ADD CONSTRAINT uq_examination_services_code UNIQUE (branch_id, code);
++
++DROP INDEX IF EXISTS catalog.drug_icd_interactions_unique;
++CREATE UNIQUE INDEX drug_icd_interactions_unique ON catalog.drug_icd_interactions
++  (branch_id, lower(btrim(active_ingredient)), upper(btrim(icd_code)), match_type);
++DROP INDEX IF EXISTS catalog.uq_service_icd_rules_service_icd_match;
++CREATE UNIQUE INDEX uq_service_icd_rules_service_icd_match ON catalog.service_icd_rules
++  (branch_id, service_code, icd_code, match_type);
++
++DO $$
++DECLARE f RECORD; update_action TEXT; delete_action TEXT;
++BEGIN
++  FOR f IN SELECT * FROM branch_foreign_keys LOOP
++    update_action := CASE f.confupdtype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
++      WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END;
++    delete_action := CASE f.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
++      WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL (' || f.child_columns || ')'
++      WHEN 'd' THEN 'SET DEFAULT (' || f.child_columns || ')' END;
++    EXECUTE format('ALTER TABLE %I.%I ADD CONSTRAINT %I FOREIGN KEY (branch_id, %s) REFERENCES %I.%I (branch_id, %s) ON UPDATE %s ON DELETE %s %s',
++      f.child_schema, f.child_table, f.conname, f.child_columns,
++      f.parent_schema, f.parent_table, f.parent_columns, update_action, delete_action,
++      CASE WHEN f.condeferrable THEN 'DEFERRABLE ' || CASE WHEN f.condeferred THEN 'INITIALLY DEFERRED' ELSE 'INITIALLY IMMEDIATE' END ELSE 'NOT DEFERRABLE' END);
++  END LOOP;
++END $$;
++
++DO $$
++BEGIN
++  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'medguard_branch') THEN
++    CREATE ROLE medguard_branch NOLOGIN;
++  END IF;
++END $$;
++ALTER ROLE medguard_branch NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
++GRANT medguard_branch TO CURRENT_USER;
++GRANT USAGE ON SCHEMA auth, core, catalog, validation TO medguard_branch;
++GRANT SELECT ON auth.branches TO medguard_branch;
++GRANT SELECT, INSERT, UPDATE ON auth.users TO medguard_branch;
++REVOKE ALL ON validation.rules FROM medguard_branch;
++GRANT SELECT ON validation.rules TO medguard_branch;
++GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA core, catalog, validation TO medguard_branch;
++
++DO $$
++DECLARE t RECORD;
++BEGIN
++  FOR t IN SELECT schemaname, tablename FROM pg_tables
++    WHERE schemaname IN ('catalog','core','validation')
++      AND NOT (schemaname='validation' AND tablename='rules')
++  LOOP
++    EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', t.schemaname,t.tablename);
++    EXECUTE format('ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY', t.schemaname,t.tablename);
++    EXECUTE format('DROP POLICY IF EXISTS medguard_branch_scope ON %I.%I', t.schemaname,t.tablename);
++    EXECUTE format('CREATE POLICY medguard_branch_scope ON %I.%I AS RESTRICTIVE FOR ALL TO medguard_branch USING (branch_id = auth.current_branch_id()) WITH CHECK (branch_id = auth.current_branch_id())', t.schemaname,t.tablename);
++    EXECUTE format('DROP POLICY IF EXISTS medguard_branch_access ON %I.%I', t.schemaname,t.tablename);
++    EXECUTE format('CREATE POLICY medguard_branch_access ON %I.%I FOR ALL TO medguard_branch USING (true) WITH CHECK (true)', t.schemaname,t.tablename);
++    EXECUTE format('GRANT SELECT,INSERT,UPDATE,DELETE ON %I.%I TO medguard_branch', t.schemaname,t.tablename);
++  END LOOP;
++END $$;
++
++-- Effective rules combine shared definitions and the current branch's settings.
++CREATE OR REPLACE VIEW validation.branch_rules WITH (security_invoker = true) AS
++SELECT r.id, r.code, r.name, r.description, r.rule_type,
++  COALESCE(s.enabled,r.enabled) AS enabled,
++  COALESCE(s.severity,r.severity) AS severity,
++  COALESCE(s.priority,r.priority) AS priority,
++  COALESCE(s.config,r.config) AS config,
++  r.created_at, GREATEST(r.updated_at,s.updated_at) AS updated_at,
++  r.validator_key, r.source_xml, r.target_xml, r.category,
++  COALESCE(s.required,r.required) AS required,
++  COALESCE(s.blocks_ok,r.blocks_ok) AS blocks_ok
++FROM validation.rules r
++LEFT JOIN validation.branch_rule_settings s
++  ON s.rule_id=r.id AND s.branch_id=auth.current_branch_id()
++WHERE auth.current_branch_id() IS NOT NULL;
++
++CREATE OR REPLACE FUNCTION validation.update_branch_rule()
++RETURNS TRIGGER LANGUAGE plpgsql AS $$
++BEGIN
++  IF auth.current_branch_id() IS NULL THEN RAISE EXCEPTION 'Chưa xác định chi nhánh.'; END IF;
++  IF (to_jsonb(NEW) - ARRAY['enabled','severity','priority','config','required','blocks_ok','updated_at'])
++    IS DISTINCT FROM
++    (to_jsonb(OLD) - ARRAY['enabled','severity','priority','config','required','blocks_ok','updated_at']) THEN
++    RAISE EXCEPTION 'Không được thay đổi định nghĩa rule chung.';
++  END IF;
++  INSERT INTO validation.branch_rule_settings
++    (branch_id,rule_id,enabled,severity,priority,config,required,blocks_ok)
++  VALUES (auth.current_branch_id(),OLD.id,NEW.enabled,NEW.severity,NEW.priority,NEW.config,NEW.required,NEW.blocks_ok)
++  ON CONFLICT (branch_id,rule_id) DO UPDATE SET
++    enabled=EXCLUDED.enabled,severity=EXCLUDED.severity,priority=EXCLUDED.priority,
++    config=EXCLUDED.config,required=EXCLUDED.required,blocks_ok=EXCLUDED.blocks_ok,updated_at=NOW();
++  RETURN NEW;
++END $$;
++DROP TRIGGER IF EXISTS update_branch_rule ON validation.branch_rules;
++CREATE TRIGGER update_branch_rule INSTEAD OF UPDATE ON validation.branch_rules
++FOR EACH ROW EXECUTE FUNCTION validation.update_branch_rule();
++GRANT SELECT, UPDATE ON validation.branch_rules TO medguard_branch;
++
++CREATE OR REPLACE FUNCTION core.check_xml_branch()
++RETURNS TRIGGER LANGUAGE plpgsql AS $$
++DECLARE facility TEXT;
++BEGIN
++  facility := CASE WHEN TG_TABLE_NAME='medical_cases' THEN to_jsonb(NEW)->>'ma_cskcb'
++                  ELSE to_jsonb(NEW)->>'facility_code' END;
++  IF NULLIF(btrim(facility),'') IS DISTINCT FROM NEW.branch_id THEN
++    RAISE EXCEPTION 'Mã CSKCB trong XML không khớp chi nhánh %.', NEW.branch_id;
++  END IF;
++  RETURN NEW;
++END $$;
++DROP TRIGGER IF EXISTS check_xml_branch ON core.medical_cases;
++CREATE TRIGGER check_xml_branch BEFORE INSERT OR UPDATE ON core.medical_cases
++FOR EACH ROW EXECUTE FUNCTION core.check_xml_branch();
++DROP TRIGGER IF EXISTS check_xml_branch ON core.import_batches;
++CREATE TRIGGER check_xml_branch BEFORE INSERT OR UPDATE ON core.import_batches
++FOR EACH ROW EXECUTE FUNCTION core.check_xml_branch();
++
++COMMIT;
+diff --git a/backend/src/config/branch-context.ts b/backend/src/config/branch-context.ts
+new file mode 100644
+index 0000000..6bca5dc
+--- /dev/null
++++ b/backend/src/config/branch-context.ts
+@@ -0,0 +1,25 @@
++import { AsyncLocalStorage } from "node:async_hooks";
++
++export interface BranchContext {
++  branchId: string;
++  userId: string;
++}
++
++const contexts = new AsyncLocalStorage<BranchContext>();
++
++export function withBranch<T>(context: BranchContext, action: () => T): T {
++  if (!/^\d{5}$/.test(context.branchId)) {
++    throw new Error("Chi nhánh của tài khoản không hợp lệ.");
++  }
++  return contexts.run(Object.freeze({ ...context }), action);
++}
++
++export function currentBranch(): string | null {
++  return contexts.getStore()?.branchId ?? null;
++}
++
++export function requireBranch(): string {
++  const branchId = currentBranch();
++  if (!branchId) throw new Error("Chưa xác định chi nhánh.");
++  return branchId;
++}
+diff --git a/backend/src/config/database.ts b/backend/src/config/database.ts
+index 7c49d8e..b715d79 100644
+--- a/backend/src/config/database.ts
++++ b/backend/src/config/database.ts
+@@ -1,22 +1,94 @@
+-import pg from "pg";
++import pg, { type PoolClient, type QueryResult } from "pg";
+ import "dotenv/config";
+-
+-const { Pool } = pg;
++import { currentBranch } from "./branch-context.js";
+ 
+ if (!process.env.DATABASE_URL) {
+-  throw new Error(
+-    "DATABASE_URL chưa được cấu hình"
+-  );
++  throw new Error("DATABASE_URL chưa được cấu hình");
+ }
+ 
+-export const db = new Pool({
+-  connectionString:
+-    process.env.DATABASE_URL,
+-});
++const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
++const releases = new WeakMap<PoolClient, (error?: Error | boolean) => Promise<void>>();
++
++async function connect(): Promise<PoolClient> {
++  const branchId = currentBranch();
++  const client = await pool.connect();
++  const originalRelease = client.release.bind(client);
++
++  try {
++    // RESET on checkout as well as release: no request inherits another branch.
++    await client.query("RESET ROLE");
++    await client.query("SELECT set_config('medguard.branch_id', $1, false)", [branchId ?? ""]);
++    await client.query("SET ROLE medguard_branch");
++  } catch (error) {
++    originalRelease(true);
++    throw error;
++  }
++
++  let released = false;
++  const release = async (error?: Error | boolean): Promise<void> => {
++    if (released) return;
++    released = true;
++    releases.delete(client);
++    if (error) {
++      originalRelease(error);
++      return;
++    }
++    try {
++      // A failed/unclosed transaction must never return to the pool.
++      await client.query("ROLLBACK");
++      await client.query("RESET ROLE");
++      await client.query("SELECT set_config('medguard.branch_id', '', false)");
++      originalRelease();
++    } catch {
++      originalRelease(true);
++    }
++  };
++  releases.set(client, release);
++  client.release = (error?: Error | boolean): void => { void release(error); };
++  return client;
++}
+ 
+-db.on("error", (error) => {
+-  console.error(
+-    "PostgreSQL error:",
+-    error
+-  );
++async function runQuery(args: unknown[]): Promise<QueryResult> {
++  const client = await connect();
++  const release = releases.get(client)!;
++  try {
++    const execute = client.query.bind(client) as (...values: unknown[]) => Promise<QueryResult>;
++    return await execute(...args);
++  } finally {
++    await release();
++  }
++}
++
++function query(...args: unknown[]): Promise<QueryResult> | void {
++  const callback = typeof args[args.length - 1] === "function"
++    ? args.pop() as (error: Error | null, result?: QueryResult) => void
++    : null;
++  const result = runQuery(args);
++  if (!callback) return result;
++  void result.then(value => callback(null, value), error => callback(error));
++}
++
++// Keep the Pool API used by existing services/repositories.
++// Every query and transaction receives the authenticated branch's DB role.
++export const db: pg.Pool = new Proxy(pool, {
++  get(target, property) {
++    if (property === "query") return query;
++    if (property === "connect") {
++      return (callback?: (error: Error | undefined, client?: PoolClient, release?: PoolClient["release"]) => void) => {
++        if (!callback) return connect();
++        void connect().then(
++          client => callback(undefined, client, client.release),
++          error => callback(error instanceof Error ? error : new Error(String(error))),
++        );
++      };
++    }
++    const value: unknown = Reflect.get(target, property, target);
++    if (typeof value !== "function") return value;
++    return (...args: unknown[]) => {
++      const result: unknown = Reflect.apply(value, target, args);
++      return result === target ? db : result;
++    };
++  },
+ });
++
++pool.on("error", error => console.error("PostgreSQL error:", error));
+diff --git a/backend/src/modules/auth/auth.middleware.ts b/backend/src/modules/auth/auth.middleware.ts
+index 21a2377..4c75a1a 100644
+--- a/backend/src/modules/auth/auth.middleware.ts
++++ b/backend/src/modules/auth/auth.middleware.ts
+@@ -1,6 +1,7 @@
+ import type { NextFunction, Request, Response } from "express";
+ 
+ import jwt from "jsonwebtoken";
++import { withBranch } from "../../config/branch-context.js";
+ 
+ import { db } from "../../config/database.js";
+ 
+@@ -142,6 +143,6 @@ export async function requireAuth(
+     return;
+   }
+ 
+-  next();
++  withBranch({ branchId: req.user!.branchId, userId: req.user!.id }, next);
+ }
+ 
+diff --git a/backend/src/modules/catalog/ent-foreign-body.routes.ts b/backend/src/modules/catalog/ent-foreign-body.routes.ts
+index a5f2034..5257e37 100644
+--- a/backend/src/modules/catalog/ent-foreign-body.routes.ts
++++ b/backend/src/modules/catalog/ent-foreign-body.routes.ts
+@@ -132,7 +132,7 @@ async function findRule() {
+       required,
+       blocks_ok,
+       config
+-    FROM validation.rules
++    FROM validation.branch_rules
+     WHERE code = $1
+     LIMIT 1
+     `,
+@@ -285,7 +285,7 @@ router.put(
+ 
+       const updated = await db.query<RuleRecord>(
+         `
+-        UPDATE validation.rules
++        UPDATE validation.branch_rules
+         SET
+           enabled = $2,
+           severity = $3,
+diff --git a/backend/src/modules/catalog/service-calcium-electrolyte.routes.ts b/backend/src/modules/catalog/service-calcium-electrolyte.routes.ts
+index 4c16025..a707382 100644
+--- a/backend/src/modules/catalog/service-calcium-electrolyte.routes.ts
++++ b/backend/src/modules/catalog/service-calcium-electrolyte.routes.ts
+@@ -86,7 +86,7 @@ router.get(
+           required,
+           blocks_ok,
+           config
+-        FROM validation.rules
++        FROM validation.branch_rules
+         WHERE code = $1
+         LIMIT 1
+         `,
+@@ -239,7 +239,7 @@ router.put(
+ 
+       const result = await db.query<RuleRow>(
+         `
+-        UPDATE validation.rules
++        UPDATE validation.branch_rules
+         SET
+           enabled = $2,
+           severity = $3,
+diff --git a/backend/src/modules/catalog/service-chest-xray.routes.ts b/backend/src/modules/catalog/service-chest-xray.routes.ts
+index 9c540a9..f81c7e8 100644
+--- a/backend/src/modules/catalog/service-chest-xray.routes.ts
++++ b/backend/src/modules/catalog/service-chest-xray.routes.ts
+@@ -121,7 +121,7 @@ router.get(
+           required,
+           blocks_ok,
+           config
+-        FROM validation.rules
++        FROM validation.branch_rules
+         WHERE code = $1
+         LIMIT 1
+         `,
+@@ -253,7 +253,7 @@ router.put(
+ 
+       const result = await db.query<RuleRow>(
+         `
+-        UPDATE validation.rules
++        UPDATE validation.branch_rules
+         SET
+           enabled = $2,
+           severity = $3,
+diff --git a/backend/src/modules/catalog/service-import.service.ts b/backend/src/modules/catalog/service-import.service.ts
+index 022a628..c334184 100644
+--- a/backend/src/modules/catalog/service-import.service.ts
++++ b/backend/src/modules/catalog/service-import.service.ts
+@@ -1280,7 +1280,7 @@ Promise<
+           ${placeholders}
+ 
+         ON CONFLICT
+-          (code)
++          (branch_id, code)
+ 
+         DO UPDATE SET
+ 
+diff --git a/backend/src/modules/validation/case-results.service.ts b/backend/src/modules/validation/case-results.service.ts
+index 11fdc9b..00e4060 100644
+--- a/backend/src/modules/validation/case-results.service.ts
++++ b/backend/src/modules/validation/case-results.service.ts
+@@ -97,7 +97,7 @@ export async function getCaseResults(
+         validation.rule_results rr
+ 
+       INNER JOIN
+-        validation.rules r
++        validation.branch_rules r
+ 
+         ON
+           r.id = rr.rule_id
+diff --git a/backend/src/modules/validation/check-run-case-results.service.ts b/backend/src/modules/validation/check-run-case-results.service.ts
+index c4fdd28..d34e32e 100644
+--- a/backend/src/modules/validation/check-run-case-results.service.ts
++++ b/backend/src/modules/validation/check-run-case-results.service.ts
+@@ -88,7 +88,7 @@ export async function getCheckRunCaseResults(
+         validation.rule_results rr
+ 
+       INNER JOIN
+-        validation.rules r
++        validation.branch_rules r
+ 
+       ON
+         r.id =
+diff --git a/backend/src/modules/validation/engine/result.service.ts b/backend/src/modules/validation/engine/result.service.ts
+index 9a90ba7..64544bb 100644
+--- a/backend/src/modules/validation/engine/result.service.ts
++++ b/backend/src/modules/validation/engine/result.service.ts
+@@ -182,7 +182,7 @@ export async function calculateCaseStatus(
+         ) AS blocks_ok,
+         rr.details
+       FROM validation.rule_results rr
+-      LEFT JOIN validation.rules r
++      LEFT JOIN validation.branch_rules r
+         ON r.id = rr.rule_id
+       WHERE
+         rr.check_run_id = $1
+diff --git a/backend/src/modules/validation/engine/rule-engine.ts b/backend/src/modules/validation/engine/rule-engine.ts
+index 9e5b7a3..304e6bf 100644
+--- a/backend/src/modules/validation/engine/rule-engine.ts
++++ b/backend/src/modules/validation/engine/rule-engine.ts
+@@ -143,7 +143,7 @@ export async function loadEnabledRules(
+         source_xml,
+         target_xml,
+         category
+-      FROM validation.rules
++      FROM validation.branch_rules
+       WHERE enabled = TRUE
+       ORDER BY
+         priority ASC,
+diff --git a/backend/src/modules/validation/engine/rules/service-icd.rule.ts b/backend/src/modules/validation/engine/rules/service-icd.rule.ts
+index 2448356..feb443f 100644
+--- a/backend/src/modules/validation/engine/rules/service-icd.rule.ts
++++ b/backend/src/modules/validation/engine/rules/service-icd.rule.ts
+@@ -127,7 +127,7 @@ function splitIcdValues(values: string[]): string[] {
+ //
+ // Mặc định EXACT để tránh cảnh báo sai.
+ // Có thể cấu hình icdMatchMode = PREFIX
+-// trong validation.rules.config.
++// trong validation.branch_rules.config.
+ //
+ // Không tự động dùng CONTAINS.
+ // ======================================================
+diff --git a/backend/src/modules/xml/import-progress.service.ts b/backend/src/modules/xml/import-progress.service.ts
+index 3ec7a05..4137f71 100644
+--- a/backend/src/modules/xml/import-progress.service.ts
++++ b/backend/src/modules/xml/import-progress.service.ts
+@@ -1,3 +1,7 @@
++import { requireBranch } from "../../config/branch-context.js";
++
++function progressKey(id: string): string { return `${requireBranch()}:${id}`; }
++
+ export type ImportProgressStatus =
+   | "PROCESSING"
+   | "DONE"
+@@ -62,7 +66,7 @@ export function createImportProgress(
+ 
+ 
+   jobs.set(
+-    id,
++    progressKey(id),
+     progress
+   );
+ 
+@@ -85,7 +89,7 @@ export function updateImportProgress(
+ 
+   const job =
+     jobs.get(
+-      id
++      progressKey(id)
+     );
+ 
+ 
+@@ -149,7 +153,7 @@ export function finishImportProgress(
+ 
+   const job =
+     jobs.get(
+-      id
++      progressKey(id)
+     );
+ 
+ 
+@@ -187,7 +191,7 @@ export function failImportProgress(
+ 
+   const job =
+     jobs.get(
+-      id
++      progressKey(id)
+     );
+ 
+ 
+@@ -221,7 +225,7 @@ export function getImportProgress(
+ 
+   return (
+     jobs.get(
+-      id
++      progressKey(id)
+     ) ??
+     null
+   );
+diff --git a/backend/src/modules/xml/xml.controller.ts b/backend/src/modules/xml/xml.controller.ts
+index 17a1b98..4e4c9ae 100644
+--- a/backend/src/modules/xml/xml.controller.ts
++++ b/backend/src/modules/xml/xml.controller.ts
+@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
+ import { parseBhytXml } from "./bhytXmlParser.js";
+ import {
+   saveBhytImport,
++  validateXmlBranch,
+   validateRequestedTreatmentGroup,
+ } from "./xml.service.js";
+ import type { TreatmentGroup } from "./xml.service.js";
+@@ -31,6 +32,7 @@ export async function uploadXml(req: Request, res: Response): Promise<void> {
+     }
+     const treatmentGroup = requireGroup(req);
+     const parsed = parseBhytXml(req.file.buffer.toString("utf8"));
++    validateXmlBranch(parsed);
+     const validation = validateImportFile(parsed);
+     if (!validation.canImport) {
+       res.status(422).json({
+@@ -100,6 +102,7 @@ export async function analyzeXml(req: Request, res: Response): Promise<void> {
+     }
+     const treatmentGroup = requireGroup(req);
+     const parsed = parseBhytXml(req.file.buffer.toString("utf8"));
++    validateXmlBranch(parsed);
+     const validation = validateImportFile(parsed);
+     if (validation.canImport) {
+       validateRequestedTreatmentGroup(parsed, treatmentGroup);
+diff --git a/backend/src/modules/xml/xml.service.ts b/backend/src/modules/xml/xml.service.ts
+index 0710f52..19379b5 100644
+--- a/backend/src/modules/xml/xml.service.ts
++++ b/backend/src/modules/xml/xml.service.ts
+@@ -1,3 +1,4 @@
++import { requireBranch } from "../../config/branch-context.js";
+ 
+ import { db } from "../../config/database.js";
+ 
+@@ -315,12 +316,28 @@ export function validateRequestedTreatmentGroup(
+ // SAVE BHYT IMPORT
+ // ======================================================
+ 
++export function validateXmlBranch(result: ParsedBhytResult): void {
++  const branchId = requireBranch();
++  const facility = String(result.facilityCode ?? "").trim();
++  if (facility !== branchId) {
++    throw new Error(`Mã CSKCB trong XML (${facility || "trống"}) không khớp chi nhánh tài khoản (${branchId}).`);
++  }
++  for (const record of result.cases) {
++    const xml1 = record.files.find((file: { type: string; data?: any }) => file.type === "XML1");
++    const facilityCode = String(xml1?.data?.TONG_HOP?.MA_CSKCB ?? "").trim();
++    if (facilityCode && facilityCode !== branchId) {
++      throw new Error(`Hồ sơ ${record.maLk || record.index}: mã CSKCB ${facilityCode} khác chi nhánh ${branchId}.`);
++    }
++  }
++}
++
+ export async function saveBhytImport(
+   fileName: string,
+   result: ParsedBhytResult,
+   onProgress?: ImportProgressCallback,
+   requestedGroup?: TreatmentGroup
+ ) {
++  validateXmlBranch(result);
+   const client = await db.connect();
+ 
+   try {
+@@ -516,7 +533,7 @@ export async function saveBhytImport(
+ 
+           tongHop.MA_KHOA ?? null,
+ 
+-          tongHop.MA_CSKCB ?? facilityCode,
++          String(tongHop.MA_CSKCB ?? "").trim() || facilityCode,
+ 
+           bhytDateTime(
+             tongHop.NGAY_VAO ??
+diff --git a/backend/src/scripts/migrate-branch-isolation.ts b/backend/src/scripts/migrate-branch-isolation.ts
+new file mode 100644
+index 0000000..1e84a58
+--- /dev/null
++++ b/backend/src/scripts/migrate-branch-isolation.ts
+@@ -0,0 +1,30 @@
++import "dotenv/config";
++import pg from "pg";
++import { readFile } from "node:fs/promises";
++import { resolve } from "node:path";
++
++async function main(): Promise<void> {
++  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa được cấu hình.");
++  // Use the same DB identity as the API, without the scoped application pool.
++  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
++  try {
++    const sql = await readFile(resolve("migrations/20261107_branch_isolation.sql"), "utf8");
++    const client = await pool.connect();
++    try {
++      await client.query(sql);
++      console.log("Đã áp dụng phân tách chi nhánh. Reload metadata Hasura rồi khởi động lại backend.");
++    } catch (error) {
++      await client.query("ROLLBACK");
++      throw error;
++    } finally {
++      client.release();
++    }
++  } finally {
++    await pool.end();
++  }
++}
++
++main().catch((error: unknown) => {
++  console.error(error instanceof Error ? error.message : "Migration thất bại.");
++  process.exitCode = 1;
++});
+diff --git a/backend/src/server.ts b/backend/src/server.ts
+index c8aa501..a614c65 100644
+--- a/backend/src/server.ts
++++ b/backend/src/server.ts
+@@ -288,6 +288,12 @@ app.use(
+ );
+ 
+ 
++// All remaining API routes require an authenticated branch.
++app.use("/api", requireAuth, (_req, res, next) => {
++  res.setHeader("Cache-Control", "no-store");
++  next();
++});
++
+ // ======================================================
+ // GRAPHQL PROXY
+ // ======================================================

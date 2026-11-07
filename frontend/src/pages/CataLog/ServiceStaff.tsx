@@ -952,7 +952,7 @@ export default function ServiceStaff() {
         <Alert
           type={error ? "error" : "warning"}
           showIcon
-          message={error ? "Không thể tải cấu hình" : "Không thể tải đủ danh mục"}
+          title={error ? "Không thể tải cấu hình" : "Không thể tải đủ danh mục"}
           description={error || referenceError}
           action={
             <Button size="small" disabled={busy || loading} onClick={refresh}>
@@ -1298,7 +1298,7 @@ export default function ServiceStaff() {
           <Alert
             type="info"
             showIcon
-            message="Đang kiểm tra dữ liệu Excel..."
+            title="Đang kiểm tra dữ liệu Excel..."
             style={{ marginTop: 16 }}
           />
         )}
@@ -1340,7 +1340,7 @@ export default function ServiceStaff() {
               <Alert
                 type="warning"
                 showIcon
-                message="File có dòng lỗi"
+                title="File có dòng lỗi"
                 description="Các dòng lỗi sẽ không được import. Xem chi tiết trong cột Ghi chú."
                 style={{
                   marginBottom: 12,

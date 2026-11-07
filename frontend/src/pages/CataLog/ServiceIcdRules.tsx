@@ -533,7 +533,7 @@ export default function ServiceIcd() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải danh mục DVKT - ICD"
+          title="Không thể tải danh mục DVKT - ICD"
           description={error}
           action={
             <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>

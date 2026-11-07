@@ -1,68 +1,35 @@
-import {
-  Navigate,
-  Outlet,
-} from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 
-import {
-  Spin,
-} from "antd";
+import { Spin } from "antd";
 
-import {
-  useAuth,
-} from "./AuthContext";
-
+import { useAuth } from "./AuthContext";
 
 export default function ProtectedRoute() {
-
-  const {
-    user,
-    loading,
-  } =
-    useAuth();
-
+  const { user, loading } = useAuth();
 
   if (loading) {
-
     return (
       <div
         style={{
-          width:
-            "100vw",
+          width: "100vw",
 
-          height:
-            "100vh",
+          height: "100vh",
 
-          display:
-            "flex",
+          display: "flex",
 
-          justifyContent:
-            "center",
+          justifyContent: "center",
 
-          alignItems:
-            "center",
+          alignItems: "center",
         }}
       >
-        <Spin
-          size="large"
-          tip="Đang kiểm tra đăng nhập..."
-        />
+        <Spin size="large" description="Đang kiểm tra đăng nhập..." />{" "}
       </div>
     );
   }
 
-
   if (!user) {
-
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
-
-  return (
-    <Outlet />
-  );
+  return <Outlet />;
 }

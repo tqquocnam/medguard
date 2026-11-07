@@ -725,7 +725,7 @@ export default function IcdWarnings() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải danh mục ICD cảnh báo"
+          title="Không thể tải danh mục ICD cảnh báo"
           description={error}
           action={
             <Button size="small" disabled={busy || loading} onClick={() => void loadIcdWarnings()}>
@@ -1010,7 +1010,7 @@ export default function IcdWarnings() {
           type="info"
           showIcon
           style={{ marginTop: 16 }}
-          message="Cấu trúc file Excel"
+          title="Cấu trúc file Excel"
           description={
             <div className="iw-import-help">
               File cần có tối thiểu <b>ICD</b> và <b>MA_LOI</b>. Các cột bổ sung: <b>TEN_BENH</b>,{" "}
@@ -1070,7 +1070,7 @@ export default function IcdWarnings() {
             <Alert
               type="success"
               showIcon
-              message={importMessage || "Import thành công."}
+              title={importMessage || "Import thành công."}
               style={{ marginTop: 16 }}
             />
 
@@ -1111,7 +1111,7 @@ export default function IcdWarnings() {
           <Alert
             type="error"
             showIcon
-            message={importMessage}
+            title={importMessage}
             description={
               importErrors.length > 0
                 ? "Không có dữ liệu nào được import. Sửa các dòng lỗi rồi import lại."

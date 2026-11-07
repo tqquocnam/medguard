@@ -463,7 +463,7 @@ export default function DrugInteraction() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải danh mục tương tác thuốc"
+          title="Không thể tải danh mục tương tác thuốc"
           description={error}
           action={
             <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>

@@ -1,511 +1,177 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { useApolloClient } from "@apollo/client/react";
 
-import {
-  useApolloClient,
-} from "@apollo/client/react";
+const ENV_API_URL = String(import.meta.env.VITE_API_URL ?? "").trim();
 
+const API = (ENV_API_URL || "http://localhost:3000/api").replace(/\/+$/, "");
 
+export const AUTH_UNAUTHORIZED_EVENT = "medguard:unauthorized";
 
-const ENV_API_URL =
-  String(
-    import.meta.env
-      .VITE_API_URL ??
-      ""
-  ).trim();
-
-
-const API =
-  (
-    ENV_API_URL ||
-    "http://localhost:3000/api"
-  ).replace(
-    /\/+$/,
-    ""
-  );
-
-
-// ======================================================
-// UNAUTHORIZED EVENT
-// ======================================================
-
-export const AUTH_UNAUTHORIZED_EVENT =
-  "medguard:unauthorized";
-
-
-export function notifyUnauthorized() {
-  window.dispatchEvent(
-    new Event(
-      AUTH_UNAUTHORIZED_EVENT
-    )
-  );
+export function notifyUnauthorized(): void {
+  window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
 }
-
-
-// ======================================================
-// TYPES
-// ======================================================
 
 export interface AuthUser {
-  id:
-    string;
-
-  username:
-    string;
-
-  role:
-    string;
-
-  fullName?:
-    string;
+  id: string;
+  username: string;
+  role: string;
+  fullName?: string | null;
+  branchId: string;
+  branchName?: string | null;
 }
 
+interface AuthResponse {
+  success?: boolean;
+  message?: string;
+  user?: AuthUser;
+}
 
 interface AuthContextValue {
-  user:
-    AuthUser |
-    null;
-
-  loading:
-    boolean;
-
-  login: (
-    username: string,
-    password: string
-  ) => Promise<void>;
-
-  logout:
-    () => Promise<void>;
-
-  refreshUser:
-    () => Promise<void>;
-
-  clearSession:
-    () => void;
+  user: AuthUser | null;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  clearSession: () => void;
 }
 
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// ======================================================
-// CONTEXT
-// ======================================================
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const apolloClient = useApolloClient();
 
-const AuthContext =
-  createContext<
-    AuthContextValue |
-    undefined
-  >(
-    undefined
-  );
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  const clearCache = useCallback(async (): Promise<void> => {
+    try {
+      await apolloClient.clearStore();
+    } catch (error) {
+      console.error("Không thể xóa bộ nhớ đệm Apollo:", error);
+    }
+  }, [apolloClient]);
 
-// ======================================================
-// PROVIDER
-// ======================================================
+  const clearSession = useCallback((): void => {
+    setUser(null);
+    void clearCache();
+  }, [clearCache]);
 
-export function AuthProvider({
-  children,
-}: {
-  children:
-    ReactNode;
-}) {
-  const apolloClient =
-    useApolloClient();
+  const refreshUser = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetch(`${API}/auth/me`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-
-  const [
-    user,
-    setUser,
-  ] =
-    useState<
-      AuthUser |
-      null
-    >(
-      null
-    );
-
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      true
-    );
-
-
-  // ====================================================
-  // CLEAR SESSION
-  // ====================================================
-
-  const clearSession =
-    useCallback(
-      () => {
-        setUser(
-          null
-        );
-
-
-        void apolloClient
-          .clearStore()
-          .catch(
-            (
-              error
-            ) => {
-              console.error(
-                "Apollo clearStore error:",
-                error
-              );
-            }
-          );
-      },
-
-      [
-        apolloClient,
-      ]
-    );
-
-
-  // ====================================================
-  // GET CURRENT USER
-  // ====================================================
-
-  const refreshUser =
-    useCallback(
-      async () => {
-        try {
-          const response =
-            await fetch(
-              `${API}/auth/me`,
-              {
-                method:
-                  "GET",
-
-                credentials:
-                  "include",
-
-                headers: {
-                  Accept:
-                    "application/json",
-                },
-              }
-            );
-
-
-          if (
-            response.status ===
-            401
-          ) {
-            setUser(
-              null
-            );
-
-            return;
-          }
-
-
-          if (
-            !response.ok
-          ) {
-            console.error(
-              "Auth me HTTP error:",
-              response.status
-            );
-
-            setUser(
-              null
-            );
-
-            return;
-          }
-
-
-          const json =
-            await response.json();
-
-
-          if (
-            json.success &&
-            json.user
-          ) {
-            setUser(
-              json.user
-            );
-
-            return;
-          }
-
-
-          setUser(
-            null
-          );
-
-        } catch (
-          error
-        ) {
-          console.error(
-            "Auth me error:",
-            error
-          );
-
-
-          setUser(
-            null
-          );
-        }
-      },
-
-      []
-    );
-
-
-  // ====================================================
-  // INITIAL SESSION
-  // ====================================================
-
-  useEffect(
-    () => {
-      let mounted =
-        true;
-
-
-      async function load() {
-        setLoading(
-          true
-        );
-
-
-        await refreshUser();
-
-
-        if (
-          mounted
-        ) {
-          setLoading(
-            false
-          );
-        }
+      if (!response.ok) {
+        clearSession();
+        return;
       }
 
+      const json = (await response.json()) as AuthResponse;
 
-      void load();
+      if (json.success === true && json.user) {
+        setUser(json.user);
+        return;
+      }
 
+      clearSession();
+    } catch (error) {
+      console.error("Không thể kiểm tra phiên đăng nhập:", error);
+      clearSession();
+    }
+  }, [clearSession]);
 
-      return () => {
-        mounted =
-          false;
-      };
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSession(): Promise<void> {
+      try {
+        await refreshUser();
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [refreshUser]);
+
+  useEffect(() => {
+    const handleUnauthorized = (): void => {
+      clearSession();
+    };
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+
+    return () => {
+      window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    };
+  }, [clearSession]);
+
+  const login = useCallback(
+    async (username: string, password: string): Promise<void> => {
+      const response = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+        }),
+      });
+
+      let json: AuthResponse;
+
+      try {
+        json = (await response.json()) as AuthResponse;
+      } catch {
+        throw new Error("Backend trả dữ liệu không hợp lệ.");
+      }
+
+      if (!response.ok || json?.success !== true) {
+        throw new Error(json?.message || "Đăng nhập thất bại.");
+      }
+
+      if (!json.user) {
+        throw new Error("Backend không trả về thông tin tài khoản.");
+      }
+
+      setUser(null);
+      await clearCache();
+      setUser(json.user);
     },
-
-    [
-      refreshUser,
-    ]
+    [clearCache],
   );
 
-
-  // ====================================================
-  // HANDLE GLOBAL 401
-  // ====================================================
-
-  useEffect(
-    () => {
-      const handleUnauthorized =
-        () => {
-          console.warn(
-            "MedGuard session invalidated."
-          );
-
-
-          clearSession();
-        };
-
-
-      window.addEventListener(
-        AUTH_UNAUTHORIZED_EVENT,
-        handleUnauthorized
-      );
-
-
-      return () => {
-        window.removeEventListener(
-          AUTH_UNAUTHORIZED_EVENT,
-          handleUnauthorized
-        );
-      };
-    },
-
-    [
-      clearSession,
-    ]
-  );
-
-
-  // ====================================================
-  // LOGIN
-  // ====================================================
-
-  const login =
-    useCallback(
-      async (
-        username:
-          string,
-
-        password:
-          string
-      ) => {
-        const response =
-          await fetch(
-            `${API}/auth/login`,
-            {
-              method:
-                "POST",
-
-              credentials:
-                "include",
-
-              headers: {
-                Accept:
-                  "application/json",
-
-                "Content-Type":
-                  "application/json",
-              },
-
-              body:
-                JSON.stringify({
-                  username,
-                  password,
-                }),
-            }
-          );
-
-
-        let json:
-          any =
-          null;
-
-
-        try {
-          json =
-            await response.json();
-        } catch {
-          throw new Error(
-            "Backend trả dữ liệu không hợp lệ."
-          );
-        }
-
-
-        if (
-          !response.ok ||
-          !json?.success
-        ) {
-          throw new Error(
-            json?.message ||
-            "Đăng nhập thất bại."
-          );
-        }
-
-
-        if (
-          !json.user
-        ) {
-          throw new Error(
-            "Backend không trả về thông tin tài khoản."
-          );
-        }
-
-
-        try {
-          await apolloClient
-            .clearStore();
-        } catch (
-          error
-        ) {
-          console.error(
-            "Apollo clearStore after login error:",
-            error
-          );
-        }
-
-
-        setUser(
-          json.user
-        );
+  const logout = useCallback(async (): Promise<void> => {
+    const response = await fetch(`${API}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
       },
+    });
 
-      [
-        apolloClient,
-      ]
-    );
+    if (!response.ok && response.status !== 401) {
+      throw new Error("Không thể đăng xuất. Vui lòng thử lại.");
+    }
 
-
-  // ====================================================
-  // LOGOUT
-  // ====================================================
-
-  const logout =
-    useCallback(
-      async () => {
-        try {
-          await fetch(
-            `${API}/auth/logout`,
-            {
-              method:
-                "POST",
-
-              credentials:
-                "include",
-
-              headers: {
-                Accept:
-                  "application/json",
-              },
-            }
-          );
-
-        } catch (
-          error
-        ) {
-          console.error(
-            "Logout error:",
-            error
-          );
-
-        } finally {
-          setUser(
-            null
-          );
-
-
-          try {
-            await apolloClient
-              .clearStore();
-
-          } catch (
-            error
-          ) {
-            console.error(
-              "Apollo clearStore logout error:",
-              error
-            );
-          }
-        }
-      },
-
-      [
-        apolloClient,
-      ]
-    );
-
-
-  // ====================================================
-  // PROVIDER
-  // ====================================================
+    setUser(null);
+    await clearCache();
+  }, [clearCache]);
 
   return (
     <AuthContext.Provider
@@ -523,26 +189,12 @@ export function AuthProvider({
   );
 }
 
+export function useAuth(): AuthContextValue {
+  const context = useContext(AuthContext);
 
-// ======================================================
-// HOOK
-// ======================================================
-
-export function useAuth() {
-  const context =
-    useContext(
-      AuthContext
-    );
-
-
-  if (
-    !context
-  ) {
-    throw new Error(
-      "useAuth phải được sử dụng bên trong AuthProvider."
-    );
+  if (!context) {
+    throw new Error("useAuth phải được sử dụng bên trong AuthProvider.");
   }
-
 
   return context;
 }
