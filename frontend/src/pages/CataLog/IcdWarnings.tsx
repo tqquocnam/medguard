@@ -24,7 +24,6 @@ import {
 import type { TableColumnsType, UploadFile } from "antd";
 
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
   EditOutlined,
   HomeOutlined,

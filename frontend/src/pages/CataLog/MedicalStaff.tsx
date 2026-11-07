@@ -25,7 +25,6 @@ import {
 import type { TableColumnsType, UploadFile } from "antd";
 
 import {
-  ArrowLeftOutlined,
   EditOutlined,
   HomeOutlined,
   PlusOutlined,

@@ -19,7 +19,6 @@ import {
   CheckCircleOutlined,
   ExperimentOutlined,
   HomeOutlined,
-  ReloadOutlined,
   SaveOutlined,
   UndoOutlined,
   WarningOutlined,
