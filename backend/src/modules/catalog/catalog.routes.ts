@@ -1,40 +1,32 @@
-import {
-  Router,
-} from "express";
+import { Router } from "express";
 
-import multer
-  from "multer";
+import multer from "multer";
 
 import {
   getCatalogRules,
   addCatalogRule,
   editCatalogRule,
   removeCatalogRule,
-
   getMachines,
   getMachineByCode,
   addMachine,
   editMachine,
   removeMachine,
-
   getServices,
   getServiceByCode,
   addService,
   editService,
   removeService,
-
   getDepartments,
   getDepartmentByCode,
   addDepartment,
   editDepartment,
   removeDepartment,
-
   getMedicalStaffList,
   getMedicalStaffById,
   addMedicalStaff,
   editMedicalStaff,
   removeMedicalStaff,
-
   getDrugs,
   getDrugByCode,
   addDrug,
@@ -42,38 +34,25 @@ import {
   removeDrug,
 } from "./catalog.controller.js";
 
-import {
-  requireAuth,
-} from "../auth/auth.middleware.js";
+import { requireAuth } from "../auth/auth.middleware.js";
 
-import {
-  requireAdmin,
-} from "../auth/admin.middleware.js";
+import { requireAdmin } from "../auth/admin.middleware.js";
 
-import {
-  importDrugsExcel,
-} from "./drug-import.controller.js";
+import { importDrugsExcel } from "./drug-import.controller.js";
 
-import {
-  importServicesExcel,
-} from "./service-import.controller.js";
+import { importServicesExcel } from "./service-import.controller.js";
 
-import {
-  importMedicalStaffExcel,
-} from "./medical-staff-import.controller.js";
+import { importMedicalStaffExcel } from "./medical-staff-import.controller.js";
 
-import examinationServiceRouter
-  from "./examination-service.routes.js";
+import examinationServiceRouter from "./examination-service.routes.js";
 
-import staffScheduleRoutes
-  from "./staff-schedule.routes.js";
+import staffScheduleRoutes from "./staff-schedule.routes.js";
 
 import {
   downloadServiceStaffTemplate,
   importServiceStaffExcelController,
   previewServiceStaffExcel,
 } from "./service-staff-import.controller.js";
-
 
 // ======================================================
 // ICD WARNING
@@ -86,92 +65,58 @@ import {
   toggleIcdWarningActiveController,
 } from "./icd-warning.controller.js";
 
-import {
-  importIcdWarningsExcel,
-} from "./icd-warning-import.controller.js";
+import { importIcdWarningsExcel } from "./icd-warning-import.controller.js";
 
-import entForeignBodyRoutes
-  from "./ent-foreign-body.routes.js";
+import entForeignBodyRoutes from "./ent-foreign-body.routes.js";
 
+import serviceCalciumElectrolyteRoutes from "./service-calcium-electrolyte.routes.js";
 
-import serviceCalciumElectrolyteRoutes
-  from "./service-calcium-electrolyte.routes.js";
+import serviceChestXrayRoutes from "./service-chest-xray.routes.js";
 
+import serviceIcdRoutes from "./service-icd.routes.js";
 
-import serviceChestXrayRoutes
-  from "./service-chest-xray.routes.js";
-
-
-
-import serviceIcdRoutes
-  from "./service-icd.routes.js";
+import { importMachinesExcel } from "./machine-import.controller.js";
 // ======================================================
 // ROUTER
 // ======================================================
 
-const router =
-  Router();
-
+const router = Router();
 
 // ======================================================
 // EXCEL UPLOAD
 // ======================================================
 
-const excelUpload =
-  multer({
-    storage:
-      multer.memoryStorage(),
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
 
-    limits: {
-      fileSize:
-        10 *
-        1024 *
-        1024,
-    },
-  });
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+});
 
+const medicalStaffExcelUpload = multer({
+  storage: multer.memoryStorage(),
 
-const medicalStaffExcelUpload =
-  multer({
-    storage:
-      multer.memoryStorage(),
+  limits: {
+    fileSize: 30 * 1024 * 1024,
+  },
+});
 
-    limits: {
-      fileSize:
-        30 *
-        1024 *
-        1024,
-    },
-  });
+const serviceExcelUpload = multer({
+  storage: multer.memoryStorage(),
 
+  limits: {
+    fileSize: 30 * 1024 * 1024,
+  },
+});
 
-const serviceExcelUpload =
-  multer({
-    storage:
-      multer.memoryStorage(),
+const drugExcelUpload = multer({
+  storage: multer.memoryStorage(),
 
-    limits: {
-      fileSize:
-        30 *
-        1024 *
-        1024,
-    },
-  });
-
-
-const drugExcelUpload =
-  multer({
-    storage:
-      multer.memoryStorage(),
-
-    limits: {
-      fileSize:
-        30 *
-        1024 *
-        1024,
-    },
-  });
-
+  limits: {
+    fileSize: 30 * 1024 * 1024,
+  },
+});
 
 // ======================================================
 // AUTH
@@ -179,280 +124,141 @@ const drugExcelUpload =
 // Toàn bộ catalog chỉ ADMIN
 // ======================================================
 
-router.use(
-  requireAuth,
-  requireAdmin
-);
+router.use(requireAuth, requireAdmin);
 
-  // ======================================================
-  // DVKT - ICD
-  // ======================================================
+// ======================================================
+// DVKT - ICD
+// ======================================================
 
-  router.use(
-    "/service-icd-rules",
-    serviceIcdRoutes
-  );
+router.use("/service-icd-rules", serviceIcdRoutes);
 
+router.use("/service-chest-xray", serviceChestXrayRoutes);
 
-router.use(
-  "/service-chest-xray",
-  serviceChestXrayRoutes
-);
+router.use("/service-calcium-electrolyte", serviceCalciumElectrolyteRoutes);
 
-router.use(
-  "/service-calcium-electrolyte",
-  serviceCalciumElectrolyteRoutes
-);
-
-
-router.use(
-  "/ent-foreign-body",
-  entForeignBodyRoutes
-);
+router.use("/ent-foreign-body", entForeignBodyRoutes);
 // ======================================================
 // EXAMINATION SERVICES
 // ======================================================
 
-router.use(
-  "/examination-services",
-  examinationServiceRouter
-);
-
+router.use("/examination-services", examinationServiceRouter);
 
 // ======================================================
 // MACHINES
 // ======================================================
 
-router.get(
-  "/machines",
-  getMachines
-);
+router.get("/machines", getMachines);
 
+router.get("/machines/:code", getMachineByCode);
 
-router.get(
-  "/machines/:code",
-  getMachineByCode
-);
+router.post("/machines", addMachine);
 
+router.put("/machines/:code", editMachine);
+
+router.delete("/machines/:code", removeMachine);
 
 router.post(
-  "/machines",
-  addMachine
+  "/machines/import",
+  (req, res, next) => {
+    excelUpload.single("file")(req, res, (error: unknown) => {
+      if (error) {
+        res.status(400).json({
+          success: false,
+          message:
+            error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
+              ? "File Excel không được vượt quá 10 MB."
+              : "Không thể nhận file Excel. Vui lòng chọn lại file.",
+        });
+        return;
+      }
+
+      next();
+    });
+  },
+  importMachinesExcel,
 );
-
-
-router.put(
-  "/machines/:code",
-  editMachine
-);
-
-
-router.delete(
-  "/machines/:code",
-  removeMachine
-);
-
 
 // ======================================================
 // SERVICES / DVKT
 // ======================================================
 
-router.get(
-  "/services",
-  getServices
-);
+router.get("/services", getServices);
 
+router.post("/services/import", serviceExcelUpload.single("file"), importServicesExcel);
 
-router.post(
-  "/services/import",
-  serviceExcelUpload.single(
-    "file"
-  ),
-  importServicesExcel
-);
+router.get("/services/:code", getServiceByCode);
 
+router.post("/services", addService);
 
-router.get(
-  "/services/:code",
-  getServiceByCode
-);
+router.put("/services/:code", editService);
 
-
-router.post(
-  "/services",
-  addService
-);
-
-
-router.put(
-  "/services/:code",
-  editService
-);
-
-
-router.delete(
-  "/services/:code",
-  removeService
-);
-
+router.delete("/services/:code", removeService);
 
 // ======================================================
 // DEPARTMENTS / KHOA
 // ======================================================
 
-router.get(
-  "/departments",
-  getDepartments
-);
+router.get("/departments", getDepartments);
 
+router.get("/departments/:code", getDepartmentByCode);
 
-router.get(
-  "/departments/:code",
-  getDepartmentByCode
-);
+router.post("/departments", addDepartment);
 
+router.put("/departments/:code", editDepartment);
 
-router.post(
-  "/departments",
-  addDepartment
-);
-
-
-router.put(
-  "/departments/:code",
-  editDepartment
-);
-
-
-router.delete(
-  "/departments/:code",
-  removeDepartment
-);
-
+router.delete("/departments/:code", removeDepartment);
 
 // ======================================================
 // MEDICAL STAFF / NHÂN VIÊN Y TẾ
 // ======================================================
 
-router.get(
-  "/medical-staff",
-  getMedicalStaffList
-);
-
+router.get("/medical-staff", getMedicalStaffList);
 
 router.post(
   "/medical-staff/import",
-  medicalStaffExcelUpload.single(
-    "file"
-  ),
-  importMedicalStaffExcel
+  medicalStaffExcelUpload.single("file"),
+  importMedicalStaffExcel,
 );
 
+router.get("/medical-staff/:id", getMedicalStaffById);
 
-router.get(
-  "/medical-staff/:id",
-  getMedicalStaffById
-);
+router.post("/medical-staff", addMedicalStaff);
 
+router.put("/medical-staff/:id", editMedicalStaff);
 
-router.post(
-  "/medical-staff",
-  addMedicalStaff
-);
-
-
-router.put(
-  "/medical-staff/:id",
-  editMedicalStaff
-);
-
-
-router.delete(
-  "/medical-staff/:id",
-  removeMedicalStaff
-);
-
+router.delete("/medical-staff/:id", removeMedicalStaff);
 
 // ======================================================
 // STAFF SCHEDULES
 // ======================================================
 
-router.use(
-  "/staff-schedules",
-  staffScheduleRoutes
-);
-
+router.use("/staff-schedules", staffScheduleRoutes);
 
 // ======================================================
 // DRUGS / THUỐC
 // ======================================================
 
-router.post(
-  "/drugs/import",
-  drugExcelUpload.single(
-    "file"
-  ),
-  importDrugsExcel
-);
+router.post("/drugs/import", drugExcelUpload.single("file"), importDrugsExcel);
 
+router.get("/drugs", getDrugs);
 
-router.get(
-  "/drugs",
-  getDrugs
-);
+router.get("/drugs/:code", getDrugByCode);
 
+router.post("/drugs", addDrug);
 
-router.get(
-  "/drugs/:code",
-  getDrugByCode
-);
+router.put("/drugs/:code", editDrug);
 
-
-router.post(
-  "/drugs",
-  addDrug
-);
-
-
-router.put(
-  "/drugs/:code",
-  editDrug
-);
-
-
-router.delete(
-  "/drugs/:code",
-  removeDrug
-);
-
+router.delete("/drugs/:code", removeDrug);
 
 // ======================================================
 // SERVICE STAFF
 // ======================================================
 
-router.get(
-  "/service-staff/template",
-  downloadServiceStaffTemplate
-);
+router.get("/service-staff/template", downloadServiceStaffTemplate);
 
+router.post("/service-staff/import/preview", excelUpload.single("file"), previewServiceStaffExcel);
 
-router.post(
-  "/service-staff/import/preview",
-  excelUpload.single(
-    "file"
-  ),
-  previewServiceStaffExcel
-);
-
-
-router.post(
-  "/service-staff/import",
-  excelUpload.single(
-    "file"
-  ),
-  importServiceStaffExcelController
-);
-
+router.post("/service-staff/import", excelUpload.single("file"), importServiceStaffExcelController);
 
 // ======================================================
 // ICD WARNING / ICD CẢNH BÁO
@@ -475,16 +281,11 @@ router.post(
 //
 // ======================================================
 
-
 // ======================================================
 // GET ICD WARNING LIST
 // ======================================================
 
-router.get(
-  "/icd-warnings",
-  getIcdWarningsList
-);
-
+router.get("/icd-warnings", getIcdWarningsList);
 
 // ======================================================
 // IMPORT ICD WARNING EXCEL
@@ -492,44 +293,25 @@ router.get(
 // PHẢI đặt route /import trước các route động.
 // ======================================================
 
-router.post(
-  "/icd-warnings/import",
-  excelUpload.single(
-    "file"
-  ),
-  importIcdWarningsExcel
-);
-
+router.post("/icd-warnings/import", excelUpload.single("file"), importIcdWarningsExcel);
 
 // ======================================================
 // CREATE ICD WARNING
 // ======================================================
 
-router.post(
-  "/icd-warnings",
-  createIcdWarningController
-);
-
+router.post("/icd-warnings", createIcdWarningController);
 
 // ======================================================
 // UPDATE ICD WARNING
 // ======================================================
 
-router.put(
-  "/icd-warnings/:id",
-  updateIcdWarningController
-);
-
+router.put("/icd-warnings/:id", updateIcdWarningController);
 
 // ======================================================
 // TOGGLE ACTIVE ICD WARNING
 // ======================================================
 
-router.patch(
-  "/icd-warnings/:id/toggle-active",
-  toggleIcdWarningActiveController
-);
-
+router.patch("/icd-warnings/:id/toggle-active", toggleIcdWarningActiveController);
 
 // ======================================================
 // GENERIC CATALOG
@@ -537,29 +319,13 @@ router.patch(
 // CÁC ROUTE NÀY PHẢI ĐỂ CUỐI
 // ======================================================
 
-router.get(
-  "/:type",
-  getCatalogRules
-);
+router.get("/:type", getCatalogRules);
 
+router.post("/:type", addCatalogRule);
 
-router.post(
-  "/:type",
-  addCatalogRule
-);
+router.put("/:type/:id", editCatalogRule);
 
-
-router.put(
-  "/:type/:id",
-  editCatalogRule
-);
-
-
-router.delete(
-  "/:type/:id",
-  removeCatalogRule
-);
-
+router.delete("/:type/:id", removeCatalogRule);
 
 // ======================================================
 // EXPORT
