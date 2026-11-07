@@ -13,11 +13,9 @@ import {
   message,
 } from "antd";
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
-  ReloadOutlined,
   SaveOutlined,
   UndoOutlined,
   WarningOutlined,

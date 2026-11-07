@@ -1,479 +1,414 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useNavigate } from "react-router-dom";
+
 import {
+  Alert,
+  Breadcrumb,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  message,
+} from "antd";
+
+import type { ColumnsType } from "antd/es/table";
+
+import {
+  ArrowLeftOutlined,
+  DeleteOutlined,
   HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 
-import {
-  Breadcrumb,
-  Button,
-  Card,
-  Form,
-  Input,
-  message,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from "antd";
-
-import { useEffect, useMemo, useState } from "react";
-
-import type { ColumnsType } from "antd/es/table";
-
-import { useNavigate } from "react-router-dom";
-
 import { apiFetch } from "../../api/apiClient";
 
 const { Title, Text } = Typography;
 
-interface ServiceDiagnosisRow {
-  id: string;
+const API = "/catalog/service-diagnosis";
 
-  service_code: string;
-
-  diagnosis_pattern: string;
-
-  match_type: string;
-
-  active: boolean;
-
-  note?: string | null;
-}
-
-interface GroupedServiceDiagnosis {
-  serviceCode: string;
-
-  rows: ServiceDiagnosisRow[];
-}
+const MATCH_OPTIONS = [
+  { label: "Có chứa", value: "CONTAINS" },
+  { label: "Chính xác", value: "EXACT" },
+  { label: "Bắt đầu bằng", value: "STARTS_WITH" },
+];
 
 interface FormValues {
   service_code: string;
-
   diagnosis_pattern: string;
-
   match_type: string;
-
   active: boolean;
-
-  note?: string;
+  note?: string | null;
 }
 
-const MATCH_OPTIONS = [
-  {
-    label: "Có chứa",
+interface RuleRow extends FormValues {
+  id: string | number;
+}
 
-    value: "CONTAINS",
-  },
+interface GroupedRow {
+  serviceCode: string;
+  rows: RuleRow[];
+}
 
-  {
-    label: "Chính xác",
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
 
-    value: "EXACT",
-  },
+type StatusFilter = "active" | "inactive";
 
-  {
-    label: "Bắt đầu bằng",
+const text = (value: unknown): string => String(value ?? "").trim();
 
-    value: "STARTS_WITH",
-  },
-];
+const normalize = (value: unknown): string =>
+  text(value).normalize("NFC").replace(/\s+/gu, " ").toLocaleLowerCase("vi");
 
-function getMatchLabel(value: string) {
+function getMatchLabel(value: string): string {
   return MATCH_OPTIONS.find((item) => item.value === value)?.label ?? value;
+}
+
+async function request<T>(path = "", init?: RequestInit): Promise<T | undefined> {
+  const headers = new Headers(init?.headers);
+
+  if (init?.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await apiFetch(`${API}${path}`, {
+    ...init,
+    headers,
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(`API không trả về JSON (HTTP ${response.status}).`);
+  }
+
+  const json = (await response.json()) as ApiResponse<T>;
+
+  if (!response.ok || json.success !== true) {
+    throw new Error(json.message || json.error || `Lỗi HTTP ${response.status}`);
+  }
+
+  return json.data;
 }
 
 export default function ServiceDiagnosis() {
   const navigate = useNavigate();
 
+  const [messageApi, contextHolder] = message.useMessage();
+
   const [form] = Form.useForm<FormValues>();
 
-  const [rows, setRows] = useState<ServiceDiagnosisRow[]>([]);
+  const requestSequence = useRef(0);
+  const savingRef = useRef(false);
 
+  const [rows, setRows] = useState<RuleRow[]>([]);
   const [loading, setLoading] = useState(false);
-
   const [saving, setSaving] = useState(false);
 
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+
+  const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [editing, setEditing] = useState<ServiceDiagnosisRow | null>(null);
+  const [editing, setEditing] = useState<RuleRow | null>(null);
 
   const [selectedServiceCode, setSelectedServiceCode] = useState<string | undefined>();
 
-  async function loadData() {
+  const [diagnosisFilter, setDiagnosisFilter] = useState("");
+
+  const [status, setStatus] = useState<StatusFilter | undefined>();
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const busy = saving || deletingId !== null;
+
+  const loadData = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+
+    setLoading(true);
+    setError("");
+
     try {
-      setLoading(true);
+      const data = await request<RuleRow[] | { items: RuleRow[] }>();
 
-      const response = await apiFetch("/catalog/service-diagnosis", {
-        method: "GET",
-      });
+      const items = Array.isArray(data) ? data : data?.items;
 
-      let json: any = null;
-
-      try {
-        json = await response.json();
-      } catch {
-        json = null;
+      if (!Array.isArray(items)) {
+        throw new Error("Danh sách cấu hình không hợp lệ.");
       }
 
-      if (!response.ok || json?.success !== true) {
-        throw new Error(json?.message || "Không thể tải dữ liệu.");
+      if (sequence === requestSequence.current) {
+        setRows(items);
       }
-
-      const data = Array.isArray(json?.data)
-        ? json.data
-        : Array.isArray(json?.data?.items)
-          ? json.data.items
-          : [];
-
-      setRows(data);
-    } catch (error) {
-      console.error("Load service diagnosis error:", error);
-
-      message.error(error instanceof Error ? error.message : "Không thể tải dữ liệu.");
+    } catch (err) {
+      if (sequence === requestSequence.current) {
+        setError(err instanceof Error ? err.message : "Không thể tải danh mục.");
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadData();
-  }, []);
 
-  const serviceOptions = useMemo(() => {
-    const values = Array.from(
-      new Set(rows.map((item) => String(item.service_code ?? "").trim()).filter(Boolean)),
-    );
+    return () => {
+      requestSequence.current++;
+    };
+  }, [loadData]);
 
-    values.sort((a, b) => a.localeCompare(b));
-
-    return values.map((value) => ({
-      value,
-
-      label: value,
-    }));
-  }, [rows]);
+  const serviceOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => text(row.service_code)).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, "vi"))
+        .map((value) => ({ value, label: value })),
+    [rows],
+  );
 
   const filteredRows = useMemo(() => {
-    if (!selectedServiceCode) {
-      return rows;
+    const search = normalize(diagnosisFilter);
+
+    return rows.filter((row) => {
+      const matchesService = !selectedServiceCode || text(row.service_code) === selectedServiceCode;
+
+      const matchesDiagnosis = normalize(row.diagnosis_pattern).includes(search);
+
+      const matchesStatus = status === undefined || row.active === (status === "active");
+
+      return matchesService && matchesDiagnosis && matchesStatus;
+    });
+  }, [rows, selectedServiceCode, diagnosisFilter, status]);
+
+  const groupedRows = useMemo<GroupedRow[]>(() => {
+    const groups = new Map<string, RuleRow[]>();
+
+    for (const row of filteredRows) {
+      const key = text(row.service_code);
+      const items = groups.get(key) ?? [];
+
+      items.push(row);
+      groups.set(key, items);
     }
 
-    return rows.filter((item) => item.service_code === selectedServiceCode);
-  }, [rows, selectedServiceCode]);
-
-  const groupedRows: GroupedServiceDiagnosis[] = useMemo(() => {
-    const map = new Map<string, ServiceDiagnosisRow[]>();
-
-    for (const item of filteredRows) {
-      const key = String(item.service_code ?? "").trim();
-
-      if (!map.has(key)) {
-        map.set(key, []);
-      }
-
-      map.get(key)!.push(item);
-    }
-
-    return Array.from(map.entries()).map(([serviceCode, values]) => ({
+    return Array.from(groups.entries()).map(([serviceCode, items]) => ({
       serviceCode,
-
-      rows: values,
+      rows: items,
     }));
   }, [filteredRows]);
 
-  function openCreate() {
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(groupedRows.length / pageSize)));
+
+  function backToCatalog() {
+    sessionStorage.setItem("catalog-active-tab", "rules");
+
+    navigate("/catalog");
+  }
+
+  function openForm(record?: RuleRow) {
+    setEditing(record ?? null);
+    form.resetFields();
+
+    form.setFieldsValue({
+      service_code: record ? text(record.service_code) : (selectedServiceCode ?? ""),
+      diagnosis_pattern: text(record?.diagnosis_pattern),
+      match_type: record?.match_type ?? "CONTAINS",
+      active: record ? record.active === true : true,
+      note: text(record?.note),
+    });
+
+    setModalOpen(true);
+  }
+
+  function closeForm() {
+    if (savingRef.current) return;
+
+    setModalOpen(false);
     setEditing(null);
-
     form.resetFields();
-
-    form.setFieldsValue({
-      service_code: selectedServiceCode ?? "",
-
-      diagnosis_pattern: "",
-
-      match_type: "CONTAINS",
-
-      active: true,
-
-      note: "",
-    });
-
-    setModalOpen(true);
   }
 
-  function openEdit(record: ServiceDiagnosisRow) {
-    setEditing(record);
+  async function handleSave(values: FormValues) {
+    if (savingRef.current) return;
 
-    form.resetFields();
+    savingRef.current = true;
+    setSaving(true);
 
-    form.setFieldsValue({
-      service_code: record.service_code,
-
-      diagnosis_pattern: record.diagnosis_pattern,
-
-      match_type: record.match_type,
-
-      active: record.active,
-
-      note: record.note ?? "",
-    });
-
-    setModalOpen(true);
-  }
-
-  async function handleSave() {
     try {
-      const values = await form.validateFields();
+      const path = editing ? `/${encodeURIComponent(String(editing.id))}` : "";
 
-      setSaving(true);
-
-      const url = editing
-        ? `/catalog/service-diagnosis/${editing.id}`
-        : "/catalog/service-diagnosis";
-
-      const response = await apiFetch(url, {
+      await request(path, {
         method: editing ? "PUT" : "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
         body: JSON.stringify({
-          service_code: values.service_code.trim(),
-
-          diagnosis_pattern: values.diagnosis_pattern.trim(),
-
+          service_code: text(values.service_code),
+          diagnosis_pattern: text(values.diagnosis_pattern),
           match_type: values.match_type,
-
-          active: values.active,
-
-          note: values.note?.trim() || null,
+          active: values.active === true,
+          note: text(values.note) || null,
         }),
       });
 
-      let json: any = null;
-
-      try {
-        json = await response.json();
-      } catch {
-        json = null;
-      }
-
-      if (!response.ok || json?.success !== true) {
-        throw new Error(
-          json?.message || (editing ? "Không thể cập nhật cấu hình." : "Không thể thêm cấu hình."),
-        );
-      }
-
-      message.success(editing ? "Cập nhật thành công." : "Thêm mới thành công.");
+      messageApi.success(editing ? "Đã cập nhật cấu hình." : "Đã thêm cấu hình.");
 
       setModalOpen(false);
-
       setEditing(null);
-
       form.resetFields();
 
       await loadData();
-    } catch (error) {
-      if (error instanceof Error) {
-        message.error(error.message);
-      }
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Không thể lưu cấu hình.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(record: RuleRow) {
+    setDeletingId(record.id);
+
     try {
-      const response = await apiFetch(`/catalog/service-diagnosis/${id}`, {
-        method: "DELETE",
-      });
+      await request(`/${encodeURIComponent(String(record.id))}`, { method: "DELETE" });
 
-      let json: any = null;
-
-      try {
-        json = await response.json();
-      } catch {
-        json = null;
-      }
-
-      if (!response.ok || json?.success !== true) {
-        throw new Error(json?.message || "Không thể xóa cấu hình.");
-      }
-
-      message.success("Đã xóa cấu hình.");
-
+      messageApi.success("Đã xóa cấu hình.");
       await loadData();
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : "Không thể xóa cấu hình.");
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "Không thể xóa cấu hình.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  const columns: ColumnsType<GroupedServiceDiagnosis> = [
+  function resetFilters() {
+    setSelectedServiceCode(undefined);
+    setDiagnosisFilter("");
+    setStatus(undefined);
+    setPage(1);
+  }
+
+  const columns: ColumnsType<GroupedRow> = [
     {
-      title: "DVKT",
-
-      dataIndex: "serviceCode",
-
-      key: "serviceCode",
-
-      width: 280,
-
-      render: (value: string) => (
-        <Text
-          strong
-          style={{
-            color: "#172033",
-          }}
-        >
-          {value}
-        </Text>
-      ),
+      title: "STT",
+      key: "index",
+      width: 56,
+      align: "center",
+      render: (_, __, index) => (currentPage - 1) * pageSize + index + 1,
     },
-
+    {
+      title: "Mã DVKT",
+      dataIndex: "serviceCode",
+      width: 200,
+      render: (value) => <div className="sd-code">{text(value) || "—"}</div>,
+    },
     {
       title: "Chẩn đoán vào",
-
-      key: "diagnosis",
-
-      render: (
-        _: unknown,
-
-        record: GroupedServiceDiagnosis,
-      ) => (
-        <div className="service-diagnosis-tags">
+      key: "diagnoses",
+      render: (_, record) => (
+        <div className="sd-diagnoses">
           {record.rows.map((item) => (
-            <Tag
+            <div
               key={item.id}
-              color={item.active ? "blue" : "default"}
-              className="service-diagnosis-tag"
-              closable
-              onClose={(event) => {
-                event.preventDefault();
-
-                event.stopPropagation();
-
-                Modal.confirm({
-                  title: "Xóa chẩn đoán này?",
-
-                  content: (
-                    <div
-                      style={{
-                        marginTop: 10,
-                      }}
-                    >
-                      <div
-                        style={{
-                          marginBottom: 6,
-
-                          color: "#64748b",
-                        }}
-                      >
-                        Bạn có chắc muốn xóa:
-                      </div>
-
-                      <div
-                        style={{
-                          padding: "8px 10px",
-
-                          borderRadius: 8,
-
-                          background: "#f5f7fa",
-
-                          color: "#1677ff",
-
-                          fontWeight: 700,
-                        }}
-                      >
-                        {item.diagnosis_pattern}
-                      </div>
-                    </div>
-                  ),
-
-                  okText: "Xóa",
-
-                  cancelText: "Hủy",
-
-                  centered: true,
-
-                  okButtonProps: {
-                    danger: true,
-                  },
-
-                  onOk: async () => {
-                    await handleDelete(item.id);
-                  },
-                });
-              }}
+              className={item.active ? "sd-diagnosis" : "sd-diagnosis sd-diagnosis-inactive"}
             >
-              <span
-                onClick={(event) => {
-                  event.stopPropagation();
+              <Tooltip
+                title={
+                  <div>
+                    <div>Kiểu so khớp: {getMatchLabel(item.match_type)}</div>
 
-                  openEdit(item);
-                }}
-                style={{
-                  cursor: "pointer",
-                }}
+                    <div>Trạng thái: {item.active ? "Đang bật" : "Đã tắt"}</div>
+
+                    {item.note && <div>Ghi chú: {item.note}</div>}
+
+                    <div>Bấm để chỉnh sửa</div>
+                  </div>
+                }
               >
-                {item.diagnosis_pattern}
-              </span>
-            </Tag>
+                <Button
+                  type="text"
+                  size="small"
+                  className="sd-diagnosis-edit"
+                  disabled={busy || loading}
+                  onClick={() => openForm(item)}
+                  aria-label={`Chỉnh sửa chẩn đoán ` + item.diagnosis_pattern}
+                >
+                  {item.diagnosis_pattern}
+                </Button>
+              </Tooltip>
+
+              <Popconfirm
+                title="Xóa chẩn đoán này?"
+                description={item.diagnosis_pattern}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+                disabled={busy || loading}
+                onConfirm={() => handleDelete(item)}
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  className="sd-diagnosis-delete"
+                  aria-label={`Xóa chẩn đoán ` + item.diagnosis_pattern}
+                  icon={<DeleteOutlined />}
+                  disabled={busy || loading}
+                  loading={deletingId === item.id}
+                />
+              </Popconfirm>
+            </div>
           ))}
         </div>
       ),
     },
-
     {
       title: "Kiểu so khớp",
-
       key: "matchType",
-
-      width: 150,
-
-      render: (
-        _: unknown,
-
-        record: GroupedServiceDiagnosis,
-      ) => {
-        const values = Array.from(new Set(record.rows.map((item) => item.match_type)));
-
-        return (
-          <Space wrap size={[4, 4]}>
-            {values.map((value) => (
-              <Tag key={value} className="service-match-tag">
-                {getMatchLabel(value)}
-              </Tag>
-            ))}
-          </Space>
-        );
-      },
+      width: 175,
+      render: (_, record) => (
+        <Space size={[4, 5]} wrap>
+          {Array.from(new Set(record.rows.map((item) => item.match_type))).map((value) => (
+            <Tag
+              key={value}
+              color={value === "EXACT" ? "blue" : value === "STARTS_WITH" ? "purple" : "cyan"}
+            >
+              {getMatchLabel(value)}
+            </Tag>
+          ))}
+        </Space>
+      ),
     },
-
     {
-      title: "Hoạt động",
-
+      title: "Đang bật / Tổng",
       key: "active",
-
-      width: 110,
-
+      width: 130,
       align: "center",
-
-      render: (
-        _: unknown,
-
-        record: GroupedServiceDiagnosis,
-      ) => {
+      render: (_, record) => {
         const activeCount = record.rows.filter((item) => item.active).length;
 
         return (
           <Tag
-            color={activeCount === record.rows.length ? "success" : "warning"}
-            className="service-status-tag"
+            color={
+              activeCount === 0
+                ? "default"
+                : activeCount === record.rows.length
+                  ? "success"
+                  : "warning"
+            }
           >
             {activeCount}/{record.rows.length}
           </Tag>
@@ -483,81 +418,69 @@ export default function ServiceDiagnosis() {
   ];
 
   return (
-    <div className="service-diagnosis-page">
-      <div className="service-breadcrumb">
-        <Breadcrumb
-          items={[
-            {
-              title: (
-                <HomeOutlined
-                  onClick={() => navigate("/")}
-                  style={{
-                    cursor: "pointer",
-                  }}
-                />
-              ),
-            },
+    <div className="sd-page">
+      {contextHolder}
 
-            {
-              title: (
-                <span
-                  onClick={() => navigate("/catalog")}
-                  style={{
-                    cursor: "pointer",
-                  }}
-                >
-                  Danh mục
-                </span>
-              ),
-            },
+      <Breadcrumb
+        items={[
+          {
+            title: (
+              <Button
+                type="link"
+                size="small"
+                className="sd-crumb"
+                aria-label="Trang chủ"
+                icon={<HomeOutlined />}
+                onClick={() => navigate("/")}
+              />
+            ),
+          },
+          {
+            title: (
+              <Button type="link" size="small" className="sd-crumb" onClick={backToCatalog}>
+                Danh mục
+              </Button>
+            ),
+          },
+          { title: "DVKT - Chẩn đoán vào" },
+        ]}
+      />
 
-            {
-              title: "DVKT - Chẩn đoán vào",
-            },
-          ]}
-        />
-      </div>
-
-      <div className="service-page-header">
+      <div className="sd-header">
         <div>
           <Title
             level={3}
             style={{
               margin: 0,
-
               color: "#172033",
-
+              fontSize: 21,
               fontWeight: 800,
             }}
           >
             <SafetyCertificateOutlined
               style={{
                 marginRight: 9,
-
                 color: "#1677ff",
               }}
             />
             DVKT - Chẩn đoán vào
           </Title>
 
-          <Text
-            type="secondary"
-            style={{
-              display: "block",
-
-              marginTop: 4,
-            }}
-          >
+          <Text type="secondary" className="sd-subtitle">
             Quản lý chẩn đoán phù hợp theo từng dịch vụ kỹ thuật
           </Text>
         </div>
 
-        <Space size={8}>
+        <Space size={8} wrap>
+          <Button icon={<ArrowLeftOutlined />} disabled={busy} onClick={backToCatalog}>
+            Quay lại
+          </Button>
+
           <Button
             icon={<ReloadOutlined />}
             loading={loading}
+            disabled={busy}
             onClick={() => void loadData()}
-            className="service-header-button"
           >
             Làm mới
           </Button>
@@ -565,123 +488,189 @@ export default function ServiceDiagnosis() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={openCreate}
-            className="service-header-button service-add-button"
+            disabled={busy || loading}
+            onClick={() => openForm()}
           >
             Thêm mới
           </Button>
         </Space>
       </div>
 
-      <div className="service-filter-block">
-        <div className="service-filter-label">DVKT</div>
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Không thể tải danh mục DVKT - Chẩn đoán vào"
+          description={error}
+          action={
+            <Button size="small" disabled={busy || loading} onClick={() => void loadData()}>
+              Thử lại
+            </Button>
+          }
+        />
+      )}
 
-        <div className="service-filter-row">
-          <Select
+      <div className="sd-filters">
+        <div className="sd-filter">
+          <label htmlFor="sd-service">Mã DVKT</label>
+
+          <Select<string>
+            id="sd-service"
             showSearch
             allowClear
-            value={selectedServiceCode}
-            placeholder="Chọn DVKT"
             optionFilterProp="label"
+            value={selectedServiceCode}
+            placeholder="Tất cả DVKT"
             options={serviceOptions}
-            className="service-filter-select"
-            onChange={(value) => setSelectedServiceCode(value)}
-          />
-
-          <Button
-            type="primary"
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              setSelectedServiceCode(undefined);
-
-              void loadData();
+            onChange={(value) => {
+              setSelectedServiceCode(value);
+              setPage(1);
             }}
-            className="service-filter-refresh"
-          >
-            Làm mới
-          </Button>
+          />
         </div>
+
+        <div className="sd-filter">
+          <label htmlFor="sd-diagnosis-search">Chẩn đoán vào</label>
+
+          <Input
+            id="sd-diagnosis-search"
+            allowClear
+            value={diagnosisFilter}
+            placeholder="Nhập chẩn đoán cần tìm"
+            onChange={(event) => {
+              setDiagnosisFilter(event.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+
+        <div className="sd-filter">
+          <label htmlFor="sd-status">Trạng thái</label>
+
+          <Select<StatusFilter>
+            id="sd-status"
+            allowClear
+            value={status}
+            placeholder="Tất cả trạng thái"
+            options={[
+              { value: "active", label: "Đang bật" },
+              { value: "inactive", label: "Đã tắt" },
+            ]}
+            onChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+          />
+        </div>
+
+        <Button icon={<ReloadOutlined />} onClick={resetFilters}>
+          Xóa bộ lọc
+        </Button>
       </div>
 
-      <Card
-        className="service-table-card"
-        styles={{
-          body: {
-            padding: 0,
-          },
-        }}
-      >
-        <Table<GroupedServiceDiagnosis>
+      <Card className="sd-table" styles={{ body: { padding: 0 } }}>
+        <Table<GroupedRow>
           rowKey="serviceCode"
           loading={loading}
           dataSource={groupedRows}
           columns={columns}
+          tableLayout="fixed"
           size="middle"
+          scroll={{ x: 960 }}
           pagination={{
-            pageSize: 10,
-
+            current: currentPage,
+            pageSize,
             showSizeChanger: true,
-
             pageSizeOptions: ["10", "20", "50"],
-
-            showTotal: (total) => `Tổng số: ${total}`,
+            showTotal: (total) => `Tổng số: ${total} DVKT`,
+            onChange: (nextPage, nextSize) => {
+              setPage(nextSize !== pageSize ? 1 : nextPage);
+              setPageSize(nextSize);
+            },
           }}
           locale={{
-            emptyText: "Chưa có dữ liệu",
+            emptyText: error
+              ? "Chưa tải được dữ liệu."
+              : rows.length === 0
+                ? "Chưa có cấu hình chẩn đoán."
+                : "Không có cấu hình phù hợp bộ lọc.",
           }}
         />
       </Card>
 
+      <Text type="secondary" className="sd-legend">
+        Bấm vào chẩn đoán để chỉnh sửa, bấm biểu tượng thùng rác để xóa. Khi lọc, bảng chỉ hiển thị
+        và đếm các cấu hình phù hợp bộ lọc.
+      </Text>
+
       <Modal
         open={modalOpen}
-        className="service-diagnosis-modal"
+        centered
+        width={720}
+        destroyOnHidden
+        className="sd-modal"
         title={
-          <div>
-            <div className="service-modal-title">
-              {editing ? "Cập nhật chẩn đoán vào" : "Thêm chẩn đoán vào"}
+          <div className="sd-modal-heading">
+            <div className="sd-modal-icon">
+              <SafetyCertificateOutlined />
             </div>
 
-            <div className="service-modal-description">Thiết lập điều kiện phù hợp cho DVKT</div>
+            <div>
+              <div className="sd-modal-title">
+                {editing ? "Cập nhật chẩn đoán vào" : "Thêm chẩn đoán vào"}
+              </div>
+
+              <div className="sd-subtitle">Thiết lập điều kiện phù hợp cho DVKT</div>
+            </div>
           </div>
         }
-        width={620}
         okText={editing ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
         confirmLoading={saving}
-        onOk={() => void handleSave()}
-        onCancel={() => {
-          if (saving) {
-            return;
-          }
-
-          setModalOpen(false);
-
-          setEditing(null);
-
-          form.resetFields();
-        }}
+        cancelButtonProps={{ disabled: saving }}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
+        onCancel={closeForm}
+        onOk={() => form.submit()}
       >
-        <Form
+        <Form<FormValues>
           form={form}
           layout="vertical"
+          preserve={false}
           requiredMark={false}
-          style={{
-            marginTop: 18,
-          }}
+          disabled={saving}
+          onFinish={handleSave}
+          style={{ marginTop: 18 }}
         >
-          <Form.Item
-            name="service_code"
-            label="Mã DVKT"
-            rules={[
-              {
-                required: true,
+          <div className="sd-form-grid">
+            <Form.Item
+              name="service_code"
+              label="Mã DVKT"
+              rules={[
+                {
+                  required: true,
+                  whitespace: true,
+                  message: "Vui lòng nhập mã DVKT.",
+                },
+              ]}
+            >
+              <Input placeholder="Ví dụ: 21.0014.1778" />
+            </Form.Item>
 
-                message: "Vui lòng nhập mã DVKT.",
-              },
-            ]}
-          >
-            <Input placeholder="Ví dụ: 21.0014.1778" />
-          </Form.Item>
+            <Form.Item
+              name="match_type"
+              label="Kiểu so khớp"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng chọn kiểu so khớp.",
+                },
+              ]}
+            >
+              <Select options={MATCH_OPTIONS} />
+            </Form.Item>
+          </div>
 
           <Form.Item
             name="diagnosis_pattern"
@@ -689,7 +678,7 @@ export default function ServiceDiagnosis() {
             rules={[
               {
                 required: true,
-
+                whitespace: true,
                 message: "Vui lòng nhập chẩn đoán vào.",
               },
             ]}
@@ -697,367 +686,309 @@ export default function ServiceDiagnosis() {
             <Input placeholder="Ví dụ: đau ngực" />
           </Form.Item>
 
-          <Form.Item
-            name="match_type"
-            label="Kiểu so khớp"
-            rules={[
-              {
-                required: true,
-
-                message: "Vui lòng chọn kiểu so khớp.",
-              },
-            ]}
-          >
-            <Select options={MATCH_OPTIONS} />
-          </Form.Item>
-
-          {/* <Form.Item
-            name="active"
-
-            label="Hoạt động"
-
-            valuePropName="checked"
-          >
-            <Switch
-              checkedChildren="Bật"
-
-              unCheckedChildren="Tắt"
-            />
-          </Form.Item> */}
-
           <Form.Item name="note" label="Ghi chú">
-            <Input.TextArea rows={3} placeholder="Ghi chú nếu có" />
+            <Input.TextArea
+              autoSize={{ minRows: 3, maxRows: 6 }}
+              placeholder="Nhập ghi chú nếu có"
+            />
           </Form.Item>
+
+          <div className="sd-active">
+            <div>
+              <Text strong>Kích hoạt quy tắc</Text>
+
+              <Text type="secondary" className="sd-subtitle">
+                Áp dụng trong lần kiểm tra hồ sơ tiếp theo
+              </Text>
+            </div>
+
+            <Form.Item name="active" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
 
       <style>
         {`
-          .service-diagnosis-page {
+          .sd-page {
             display: flex;
             flex-direction: column;
             gap: 15px;
+            min-width: 0;
           }
 
-          .service-breadcrumb {
-            margin-bottom: -2px;
+          .sd-page .ant-breadcrumb {
+            font-size: 12px;
           }
 
-          .service-page-header {
+          .sd-crumb.ant-btn {
+            height: auto;
+            padding: 0;
+            font-size: 12px;
+            line-height: inherit;
+          }
+
+          .sd-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
           }
 
-          .service-header-button {
+          .sd-header .ant-btn {
             height: 36px;
             border-radius: 8px;
             font-weight: 600;
           }
 
-          .service-add-button {
-            box-shadow:
-              0
-              4px
-              12px
-              rgba(
-                22,
-                119,
-                255,
-                0.20
-              );
+          .sd-subtitle {
+            display: block;
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.6;
           }
 
-          .service-filter-block {
-            padding:
-              2px
-              0
-              3px;
+          .sd-filters {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1.1fr)
+              minmax(0, 1.3fr)
+              minmax(160px, .7fr)
+              auto;
+            align-items: end;
+            gap: 10px;
           }
 
-          .service-filter-label {
-            margin-bottom: 6px;
-            color: #172033;
-            font-size: 13px;
-            font-weight: 700;
-          }
-
-          .service-filter-row {
+          .sd-filter {
             display: flex;
-            align-items: center;
-            gap: 9px;
+            flex-direction: column;
+            min-width: 0;
+            gap: 6px;
           }
 
-          .service-filter-select {
-            width: 310px;
+          .sd-filter > label {
+            color: #172033;
+            font-size: 12px;
+            font-weight: 600;
           }
 
-          .service-filter-refresh {
-            height: 34px;
-            min-width: 105px;
+          .sd-filter .ant-select {
+            width: 100%;
+          }
+
+          .sd-filters > .ant-btn {
+            height: 32px;
             border-radius: 7px;
             font-weight: 600;
           }
 
-          .service-table-card {
+          .sd-table {
+            min-width: 0;
             overflow: hidden;
-            border:
-              1px solid
-              #dfe6ee;
+            border: 1px solid #dfe6ee;
             border-radius: 8px;
             box-shadow:
-              0
-              2px
-              8px
-              rgba(
-                15,
-                23,
-                42,
-                0.03
-              );
+              0 2px 8px rgba(15, 23, 42, .03);
           }
 
-          .service-table-card
-          .ant-table-thead
-          > tr
-          > th {
-            background:
-              #f2f5f8 !important;
-
-            color:
-              #334155 !important;
-
+          .sd-table .ant-table-thead > tr > th {
+            background: #f2f5f8 !important;
+            color: #334155;
             font-size: 12px;
-
-            font-weight:
-              700 !important;
-
-            border-bottom:
-              1px solid
-              #d8e0e8 !important;
+            font-weight: 700;
+            border-bottom: 1px solid #d8e0e8;
           }
 
-          .service-table-card
-          .ant-table-tbody
-          > tr
-          > td {
-            padding:
-              11px
-              12px !important;
-
-            color:
-              #334155;
-
-            font-size:
-              12px;
-
-            vertical-align:
-              middle;
+          .sd-table .ant-table-tbody > tr > td {
+            padding: 12px;
+            color: #334155;
+            font-size: 12px;
+            vertical-align: top;
+            overflow-wrap: anywhere;
           }
 
-          .service-table-card
-          .ant-table-tbody
-          > tr:hover
-          > td {
-            background:
-              #f7fbff !important;
+          .sd-table
+          .ant-table-tbody > tr:hover > td {
+            background: #f7fbff !important;
           }
 
-        .service-diagnosis-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
+          .sd-code {
+            color: #172033;
+            font-weight: 600;
+            line-height: 1.7;
+            overflow-wrap: anywhere;
+          }
 
-.service-diagnosis-tag {
-  display: inline-flex;
-  align-items: center;
+          .sd-diagnoses {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 7px;
+          }
 
-  margin: 0;
+          .sd-diagnosis {
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            overflow: hidden;
+            border: 1px solid #bae0ff;
+            border-radius: 12px;
+            background: #e6f4ff;
+          }
 
-  padding:
-    3px
-    7px
-    3px
-    9px;
+          .sd-diagnosis-edit.ant-btn {
+            display: block;
+            height: auto;
+            min-height: 28px;
+            max-width: 100%;
+            padding: 4px 9px;
+            color: #1677ff;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.6;
+            text-align: left;
+            white-space: normal;
+          }
 
-  border-radius:
-    999px;
+          .sd-diagnosis-edit.ant-btn > span {
+            white-space: normal;
+            overflow-wrap: anywhere;
+          }
 
-  font-size:
-    11px;
+          .sd-diagnosis-delete.ant-btn {
+            flex-shrink: 0;
+            width: 27px;
+            height: 27px;
+            margin-right: 2px;
+            color: #64748b;
+            font-size: 12px;
+          }
 
-  font-weight:
-    600;
+          .sd-diagnosis-delete.ant-btn:hover {
+            color: #ff4d4f !important;
+            background: #fff1f0 !important;
+          }
 
-  cursor:
-    pointer;
+          .sd-diagnosis-inactive {
+            border-color: #e2e8f0;
+            background: #f8fafc;
+          }
 
-  transition:
-    all
-    0.18s
-    ease;
-}
+          .sd-diagnosis-inactive
+          .sd-diagnosis-edit.ant-btn {
+            color: #64748b;
+          }
 
-.service-diagnosis-tag:hover {
-  transform:
-    translateY(
-      -1px
-    );
-
-  box-shadow:
-    0
-    3px
-    8px
-    rgba(
-      22,
-      119,
-      255,
-      0.18
-    );
-}
-
-.service-diagnosis-tag
-.ant-tag-close-icon {
-  margin-left:
-    5px;
-
-  font-size:
-    10px;
-
-  opacity:
-    0.7;
-}
-
-.service-diagnosis-tag:hover
-.ant-tag-close-icon {
-  opacity:
-    1;
-}
-
-.service-match-tag {
-  margin: 0;
-
-  padding:
-    2px
-    8px;
-
-  border-radius:
-    999px;
-
-  color:
-    #475569;
-
-  background:
-    #f8fafc;
-
-  border:
-    1px solid
-    #e2e8f0;
-
-  font-size:
-    11px;
-
-  font-weight:
-    600;
-}
-
-.service-status-tag {
-  min-width:
-    46px;
-
-  margin:
-    0;
-
-  text-align:
-    center;
-
-  border-radius:
-    999px;
-
-  font-size:
-    11px;
-
-  font-weight:
-    700;
-}
-
-          .service-match-tag {
+          .sd-table .ant-tag {
             margin: 0;
-
-            border-radius:
-              999px;
-
-            font-size:
-              11px;
+            border-radius: 999px;
+            font-size: 11px;
           }
 
-
-
-
-
-
-          .service-table-card
-          .ant-pagination {
-            padding:
-              0
-              12px
-              10px;
+          .sd-table .ant-pagination {
+            padding: 0 12px 10px;
           }
 
-          .service-diagnosis-modal
-          .ant-modal-content {
-            border-radius:
-              14px;
-
-            overflow:
-              hidden;
+          .sd-legend {
+            margin-top: -5px;
+            font-size: 11px;
+            line-height: 1.7;
           }
 
-          .service-modal-title {
-            color:
-              #172033;
-
-            font-size:
-              18px;
-
-            font-weight:
-              800;
+          .sd-modal .ant-modal-content {
+            border-radius: 14px;
           }
 
-          .service-modal-description {
-            margin-top:
-              3px;
-
-            color:
-              #64748b;
-
-            font-size:
-              12px;
+          .sd-modal-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 8px;
           }
 
-          @media
-          (
-            max-width:
-              700px
-          ) {
-            .service-page-header {
-              flex-direction:
-                column;
+          .sd-modal-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #e6f4ff;
+            color: #1677ff;
+            font-size: 21px;
+          }
+
+          .sd-modal-title {
+            color: #172033;
+            font-size: 18px;
+            font-weight: 800;
+          }
+
+          .sd-form-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+            column-gap: 16px;
+          }
+
+          .sd-modal
+          .ant-form-item-label > label {
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .sd-modal .ant-input,
+          .sd-modal .ant-select-selector {
+            border-radius: 8px;
+          }
+
+          .sd-modal input.ant-input {
+            min-height: 36px;
+          }
+
+          .sd-active {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 9px;
+            background: #fafcff;
+          }
+
+          .sd-modal .ant-modal-footer .ant-btn {
+            border-radius: 8px;
+          }
+
+          @media (max-width: 1000px) {
+            .sd-header {
+              flex-direction: column;
             }
 
-            .service-filter-row {
-              align-items:
-                stretch;
+            .sd-filters {
+              grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            }
+          }
 
-              flex-direction:
-                column;
+          @media (max-width: 600px) {
+            .sd-filters,
+            .sd-form-grid {
+              grid-template-columns: 1fr;
             }
 
-            .service-filter-select {
-              width:
-                100%;
+            .sd-header .ant-space {
+              width: 100%;
+            }
+
+            .sd-modal-title {
+              font-size: 16px;
             }
           }
         `}

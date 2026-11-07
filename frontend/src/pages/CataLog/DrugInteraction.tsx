@@ -24,7 +24,6 @@ import {
 import type { ColumnsType } from "antd/es/table";
 
 import {
-  ArrowLeftOutlined,
   DeleteOutlined,
   EditOutlined,
   HomeOutlined,
