@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://desktop-8532rq2.tail2d1abe.ts.net/api/:path*"
+      "destination": "https://tqquocnugf383459.tino.page/api/:path*"
     },
     {
       "source": "/(.*)",
@@ -10,4 +10,3 @@
     }
   ]
 }
-
