@@ -40,6 +40,8 @@ import { gql } from "@apollo/client";
 
 import CaseXmlDetailsModal from "../components/CaseXmlDetailsModal";
 
+import { getImportPaymentDate } from "../utils/importPaymentDate";
+
 // Phân trang cần ORDER BY có khóa duy nhất: nếu chỉ sort ngày vào,
 // các hồ sơ cùng ngày có thể đổi chỗ giữa các lần gọi LIMIT/OFFSET.
 const GET_MEDICAL_CASES_STABLE = gql`
@@ -415,8 +417,9 @@ export default function MedicalCases() {
   // PAYMENT DATE
   // ====================================================
 
-  const [paymentDate, setPaymentDate] = useState<string | undefined>(undefined);
+  const [importPaymentDate] = useState(() => getImportPaymentDate());
 
+  const [paymentDate, setPaymentDate] = useState<string | undefined>(importPaymentDate);
   const [clearingPaymentDate, setClearingPaymentDate] = useState(false);
 
   const clearPaymentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -545,55 +548,50 @@ export default function MedicalCases() {
   const [kcbType, setKcbType] = useState<string>("ALL");
   const [treatmentGroup, setTreatmentGroup] = useState<string>("ALL");
 
-  const urlYear = searchParams.get("year");
+  const [year, setYear] = useState<number | undefined>(() => {
+    const value = Number(searchParams.get("year"));
 
-  const urlMonth = searchParams.get("month");
-
-  const [year, setYear] = useState<number | undefined>(
-    urlYear && !Number.isNaN(Number(urlYear)) ? Number(urlYear) : dayjs().year(),
-  );
-
-  const [month, setMonth] = useState<number | undefined>(() => {
-    const currentMonth = dayjs().month() + 1;
-
-    if (urlMonth) {
-      const parsedMonth = Number(urlMonth);
-
-      if (Number.isInteger(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12) {
-        return parsedMonth;
-      }
+    if (Number.isInteger(value) && value > 0) {
+      return value;
     }
 
-    return currentMonth;
+    return importPaymentDate ? dayjs(importPaymentDate).year() : dayjs().year();
+  });
+
+  const [month, setMonth] = useState<number | undefined>(() => {
+    const value = Number(searchParams.get("month"));
+
+    if (Number.isInteger(value) && value >= 1 && value <= 12) {
+      return value;
+    }
+
+    return importPaymentDate ? dayjs(importPaymentDate).month() + 1 : dayjs().month() + 1;
   });
 
   useEffect(() => {
-    const yearParam = searchParams.get("year");
+    const yearParam = Number(searchParams.get("year"));
+    const monthParam = Number(searchParams.get("month"));
 
-    const monthParam = searchParams.get("month");
+    const validYear = Number.isInteger(yearParam) && yearParam > 0;
+    const validMonth = Number.isInteger(monthParam) && monthParam >= 1 && monthParam <= 12;
 
-    if (yearParam) {
-      const nextYear = Number(yearParam);
+    const defaultDate = importPaymentDate ? dayjs(importPaymentDate) : dayjs();
 
-      if (!Number.isNaN(nextYear)) {
-        setYear(nextYear);
-      }
-    }
+    const nextYear = validYear ? yearParam : defaultDate.year();
+    const nextMonth = validMonth ? monthParam : defaultDate.month() + 1;
 
-    if (monthParam) {
-      const nextMonth = Number(monthParam);
+    setYear(nextYear);
+    setMonth(nextMonth);
 
-      if (Number.isInteger(nextMonth) && nextMonth >= 1 && nextMonth <= 12) {
-        setMonth(nextMonth);
-      } else {
-        setMonth(dayjs().month() + 1);
-      }
-    } else {
-      setMonth(dayjs().month() + 1);
-    }
+    // Nếu đi từ liên kết có tháng/năm khác, tránh giữ ngày gây lọc rỗng.
+    const matchesImportDate =
+      importPaymentDate &&
+      dayjs(importPaymentDate).year() === nextYear &&
+      dayjs(importPaymentDate).month() + 1 === nextMonth;
 
+    setPaymentDate(matchesImportDate ? importPaymentDate : undefined);
     setPage(1);
-  }, [searchParams]);
+  }, [searchParams, importPaymentDate]);
 
   // ====================================================
   // GRAPHQL WHERE
@@ -1589,6 +1587,8 @@ export default function MedicalCases() {
                   if (date) {
                     setClearingPaymentDate(false);
                     setPaymentDate(date.format("YYYY-MM-DD"));
+                    setYear(date.year());
+                    setMonth(date.month() + 1);
                   } else {
                     setClearingPaymentDate(false);
                     setPaymentDate(undefined);

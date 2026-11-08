@@ -14,6 +14,8 @@ import type { TableColumnsType, UploadFile } from "antd";
 import { useEffect, useId, useRef, useState } from "react";
 import apiClient from "../api/apiClient";
 
+import { readXmlPaymentDate, setImportPaymentDate } from "../utils/importPaymentDate";
+
 const { Dragger } = Upload;
 
 type TreatmentGroup = "GENERAL" | "YHCT";
@@ -228,7 +230,7 @@ export default function XmlImport() {
           setImportStatus("done");
           setCanImport(false);
           setNotice(progress.message || "Dữ liệu đã được ghi vào hệ thống.");
-          return;
+          return true;
         }
 
         if (progress.status === "ERROR") {
@@ -270,7 +272,29 @@ export default function XmlImport() {
         throw new Error("Không nhận được mã tiến trình import.");
       }
 
-      await waitForImport(String(importId));
+      const completed = await waitForImport(String(importId));
+
+      if (completed) {
+        // Chỉ cập nhật ngày sau khi backend xác nhận import thành công.
+        // Xóa ngày cũ trước để không dùng nhầm khi XML mới thiếu ngày.
+        setImportPaymentDate(undefined);
+
+        try {
+          const paymentDate = await readXmlPaymentDate(file);
+
+          setImportPaymentDate(paymentDate);
+
+          if (mounted.current && !paymentDate) {
+            messageApi.warning(
+              "Đã import thành công nhưng không tìm thấy NGAY_TTOAN hợp lệ trong XML.",
+            );
+          }
+        } catch {
+          if (mounted.current) {
+            messageApi.warning("Đã import thành công nhưng chưa đọc được ngày thanh toán từ XML.");
+          }
+        }
+      }
     } catch (error: unknown) {
       if (!mounted.current) return;
 
@@ -403,7 +427,7 @@ export default function XmlImport() {
           : "Dữ liệu chưa đủ điều kiện import";
 
   const statusDescription = importing
-    ? `Đã xử lý ${Math.round(importPercent)}%. Vui lòng giữ trang mở.`
+    ? `Đã xử lý ${Math.round(importPercent)}%. Vui lòng chờ trong giây lát....`
     : notice ||
       (canImport
         ? "Dữ liệu đã sẵn sàng để import vào hệ thống."
