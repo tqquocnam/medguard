@@ -1,372 +1,215 @@
-import type {
-  RuleValidator,
-} from "./rule.types.js";
-
-import {
-  icdRequiredRule,
-} from "./rules/icd-required.rule.js";
-
-import {
-  visitTimeRule,
-} from "./rules/visit-time.rule.js";
-
-import {
-  orderTimeRule,
-} from "./rules/order-time.rule.js";
-
-import {
-  eventInsideVisitRule,
-} from "./rules/event-inside-visit.rule.js";
-
-import {
-  staffTimeOverlapRule,
-} from "./rules/staff-time-overlap.rule.js";
-
-import {
-  examMinTimeRule,
-} from "./rules/exam-min-time.rule.js";
-
-import {
-  serviceDiagnosisRule,
-} from "./rules/service-diagnosis.rule.js";
-
-import {
-  serviceIcdRule,
-} from "./rules/service-icd.rule.js";
-
-import {
-  drugIcdRule,
-} from "./rules/drug-icd.rule.js";
-
-import {
-  drugIcdInteractionsRule,
-} from "./rules/drug-icd-interactions.rule.js";
-
-import {
-  drugNameInteractionRule,
-} from "./rules/drug-name-interaction.rule.js";
-
-import {
-  machineExistsRule,
-} from "./rules/machine-exists.rule.js";
-
-import {
-  serviceMachineRequiredRule,
-} from "./rules/service-machine-required.rule.js";
-
-import {
-  serviceMachineMismatchRule,
-} from "./rules/service-machine-mismatch.rule.js";
-
-import {
-  serviceDurationRule,
-} from "./rules/service-duration.rule.js";
-
-import {
-  staffExistsRule,
-} from "./rules/staff-exists.rule.js";
-
-import {
-  staffDepartmentMismatchRule,
-} from "./rules/staff-department-mismatch.rule.js";
-
-import {
-  departmentExistsRule,
-} from "./rules/department-exists.rule.js";
-
-import {
-  drugExistsRule,
-} from "./rules/drug-exists.rule.js";
-
-import {
-  staffScheduleRule,
-} from "./rules/staff-schedule.rule.js";
-
-import {
-  serviceStaffRule,
-} from "./rules/service-staff.rule.js";
-
-import {
-  icdWarningRule,
-} from "./rules/icd-warning.rule.js";
-
-import {
-  kcbTypeRule,
-} from "./rules/kcb-type.rule.js";
-
-import {
-  outpatientTreatmentTimeRule,
-} from "./rules/outpatient-treatment-time.rule.js";
-
-import {
-  outpatientDailyServiceRule,
-} from "./rules/outpatient-daily-service.rule.js";
-
-import {
-  outpatientClinicalProgressRule,
-} from "./rules/outpatient-clinical-progress.rule.js";
-
-import {
-  yhctCaseIdentificationRule,
-} from "./rules/yhct-case-identification.rule.js";
-
-import {
-  yhctServiceDiagnosisRule,
-} from "./rules/yhct-service-diagnosis.rule.js";
-
-import {
-  outpatientClsResultRule,
-} from "./rules/outpatient-cls-result.rule.js";
-
-import {
-  yhctServiceFrequencyRule,
-} from "./rules/yhct-service-frequency.rule.js";
-
-import {
-  yhctPerformOverlapRule,
-} from "./rules/yhct-perform-overlap.rule.js";
-
-import {
-  yhctPerformScheduleRule,
-} from "./rules/yhct-perform-schedule.rule.js";
+import type { RuleValidator } from "./rule.types.js";
 
-import {
-  yhctOrderPerformTimeRule,
-} from "./rules/yhct-order-perform-time.rule.js";
+import { icdRequiredRule } from "./rules/icd-required.rule.js";
 
-import {
-  yhctDailyStaffWorkloadRule,
-} from "./rules/yhct-daily-staff-workload.rule.js";
+import { visitTimeRule } from "./rules/visit-time.rule.js";
 
-import {
-  yhctMachineDailyUsageRule,
-} from "./rules/yhct-machine-daily-usage.rule.js";
+import { orderTimeRule } from "./rules/order-time.rule.js";
 
-import {
-  yhctDailyTreatmentContinuityRule,
-} from "./rules/yhct-daily-treatment-continuity.rule.js";
+import { eventInsideVisitRule } from "./rules/event-inside-visit.rule.js";
 
-import {
-  yhctClinicalProgressDuplicateRule,
-} from "./rules/yhct-clinical-progress-duplicate.rule.js";
+import { staffTimeOverlapRule } from "./rules/staff-time-overlap.rule.js";
 
-import {
-  yhctXml3Xml5TechniqueMatchRule,
-} from "./rules/yhct-xml3-xml5-technique-match.rule.js";
+import { examMinTimeRule } from "./rules/exam-min-time.rule.js";
 
-import {
-  yhctDailyStaffConsistencyRule,
-} from "./rules/yhct-daily-staff-consistency.rule.js";
+import { serviceDiagnosisRule } from "./rules/service-diagnosis.rule.js";
 
-import {
-  yhctClinicalProgressQualityRule,
-} from "./rules/yhct-clinical-progress-quality.rule.js";
+import { serviceIcdRule } from "./rules/service-icd.rule.js";
 
-import {
-  yhctTreatmentEpisodeReviewRule,
-} from "./rules/yhct-treatment-episode-review.rule.js";
+import { drugIcdRule } from "./rules/drug-icd.rule.js";
 
-import {
-  resultMatchServiceRule,
-} from "./rules/result-match-service.rule.js";
+import { drugIcdInteractionsRule } from "./rules/drug-icd-interactions.rule.js";
 
-import {
-  drugAgeRule,
-} from "./rules/drug-age.rule.js";
+import { drugNameInteractionRule } from "./rules/drug-name-interaction.rule.js";
 
-import {
-  serviceAgeRule,
-} from "./rules/service-age.rule.js";
+import { machineExistsRule } from "./rules/machine-exists.rule.js";
 
-import {
-  entForeignBodyCombinedPaymentRule,
-} from "./rules/ent-foreign-body-combined-payment.rule.js";
+import { serviceMachineRequiredRule } from "./rules/service-machine-required.rule.js";
 
-import {
-  serviceCalciumElectrolyteExclusionRule,
-} from "./rules/service-calcium-electrolyte-exclusion.rule.js";
+import { serviceMachineMismatchRule } from "./rules/service-machine-mismatch.rule.js";
 
-import {
-  serviceChestXrayExclusionRule,
-} from "./rules/service-chest-xray-exclusion.rule.js";
+import { serviceDurationRule } from "./rules/service-duration.rule.js";
 
-import {
-  yhctSameCaseServiceOverlapRule,
-} from "./rules/yhct-same-case-service-overlap.rule.js";
+import { staffExistsRule } from "./rules/staff-exists.rule.js";
 
-import {
-  yhctExamPaymentRateRule,
-} from "./rules/yhct-exam-payment-rate.rule.js";
+import { staffDepartmentMismatchRule } from "./rules/staff-department-mismatch.rule.js";
 
-import {
-  machineTimeOverlapRule,
-} from "./rules/machine-time-overlap.rule.js";
+import { departmentExistsRule } from "./rules/department-exists.rule.js";
 
-import {
-  internalExamUnder16Rule,
-} from "./rules/internal-exam-under-16.rule.js";
+import { drugExistsRule } from "./rules/drug-exists.rule.js";
 
-import {
-  outpatientExamAdmissionTimeRule,
-} from "./rules/outpatient-exam-admission-time.rule.js";
+import { staffScheduleRule } from "./rules/staff-schedule.rule.js";
 
-export const ruleRegistry: Record<
-  string,
-  RuleValidator
-> = {
-  ICD_REQUIRED:
-    icdRequiredRule,
+import { serviceStaffRule } from "./rules/service-staff.rule.js";
 
-  VISIT_TIME_VALID:
-    visitTimeRule,
+import { icdWarningRule } from "./rules/icd-warning.rule.js";
 
-  ORDER_TIME_SEQUENCE:
-    orderTimeRule,
+import { kcbTypeRule } from "./rules/kcb-type.rule.js";
 
-  EVENT_INSIDE_VISIT:
-    eventInsideVisitRule,
+import { outpatientTreatmentTimeRule } from "./rules/outpatient-treatment-time.rule.js";
 
-  STAFF_TIME_OVERLAP:
-    staffTimeOverlapRule,
+import { outpatientDailyServiceRule } from "./rules/outpatient-daily-service.rule.js";
 
-  EXAM_MIN_TIME:
-    examMinTimeRule,
+import { outpatientClinicalProgressRule } from "./rules/outpatient-clinical-progress.rule.js";
 
-  SERVICE_DIAGNOSIS:
-    serviceDiagnosisRule,
+import { yhctCaseIdentificationRule } from "./rules/yhct-case-identification.rule.js";
 
-  SERVICE_ICD:
-    serviceIcdRule,
+import { yhctServiceDiagnosisRule } from "./rules/yhct-service-diagnosis.rule.js";
 
-  DRUG_ICD:
-    drugIcdRule,
+import { outpatientClsResultRule } from "./rules/outpatient-cls-result.rule.js";
 
-  DRUG_ICD_INTERACTIONS:
-    drugIcdInteractionsRule,
+import { yhctServiceFrequencyRule } from "./rules/yhct-service-frequency.rule.js";
 
-  DRUG_INTERACTION:
-    drugNameInteractionRule,
+import { yhctPerformOverlapRule } from "./rules/yhct-perform-overlap.rule.js";
 
-  MACHINE_EXISTS:
-    machineExistsRule,
+import { yhctPerformScheduleRule } from "./rules/yhct-perform-schedule.rule.js";
 
-  SERVICE_MACHINE_REQUIRED:
-    serviceMachineRequiredRule,
+import { yhctOrderPerformTimeRule } from "./rules/yhct-order-perform-time.rule.js";
 
-  SERVICE_MACHINE_MISMATCH:
-    serviceMachineMismatchRule,
+import { yhctDailyStaffWorkloadRule } from "./rules/yhct-daily-staff-workload.rule.js";
 
-  SERVICE_DURATION:
-    serviceDurationRule,
+import { yhctMachineDailyUsageRule } from "./rules/yhct-machine-daily-usage.rule.js";
 
-  STAFF_EXISTS:
-    staffExistsRule,
+import { yhctDailyTreatmentContinuityRule } from "./rules/yhct-daily-treatment-continuity.rule.js";
 
-  STAFF_DEPARTMENT_MISMATCH:
-    staffDepartmentMismatchRule,
+import { yhctClinicalProgressDuplicateRule } from "./rules/yhct-clinical-progress-duplicate.rule.js";
 
-  DEPARTMENT_EXISTS:
-    departmentExistsRule,
+import { yhctXml3Xml5TechniqueMatchRule } from "./rules/yhct-xml3-xml5-technique-match.rule.js";
 
-  DRUG_EXISTS:
-    drugExistsRule,
+import { yhctDailyStaffConsistencyRule } from "./rules/yhct-daily-staff-consistency.rule.js";
 
-  STAFF_SCHEDULE:
-    staffScheduleRule,
+import { yhctClinicalProgressQualityRule } from "./rules/yhct-clinical-progress-quality.rule.js";
 
-  SERVICE_STAFF:
-    serviceStaffRule,
+import { yhctTreatmentEpisodeReviewRule } from "./rules/yhct-treatment-episode-review.rule.js";
 
-  ICD_WARNING:
-    icdWarningRule,
+import { resultMatchServiceRule } from "./rules/result-match-service.rule.js";
 
-  KCB_TYPE_VALID:
-    kcbTypeRule,
+import { drugAgeRule } from "./rules/drug-age.rule.js";
 
-  OUTPATIENT_TREATMENT_TIME:
-    outpatientTreatmentTimeRule,
+import { serviceAgeRule } from "./rules/service-age.rule.js";
 
-  OUTPATIENT_DAILY_SERVICE:
-    outpatientDailyServiceRule,
+import { entForeignBodyCombinedPaymentRule } from "./rules/ent-foreign-body-combined-payment.rule.js";
 
-  OUTPATIENT_CLINICAL_PROGRESS:
-    outpatientClinicalProgressRule,
+import { serviceCalciumElectrolyteExclusionRule } from "./rules/service-calcium-electrolyte-exclusion.rule.js";
 
-  YHCT_CASE_IDENTIFICATION:
-    yhctCaseIdentificationRule,
+import { serviceChestXrayExclusionRule } from "./rules/service-chest-xray-exclusion.rule.js";
 
-  YHCT_SERVICE_DIAGNOSIS:
-    yhctServiceDiagnosisRule,
+import { yhctSameCaseServiceOverlapRule } from "./rules/yhct-same-case-service-overlap.rule.js";
 
-  OUTPATIENT_CLS_RESULT:
-    outpatientClsResultRule,
+import { yhctExamPaymentRateRule } from "./rules/yhct-exam-payment-rate.rule.js";
 
-  YHCT_SERVICE_FREQUENCY:
-    yhctServiceFrequencyRule,
+import { machineTimeOverlapRule } from "./rules/machine-time-overlap.rule.js";
 
-  YHCT_PERFORM_OVERLAP:
-    yhctPerformOverlapRule,
+import { internalExamUnder16Rule } from "./rules/internal-exam-under-16.rule.js";
 
-  YHCT_PERFORM_SCHEDULE:
-    yhctPerformScheduleRule,
+import { outpatientExamAdmissionTimeRule } from "./rules/outpatient-exam-admission-time.rule.js";
 
-  YHCT_ORDER_PERFORM_TIME:
-    yhctOrderPerformTimeRule,
+import { sameCaseExamClsOverlapRule } from "./rules/same-case-exam-cls-overlap.rule.js";
 
-  YHCT_DAILY_STAFF_WORKLOAD:
-    yhctDailyStaffWorkloadRule,
+export const ruleRegistry: Record<string, RuleValidator> = {
+  ICD_REQUIRED: icdRequiredRule,
 
-  YHCT_MACHINE_DAILY_USAGE:
-    yhctMachineDailyUsageRule,
+  VISIT_TIME_VALID: visitTimeRule,
 
-  YHCT_DAILY_TREATMENT_CONTINUITY:
-    yhctDailyTreatmentContinuityRule,
+  ORDER_TIME_SEQUENCE: orderTimeRule,
 
-  YHCT_CLINICAL_PROGRESS_DUPLICATE:
-    yhctClinicalProgressDuplicateRule,
+  EVENT_INSIDE_VISIT: eventInsideVisitRule,
 
-  YHCT_XML3_XML5_TECHNIQUE_MATCH:
-    yhctXml3Xml5TechniqueMatchRule,
+  STAFF_TIME_OVERLAP: staffTimeOverlapRule,
 
-  YHCT_DAILY_STAFF_CONSISTENCY:
-    yhctDailyStaffConsistencyRule,
+  EXAM_MIN_TIME: examMinTimeRule,
 
-  YHCT_CLINICAL_PROGRESS_QUALITY:
-    yhctClinicalProgressQualityRule,
+  SERVICE_DIAGNOSIS: serviceDiagnosisRule,
 
-  YHCT_TREATMENT_EPISODE_REVIEW:
-    yhctTreatmentEpisodeReviewRule,
+  SERVICE_ICD: serviceIcdRule,
 
-  RESULT_MATCH_SERVICE:
-    resultMatchServiceRule,
+  DRUG_ICD: drugIcdRule,
 
-  DRUG_AGE:
-    drugAgeRule,
+  DRUG_ICD_INTERACTIONS: drugIcdInteractionsRule,
 
-  SERVICE_AGE:
-    serviceAgeRule,
+  DRUG_INTERACTION: drugNameInteractionRule,
 
-  ENT_FOREIGN_BODY_COMBINED_PAYMENT:
-    entForeignBodyCombinedPaymentRule,
+  MACHINE_EXISTS: machineExistsRule,
 
-  SERVICE_CALCIUM_ELECTROLYTE_EXCLUSION:
-    serviceCalciumElectrolyteExclusionRule,
+  SERVICE_MACHINE_REQUIRED: serviceMachineRequiredRule,
 
-  SERVICE_CHEST_XRAY_EXCLUSION:
-    serviceChestXrayExclusionRule,
+  SERVICE_MACHINE_MISMATCH: serviceMachineMismatchRule,
 
-  YHCT_SAME_CASE_SERVICE_OVERLAP:
-    yhctSameCaseServiceOverlapRule,
+  SERVICE_DURATION: serviceDurationRule,
 
-  YHCT_EXAM_PAYMENT_RATE:
-    yhctExamPaymentRateRule,
+  STAFF_EXISTS: staffExistsRule,
 
-  MACHINE_TIME_OVERLAP:
-    machineTimeOverlapRule,
+  STAFF_DEPARTMENT_MISMATCH: staffDepartmentMismatchRule,
 
-  INTERNAL_EXAM_UNDER_16:
-    internalExamUnder16Rule,
+  DEPARTMENT_EXISTS: departmentExistsRule,
 
-  OUTPATIENT_EXAM_ORDER_EQUALS_ADMISSION:
-    outpatientExamAdmissionTimeRule,
+  DRUG_EXISTS: drugExistsRule,
+
+  STAFF_SCHEDULE: staffScheduleRule,
+
+  SERVICE_STAFF: serviceStaffRule,
+
+  ICD_WARNING: icdWarningRule,
+
+  KCB_TYPE_VALID: kcbTypeRule,
+
+  OUTPATIENT_TREATMENT_TIME: outpatientTreatmentTimeRule,
+
+  OUTPATIENT_DAILY_SERVICE: outpatientDailyServiceRule,
+
+  OUTPATIENT_CLINICAL_PROGRESS: outpatientClinicalProgressRule,
+
+  YHCT_CASE_IDENTIFICATION: yhctCaseIdentificationRule,
+
+  YHCT_SERVICE_DIAGNOSIS: yhctServiceDiagnosisRule,
+
+  OUTPATIENT_CLS_RESULT: outpatientClsResultRule,
+
+  YHCT_SERVICE_FREQUENCY: yhctServiceFrequencyRule,
+
+  YHCT_PERFORM_OVERLAP: yhctPerformOverlapRule,
+
+  YHCT_PERFORM_SCHEDULE: yhctPerformScheduleRule,
+
+  YHCT_ORDER_PERFORM_TIME: yhctOrderPerformTimeRule,
+
+  YHCT_DAILY_STAFF_WORKLOAD: yhctDailyStaffWorkloadRule,
+
+  YHCT_MACHINE_DAILY_USAGE: yhctMachineDailyUsageRule,
+
+  YHCT_DAILY_TREATMENT_CONTINUITY: yhctDailyTreatmentContinuityRule,
+
+  YHCT_CLINICAL_PROGRESS_DUPLICATE: yhctClinicalProgressDuplicateRule,
+
+  YHCT_XML3_XML5_TECHNIQUE_MATCH: yhctXml3Xml5TechniqueMatchRule,
+
+  YHCT_DAILY_STAFF_CONSISTENCY: yhctDailyStaffConsistencyRule,
+
+  YHCT_CLINICAL_PROGRESS_QUALITY: yhctClinicalProgressQualityRule,
+
+  YHCT_TREATMENT_EPISODE_REVIEW: yhctTreatmentEpisodeReviewRule,
+
+  RESULT_MATCH_SERVICE: resultMatchServiceRule,
+
+  DRUG_AGE: drugAgeRule,
+
+  SERVICE_AGE: serviceAgeRule,
+
+  ENT_FOREIGN_BODY_COMBINED_PAYMENT: entForeignBodyCombinedPaymentRule,
+
+  SERVICE_CALCIUM_ELECTROLYTE_EXCLUSION: serviceCalciumElectrolyteExclusionRule,
+
+  SERVICE_CHEST_XRAY_EXCLUSION: serviceChestXrayExclusionRule,
+
+  YHCT_SAME_CASE_SERVICE_OVERLAP: yhctSameCaseServiceOverlapRule,
+
+  YHCT_EXAM_PAYMENT_RATE: yhctExamPaymentRateRule,
+
+  MACHINE_TIME_OVERLAP: machineTimeOverlapRule,
+
+  INTERNAL_EXAM_UNDER_16: internalExamUnder16Rule,
+
+  OUTPATIENT_EXAM_ORDER_EQUALS_ADMISSION: outpatientExamAdmissionTimeRule,
+
+  SAME_CASE_EXAM_CLS_OVERLAP: sameCaseExamClsOverlapRule,
 };

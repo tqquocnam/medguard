@@ -172,9 +172,18 @@ function formatViolation(rule: RuleResult, violation: any): string {
   }
 
   if (rule.rule_code === "EXAM_MIN_TIME") {
+    // Lỗi khoảng cách giờ y lệnh hai công khám.
+    if (violation.type === "EXAM_ORDER_GAP_TOO_SHORT") {
+      return String(
+        violation.displayMessage ?? "Hai công khám có thời gian y lệnh cách nhau không quá 5 phút.",
+      );
+    }
+
+    // Lỗi thời lượng từng công khám.
     const name = violation.itemName ?? violation.examName ?? "Công khám";
 
     const start = formatTime(violation.startTime);
+
     const end = formatTime(violation.endTime);
 
     const minutes = violation.durationMinutes ?? violation.minutes;
