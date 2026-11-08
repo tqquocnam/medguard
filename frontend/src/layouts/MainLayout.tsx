@@ -147,8 +147,7 @@ export default function MainLayout() {
                   />
                   {!sidebarCollapsed && (
                     <span className="mg-account-info">
-                      <strong>{displayName}</strong>{" "}
-                      <small>Chi nhánh {user?.branchId || "—"}</small>
+                      <strong>{displayName}</strong> <small>Mã CSKCB {user?.branchId || "—"}</small>
                     </span>
                   )}
                 </button>

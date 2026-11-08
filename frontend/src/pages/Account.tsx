@@ -583,7 +583,7 @@ export default function Account() {
               </Typography.Text>
 
               <div className="account-table-description">
-                Chi nhánh {branchId || "—"} · Các tài khoản có cùng quyền quản trị trong chi nhánh
+                Mã CSKCB {branchId || "—"} - Các tài khoản có cùng quyền quản trị trong chi nhánh
               </div>
             </div>
 

@@ -1,26 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+
 * {
   box-sizing: border-box;
 }
 
 html,
 body,
-#root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  min-width: 100%;
-  min-height: 100vh;
+:root {
+  --mg-font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-
 body {
   margin: 0;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--mg-font-family);
   background: #f5f7fa;
+}
+
+/* Các trường nhập liệu và nút HTML */
+button,
+input,
+textarea,
+select,
+optgroup {
+  font-family: inherit;
+}
+
+/* Đồng bộ các thành phần Ant Design, kể cả popup và thông báo */
+[class^="ant-"],
+[class*=" ant-"] {
+  font-family: var(--mg-font-family);
 }
 
 /* Keep wide data inside its own scroll area instead of widening the app. */
