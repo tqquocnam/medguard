@@ -28,6 +28,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "../../api/apiClient";
+import { Link } from "react-router-dom";
 
 const { Title, Text } = Typography;
 
@@ -566,7 +567,23 @@ export default function Machines() {
       <div className="machines-page">
         <Breadcrumb
           className="machines-breadcrumb"
-          items={[{ title: <HomeOutlined /> }, { title: "Danh mục" }, { title: "Máy" }]}
+          items={[
+            {
+              title: (
+                <Link to="/">
+                  <HomeOutlined />
+                </Link>
+              ),
+            },
+
+            {
+              title: <Link to="/catalog">Danh mục</Link>,
+            },
+
+            {
+              title: "Danh mục máy",
+            },
+          ]}
         />
 
         <div className="machines-header">

@@ -14,9 +14,7 @@ import {
   message,
 } from "antd";
 
-import type {
-  TableColumnsType,
-} from "antd";
+import type { TableColumnsType } from "antd";
 
 import {
   EditOutlined,
@@ -27,22 +25,12 @@ import {
   StopOutlined,
 } from "@ant-design/icons";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {
-  apiFetch,
-} from "../../api/apiClient";
+import { apiFetch } from "../../api/apiClient";
+import { Link } from "react-router-dom";
 
-
-const {
-  Title,
-  Text,
-} = Typography;
-
+const { Title, Text } = Typography;
 
 // ======================================================
 // TYPES
@@ -57,9 +45,7 @@ interface ExaminationServiceItem {
 
   unitPrice: number;
 
-  note:
-    | string
-    | null;
+  note: string | null;
 
   active: boolean;
 
@@ -67,7 +53,6 @@ interface ExaminationServiceItem {
 
   updatedAt?: string;
 }
-
 
 interface ExaminationServiceFormValues {
   code: string;
@@ -81,982 +66,452 @@ interface ExaminationServiceFormValues {
   active: boolean;
 }
 
-
 interface ExaminationServiceListResponse {
   success?: boolean;
 
   message?: string;
 
   data?: {
-    items:
-      ExaminationServiceItem[];
+    items: ExaminationServiceItem[];
 
-    total:
-      number;
+    total: number;
 
-    page:
-      number;
+    page: number;
 
-    pageSize:
-      number;
+    pageSize: number;
   };
 }
-
 
 // ======================================================
 // COMPONENT
 // ======================================================
 
 export default function ExaminationServices() {
-
   // ====================================================
   // FILTERS
   // ====================================================
 
-  const [
-    searchCode,
-    setSearchCode,
-  ] = useState(
-    ""
-  );
+  const [searchCode, setSearchCode] = useState("");
 
-
-  const [
-    searchName,
-    setSearchName,
-  ] = useState(
-    ""
-  );
-
+  const [searchName, setSearchName] = useState("");
 
   // ====================================================
   // DATA
   // ====================================================
 
-  const [
-    items,
-    setItems,
-  ] = useState<
-    ExaminationServiceItem[]
-  >(
-    []
-  );
+  const [items, setItems] = useState<ExaminationServiceItem[]>([]);
 
+  const [total, setTotal] = useState(0);
 
-  const [
-    total,
-    setTotal,
-  ] = useState(
-    0
-  );
+  const [page, setPage] = useState(1);
 
+  const [pageSize, setPageSize] = useState(10);
 
-  const [
-    page,
-    setPage,
-  ] = useState(
-    1
-  );
-
-
-  const [
-    pageSize,
-    setPageSize,
-  ] = useState(
-    10
-  );
-
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(
-    false
-  );
-
+  const [loading, setLoading] = useState(false);
 
   // ====================================================
   // FORM
   // ====================================================
 
-  const [
-    saving,
-    setSaving,
-  ] = useState(
-    false
-  );
+  const [saving, setSaving] = useState(false);
 
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const [
-    modalOpen,
-    setModalOpen,
-  ] = useState(
-    false
-  );
+  const [editingItem, setEditingItem] = useState<ExaminationServiceItem | null>(null);
 
-
-  const [
-    editingItem,
-    setEditingItem,
-  ] = useState<
-    ExaminationServiceItem |
-    null
-  >(
-    null
-  );
-
-
-  const [
-    form,
-  ] =
-    Form.useForm<
-      ExaminationServiceFormValues
-    >();
-
+  const [form] = Form.useForm<ExaminationServiceFormValues>();
 
   // ====================================================
   // LOAD DATA
   // ====================================================
 
-  const loadData =
-    useCallback(
-      async () => {
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
 
-        try {
+      const params = new URLSearchParams({
+        page: String(page),
 
-          setLoading(
-            true
-          );
+        pageSize: String(pageSize),
+      });
 
+      if (searchCode.trim()) {
+        params.set("code", searchCode.trim());
+      }
 
-          const params =
-            new URLSearchParams({
-              page:
-                String(
-                  page
-                ),
+      if (searchName.trim()) {
+        params.set("name", searchName.trim());
+      }
 
-              pageSize:
-                String(
-                  pageSize
-                ),
-            });
+      const response = await apiFetch(`/catalog/examination-services?${params.toString()}`, {
+        method: "GET",
+      });
 
+      const json: ExaminationServiceListResponse = await response.json();
 
-          if (
-            searchCode.trim()
-          ) {
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải danh mục công khám.");
+      }
 
-            params.set(
-              "code",
-              searchCode.trim()
-            );
-          }
+      setItems(json.data?.items ?? []);
 
+      setTotal(Number(json.data?.total ?? 0));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể tải danh mục công khám.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, searchCode, searchName]);
 
-          if (
-            searchName.trim()
-          ) {
-
-            params.set(
-              "name",
-              searchName.trim()
-            );
-          }
-
-
-          const response =
-            await apiFetch(
-              `/catalog/examination-services?${params.toString()}`,
-              {
-                method:
-                  "GET",
-              }
-            );
-
-
-          const json:
-            ExaminationServiceListResponse =
-            await response.json();
-
-
-          if (
-            !response.ok ||
-            json.success !==
-              true
-          ) {
-
-            throw new Error(
-              json.message ||
-              "Không thể tải danh mục công khám."
-            );
-          }
-
-
-          setItems(
-            json.data
-              ?.items ??
-            []
-          );
-
-
-          setTotal(
-            Number(
-              json.data
-                ?.total ??
-              0
-            )
-          );
-
-        } catch (
-          error
-        ) {
-
-          message.error(
-            error instanceof
-            Error
-              ? error.message
-              : "Không thể tải danh mục công khám."
-          );
-
-        } finally {
-
-          setLoading(
-            false
-          );
-        }
-      },
-      [
-        page,
-        pageSize,
-        searchCode,
-        searchName,
-      ]
-    );
-
-
-  useEffect(
-    () => {
-
-      void loadData();
-
-    },
-    [
-      loadData,
-    ]
-  );
-
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   // ====================================================
   // ADD
   // ====================================================
 
   function openAddModal() {
-
-    setEditingItem(
-      null
-    );
-
+    setEditingItem(null);
 
     form.resetFields();
 
-
     form.setFieldsValue({
-      code:
-        "",
+      code: "",
 
-      name:
-        "",
+      name: "",
 
-      unitPrice:
-        0,
+      unitPrice: 0,
 
-      note:
-        "",
+      note: "",
 
-      active:
-        true,
+      active: true,
     });
 
-
-    setModalOpen(
-      true
-    );
+    setModalOpen(true);
   }
-
 
   // ====================================================
   // EDIT
   // ====================================================
 
-  async function openEditModal(
-    record:
-      ExaminationServiceItem
-  ) {
-
+  async function openEditModal(record: ExaminationServiceItem) {
     try {
+      const response = await apiFetch(
+        `/catalog/examination-services/${encodeURIComponent(record.code)}`,
+        {
+          method: "GET",
+        },
+      );
 
-      const response =
-        await apiFetch(
-          `/catalog/examination-services/${encodeURIComponent(
-            record.code
-          )}`,
-          {
-            method:
-              "GET",
-          }
-        );
+      const json = await response.json();
 
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể tải công khám."
-        );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể tải công khám.");
       }
 
+      const data = json.data;
 
-      const data =
-        json.data;
-
-
-      setEditingItem(
-        data
-      );
-
+      setEditingItem(data);
 
       form.setFieldsValue({
-        code:
-          data.code,
+        code: data.code,
 
-        name:
-          data.name,
+        name: data.name,
 
-        unitPrice:
-          Number(
-            data.unitPrice ??
-            0
-          ),
+        unitPrice: Number(data.unitPrice ?? 0),
 
-        note:
-          data.note ??
-          "",
+        note: data.note ?? "",
 
-        active:
-          Boolean(
-            data.active
-          ),
+        active: Boolean(data.active),
       });
 
-
-      setModalOpen(
-        true
-      );
-
-    } catch (
-      error
-    ) {
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể tải công khám."
-      );
+      setModalOpen(true);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Không thể tải công khám.");
     }
   }
-
 
   // ====================================================
   // SAVE
   // ====================================================
 
   async function handleSave() {
-
     try {
+      const values = await form.validateFields();
 
-      const values =
-        await form.validateFields();
+      setSaving(true);
 
+      const isEdit = editingItem !== null;
 
-      setSaving(
-        true
-      );
+      const endpoint = isEdit
+        ? `/catalog/examination-services/${encodeURIComponent(editingItem.code)}`
+        : "/catalog/examination-services";
 
+      const response = await apiFetch(endpoint, {
+        method: isEdit ? "PUT" : "POST",
 
-      const isEdit =
-        editingItem !==
-        null;
+        headers: {
+          "Content-Type": "application/json",
+        },
 
+        body: JSON.stringify({
+          code: values.code.trim(),
 
-      const endpoint =
-        isEdit
-          ? `/catalog/examination-services/${encodeURIComponent(
-              editingItem.code
-            )}`
-          : "/catalog/examination-services";
+          name: values.name.trim(),
 
+          unitPrice: Number(values.unitPrice ?? 0),
 
-      const response =
-        await apiFetch(
-          endpoint,
-          {
-            method:
-              isEdit
-                ? "PUT"
-                : "POST",
+          note: values.note?.trim() || null,
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          active: values.active,
+        }),
+      });
 
-            body:
-              JSON.stringify({
-                code:
-                  values.code.trim(),
+      const json = await response.json();
 
-                name:
-                  values.name.trim(),
-
-                unitPrice:
-                  Number(
-                    values.unitPrice ??
-                    0
-                  ),
-
-                note:
-                  values.note
-                    ?.trim() ||
-                  null,
-
-                active:
-                  values.active,
-              }),
-          }
-        );
-
-
-      const json =
-        await response.json();
-
-
-      if (
-        !response.ok ||
-        json.success !==
-          true
-      ) {
-
-        throw new Error(
-          json.message ||
-          "Không thể lưu công khám."
-        );
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Không thể lưu công khám.");
       }
 
+      message.success(isEdit ? "Cập nhật công khám thành công." : "Thêm công khám thành công.");
 
-      message.success(
-        isEdit
-          ? "Cập nhật công khám thành công."
-          : "Thêm công khám thành công."
-      );
+      setModalOpen(false);
 
-
-      setModalOpen(
-        false
-      );
-
-
-      setEditingItem(
-        null
-      );
-
+      setEditingItem(null);
 
       form.resetFields();
 
-
       await loadData();
-
-    } catch (
-      error
-    ) {
-
-      if (
-        error &&
-        typeof error ===
-          "object" &&
-        "errorFields" in
-          error
-      ) {
-
+    } catch (error) {
+      if (error && typeof error === "object" && "errorFields" in error) {
         return;
       }
 
-
-      message.error(
-        error instanceof
-        Error
-          ? error.message
-          : "Không thể lưu công khám."
-      );
-
+      message.error(error instanceof Error ? error.message : "Không thể lưu công khám.");
     } finally {
-
-      setSaving(
-        false
-      );
+      setSaving(false);
     }
   }
-
 
   // ====================================================
   // DISABLE
   // ====================================================
 
-  function confirmDisable(
-    record:
-      ExaminationServiceItem
-  ) {
-
+  function confirmDisable(record: ExaminationServiceItem) {
     Modal.confirm({
-      title:
-        "Ngừng sử dụng công khám?",
+      title: "Ngừng sử dụng công khám?",
 
-      content:
-        `${record.code} - ${record.name}`,
+      content: `${record.code} - ${record.name}`,
 
-      okText:
-        "Đồng ý",
+      okText: "Đồng ý",
 
-      cancelText:
-        "Hủy",
+      cancelText: "Hủy",
 
       okButtonProps: {
-        danger:
-          true,
+        danger: true,
       },
 
-      onOk:
-        async () => {
+      onOk: async () => {
+        try {
+          const response = await apiFetch(
+            `/catalog/examination-services/${encodeURIComponent(record.code)}`,
+            {
+              method: "DELETE",
+            },
+          );
 
-          try {
+          const json = await response.json();
 
-            const response =
-              await apiFetch(
-                `/catalog/examination-services/${encodeURIComponent(
-                  record.code
-                )}`,
-                {
-                  method:
-                    "DELETE",
-                }
-              );
-
-
-            const json =
-              await response.json();
-
-
-            if (
-              !response.ok ||
-              json.success !==
-                true
-            ) {
-
-              throw new Error(
-                json.message ||
-                "Không thể ngừng sử dụng công khám."
-              );
-            }
-
-
-            message.success(
-              "Đã ngừng sử dụng công khám."
-            );
-
-
-            await loadData();
-
-          } catch (
-            error
-          ) {
-
-            message.error(
-              error instanceof
-              Error
-                ? error.message
-                : "Không thể ngừng sử dụng công khám."
-            );
+          if (!response.ok || json.success !== true) {
+            throw new Error(json.message || "Không thể ngừng sử dụng công khám.");
           }
-        },
+
+          message.success("Đã ngừng sử dụng công khám.");
+
+          await loadData();
+        } catch (error) {
+          message.error(
+            error instanceof Error ? error.message : "Không thể ngừng sử dụng công khám.",
+          );
+        }
+      },
     });
   }
-
 
   // ====================================================
   // REFRESH
   // ====================================================
 
   function handleRefresh() {
+    setSearchCode("");
 
-    setSearchCode(
-      ""
-    );
+    setSearchName("");
 
-
-    setSearchName(
-      ""
-    );
-
-
-    setPage(
-      1
-    );
+    setPage(1);
   }
-
 
   // ====================================================
   // TABLE COLUMNS
   // ====================================================
 
-  const columns:
-    TableColumnsType<
-      ExaminationServiceItem
-    > = [
-
+  const columns: TableColumnsType<ExaminationServiceItem> = [
     {
-      title:
-        "STT",
+      title: "STT",
 
-      key:
-        "stt",
+      key: "stt",
 
-      width:
-        70,
+      width: 70,
 
-      align:
-        "center",
+      align: "center",
 
-      render:
-        (
-          _,
-          __,
-          index
-        ) =>
-          (
-            page -
-            1
-          ) *
-            pageSize +
-          index +
-          1,
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
 
-
     {
-      title:
-        "ID",
+      title: "ID",
 
-      dataIndex:
-        "id",
+      dataIndex: "id",
 
-      key:
-        "id",
+      key: "id",
 
-      width:
-        80,
+      width: 80,
 
-      align:
-        "center",
+      align: "center",
     },
 
-
     {
-      title:
-        "Mã công khám",
+      title: "Mã công khám",
 
-      dataIndex:
-        "code",
+      dataIndex: "code",
 
-      key:
-        "code",
+      key: "code",
 
-      width:
-        180,
+      width: 180,
 
-      render:
-        (
-          value:
-            string
-        ) => (
-          <Text
-            strong
-          >
-            {
-              value ||
-              "-"
-            }
-          </Text>
-        ),
+      render: (value: string) => <Text strong>{value || "-"}</Text>,
     },
 
-
     {
-      title:
-        "Tên công khám",
+      title: "Tên công khám",
 
-      dataIndex:
-        "name",
+      dataIndex: "name",
 
-      key:
-        "name",
+      key: "name",
 
-      width:
-        340,
+      width: 340,
 
-      ellipsis:
-        true,
+      ellipsis: true,
 
-      render:
-        (
-          value:
-            string
-        ) =>
-          value ||
-          "-",
+      render: (value: string) => value || "-",
     },
 
-
     {
-      title:
-        "Đơn giá",
+      title: "Đơn giá",
 
-      dataIndex:
-        "unitPrice",
+      dataIndex: "unitPrice",
 
-      key:
-        "unitPrice",
+      key: "unitPrice",
 
-      width:
-        150,
+      width: 150,
 
-      align:
-        "right",
+      align: "right",
 
-      render:
-        (
-          value:
-            number
-        ) =>
-          Number(
-            value ??
-            0
-          ).toLocaleString(
-            "vi-VN"
-          ),
+      render: (value: number) => Number(value ?? 0).toLocaleString("vi-VN"),
     },
 
-
     {
-      title:
-        "Ghi chú",
+      title: "Ghi chú",
 
-      dataIndex:
-        "note",
+      dataIndex: "note",
 
-      key:
-        "note",
+      key: "note",
 
-      width:
-        280,
+      width: 280,
 
-      ellipsis:
-        true,
+      ellipsis: true,
 
-      render:
-        (
-          value:
-            string |
-            null
-        ) => {
+      render: (value: string | null) => {
+        const text = value || "-";
 
-        const text =
-          value ||
-          "-";
-
-
-        if (
-          text ===
-          "-"
-        ) {
-
+        if (text === "-") {
           return "-";
         }
 
-
         return (
-          <Tooltip
-            title={
-              text
-            }
-          >
-            <Text
-              ellipsis
-            >
-              {
-                text
-              }
-            </Text>
+          <Tooltip title={text}>
+            <Text ellipsis>{text}</Text>
           </Tooltip>
         );
       },
     },
 
-
     {
-      title:
-        "Trạng thái",
+      title: "Trạng thái",
 
-      dataIndex:
-        "active",
+      dataIndex: "active",
 
-      key:
-        "active",
+      key: "active",
 
-      width:
-        115,
+      width: 115,
 
-      align:
-        "center",
+      align: "center",
 
-      render:
-        (
-          value:
-            boolean
-        ) =>
-          value
-            ? (
-              <Tag
-                color="success"
-
-                className="examination-status"
-              >
-                Đang dùng
-              </Tag>
-            )
-            : (
-              <Tag
-                className="examination-status"
-              >
-                Ngừng dùng
-              </Tag>
-            ),
-    },
-
-
-    {
-      title:
-        "Thao tác",
-
-      key:
-        "actions",
-
-      width:
-        105,
-
-      align:
-        "center",
-
-      render:
-        (
-          _,
-          record
-        ) => (
-
-          <Space
-            size={
-              10
-            }
-          >
-
-            <Tooltip
-              title="Cập nhật"
-            >
-
-              <Button
-                type="text"
-
-                size="small"
-
-                icon={
-                  <EditOutlined
-                    style={{
-                      color:
-                        "#1677ff",
-                    }}
-                  />
-                }
-
-                onClick={() =>
-                  void openEditModal(
-                    record
-                  )
-                }
-              />
-
-            </Tooltip>
-
-
-            <Tooltip
-              title={
-                record.active
-                  ? "Ngừng sử dụng"
-                  : "Đã ngừng sử dụng"
-              }
-            >
-
-              <Button
-                type="text"
-
-                size="small"
-
-                disabled={
-                  !record.active
-                }
-
-                icon={
-                  <StopOutlined
-                    style={{
-                      color:
-                        record.active
-                          ? "#ff4d4f"
-                          : "#bfbfbf",
-                    }}
-                  />
-                }
-
-                onClick={() =>
-                  confirmDisable(
-                    record
-                  )
-                }
-              />
-
-            </Tooltip>
-
-          </Space>
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="success" className="examination-status">
+            Đang dùng
+          </Tag>
+        ) : (
+          <Tag className="examination-status">Ngừng dùng</Tag>
         ),
     },
-  ];
 
+    {
+      title: "Thao tác",
+
+      key: "actions",
+
+      width: 105,
+
+      align: "center",
+
+      render: (_, record) => (
+        <Space size={10}>
+          <Tooltip title="Cập nhật">
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <EditOutlined
+                  style={{
+                    color: "#1677ff",
+                  }}
+                />
+              }
+              onClick={() => void openEditModal(record)}
+            />
+          </Tooltip>
+
+          <Tooltip title={record.active ? "Ngừng sử dụng" : "Đã ngừng sử dụng"}>
+            <Button
+              type="text"
+              size="small"
+              disabled={!record.active}
+              icon={
+                <StopOutlined
+                  style={{
+                    color: record.active ? "#ff4d4f" : "#bfbfbf",
+                  }}
+                />
+              }
+              onClick={() => confirmDisable(record)}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
 
   // ====================================================
   // UI
@@ -1064,205 +519,104 @@ export default function ExaminationServices() {
 
   return (
     <>
-
-      <div
-        className="examination-page"
-      >
-
+      <div className="examination-page">
         {/* =================================================
             BREADCRUMB
         ================================================= */}
-
         <Breadcrumb
           className="examination-breadcrumb"
-
           items={[
             {
               title: (
-                <HomeOutlined />
+                <Link to="/">
+                  {" "}
+                  <HomeOutlined />
+                </Link>
               ),
             },
 
             {
-              title:
-                "Danh mục",
+              title: <Link to="/catalog">Danh mục</Link>,
             },
 
             {
-              title:
-                "Công khám",
+              title: "Công khám",
             },
           ]}
         />
-
 
         {/* =================================================
             HEADER
         ================================================= */}
 
-        <div
-          className="examination-header"
-        >
-
+        <div className="examination-header">
           <div>
-
-            <div
-              className="examination-title-row"
-            >
-
-              <MedicineBoxOutlined
-                className="examination-title-icon"
-              />
-
+            <div className="examination-title-row">
+              <MedicineBoxOutlined className="examination-title-icon" />
 
               <Title
-                level={
-                  3
-                }
-
+                level={3}
                 style={{
-                  margin:
-                    0,
+                  margin: 0,
                 }}
               >
                 Công khám
               </Title>
-
             </div>
 
-
-            <Text
-              type="secondary"
-
-              className="examination-subtitle"
-            >
+            <Text type="secondary" className="examination-subtitle">
               Quản lý danh mục công khám và đơn giá khám bệnh
             </Text>
-
           </div>
 
-
-          <Button
-            type="primary"
-
-            icon={
-              <PlusOutlined />
-            }
-
-            onClick={
-              openAddModal
-            }
-          >
+          <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
             Thêm mới
           </Button>
-
         </div>
-
 
         {/* =================================================
             FILTER
         ================================================= */}
 
-        <div
-          className="examination-filter-grid"
-        >
-
-          <div
-            className="examination-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="examination-filter-label"
-            >
+        <div className="examination-filter-grid">
+          <div className="examination-filter-item">
+            <Text strong className="examination-filter-label">
               Mã công khám
             </Text>
 
-
             <Input
-              value={
-                searchCode
-              }
-
+              value={searchCode}
               placeholder="Nhập mã công khám"
-
               allowClear
+              onChange={(event) => {
+                setSearchCode(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchCode(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <div
-            className="examination-filter-item"
-          >
-
-            <Text
-              strong
-
-              className="examination-filter-label"
-            >
+          <div className="examination-filter-item">
+            <Text strong className="examination-filter-label">
               Tên công khám
             </Text>
 
-
             <Input
-              value={
-                searchName
-              }
-
+              value={searchName}
               placeholder="Nhập tên công khám"
-
               allowClear
+              onChange={(event) => {
+                setSearchName(event.target.value);
 
-              onChange={(
-                event
-              ) => {
-
-                setSearchName(
-                  event.target.value
-                );
-
-
-                setPage(
-                  1
-                );
+                setPage(1);
               }}
             />
-
           </div>
 
-
-          <Button
-            type="primary"
-
-            icon={
-              <ReloadOutlined />
-            }
-
-            onClick={
-              handleRefresh
-            }
-          >
+          <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
             Làm mới
           </Button>
-
         </div>
-
 
         {/* =================================================
             TABLE
@@ -1270,372 +624,163 @@ export default function ExaminationServices() {
 
         <Table<ExaminationServiceItem>
           className="examination-table"
-
           rowKey="id"
-
           size="middle"
-
           tableLayout="fixed"
-
-          loading={
-            loading
-          }
-
-          dataSource={
-            items
-          }
-
-          columns={
-            columns
-          }
-
+          loading={loading}
+          dataSource={items}
+          columns={columns}
           scroll={{
-            x:
-              1250,
+            x: 1250,
           }}
-
           pagination={{
-            current:
-              page,
+            current: page,
 
             pageSize,
 
             total,
 
-            showSizeChanger:
-              true,
+            showSizeChanger: true,
 
-            pageSizeOptions: [
-              "10",
-              "50",
-              "100",
-            ],
+            pageSizeOptions: ["10", "50", "100"],
 
-            showTotal:
-              (
-                value
-              ) =>
-                `Tổng số: ${value}`,
+            showTotal: (value) => `Tổng số: ${value}`,
 
-            onChange:
-              (
-                newPage,
-                newPageSize
-              ) => {
+            onChange: (newPage, newPageSize) => {
+              if (newPageSize !== pageSize) {
+                setPageSize(newPageSize);
 
-                if (
-                  newPageSize !==
-                  pageSize
-                ) {
+                setPage(1);
 
-                  setPageSize(
-                    newPageSize
-                  );
+                return;
+              }
 
-
-                  setPage(
-                    1
-                  );
-
-
-                  return;
-                }
-
-
-                setPage(
-                  newPage
-                );
-              },
+              setPage(newPage);
+            },
           }}
-
           locale={{
-            emptyText:
-              "Chưa có dữ liệu công khám",
+            emptyText: "Chưa có dữ liệu công khám",
           }}
         />
-
       </div>
-
 
       {/* =================================================
           ADD / EDIT
       ================================================= */}
 
       <Modal
-        open={
-          modalOpen
-        }
-
-        title={
-          editingItem
-            ? "Cập nhật Công khám"
-            : "Thêm Công khám"
-        }
-
-        width={
-          720
-        }
-
-        okText={
-          editingItem
-            ? "Cập nhật"
-            : "Thêm mới"
-        }
-
+        open={modalOpen}
+        title={editingItem ? "Cập nhật Công khám" : "Thêm Công khám"}
+        width={720}
+        okText={editingItem ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
-
-        confirmLoading={
-          saving
-        }
-
-        onOk={() =>
-          void handleSave()
-        }
-
+        confirmLoading={saving}
+        onOk={() => void handleSave()}
         onCancel={() => {
-
-          if (
-            saving
-          ) {
-
+          if (saving) {
             return;
           }
 
+          setModalOpen(false);
 
-          setModalOpen(
-            false
-          );
-
-
-          setEditingItem(
-            null
-          );
-
+          setEditingItem(null);
 
           form.resetFields();
         }}
       >
-
-        <Form
-          form={
-            form
-          }
-
-          layout="vertical"
-
-          requiredMark={
-            false
-          }
-
-          className="examination-form"
-        >
-
-          <div
-            className="examination-form-grid"
-          >
-
+        <Form form={form} layout="vertical" requiredMark={false} className="examination-form">
+          <div className="examination-form-grid">
             <Form.Item
               label="Mã công khám"
-
               name="code"
-
               rules={[
                 {
-                  required:
-                    true,
+                  required: true,
 
-                  whitespace:
-                    true,
+                  whitespace: true,
 
-                  message:
-                    "Vui lòng nhập mã công khám.",
+                  message: "Vui lòng nhập mã công khám.",
                 },
               ]}
             >
-
-              <Input
-                placeholder="Ví dụ: 02.03"
-
-                disabled={
-                  editingItem !==
-                  null
-                }
-              />
-
+              <Input placeholder="Ví dụ: 02.03" disabled={editingItem !== null} />
             </Form.Item>
-
 
             <Form.Item
               label="Đơn giá"
-
               name="unitPrice"
-
               rules={[
                 {
-                  required:
-                    true,
+                  required: true,
 
-                  message:
-                    "Vui lòng nhập đơn giá.",
+                  message: "Vui lòng nhập đơn giá.",
                 },
 
                 {
-                  type:
-                    "number",
+                  type: "number",
 
-                  min:
-                    0,
+                  min: 0,
 
-                  message:
-                    "Đơn giá không hợp lệ.",
+                  message: "Đơn giá không hợp lệ.",
                 },
               ]}
             >
-
               <InputNumber<number>
-                min={
-                  0
-                }
-
+                min={0}
                 style={{
-                  width:
-                    "100%",
+                  width: "100%",
                 }}
-
                 placeholder="36500"
-
-                formatter={(
-                  value
-                ) => {
-
-                  if (
-                    value ===
-                      undefined ||
-                    value ===
-                      null
-                  ) {
-
+                formatter={(value) => {
+                  if (value === undefined || value === null) {
                     return "";
                   }
 
-
-                  return Number(
-                    value
-                  ).toLocaleString(
-                    "vi-VN"
-                  );
+                  return Number(value).toLocaleString("vi-VN");
                 }}
+                parser={(value) => {
+                  const text = String(value ?? "")
+                    .replace(/\./g, "")
+                    .replace(/,/g, "")
+                    .trim();
 
-                parser={(
-                  value
-                ) => {
-
-                  const text =
-                    String(
-                      value ??
-                      ""
-                    )
-                      .replace(
-                        /\./g,
-                        ""
-                      )
-                      .replace(
-                        /,/g,
-                        ""
-                      )
-                      .trim();
-
-
-                  if (
-                    !text
-                  ) {
-
+                  if (!text) {
                     return 0;
                   }
 
+                  const parsed = Number(text);
 
-                  const parsed =
-                    Number(
-                      text
-                    );
-
-
-                  return Number.isFinite(
-                    parsed
-                  )
-                    ? parsed
-                    : 0;
+                  return Number.isFinite(parsed) ? parsed : 0;
                 }}
               />
-
             </Form.Item>
-
           </div>
-
 
           <Form.Item
             label="Tên công khám"
-
             name="name"
-
             rules={[
               {
-                required:
-                  true,
+                required: true,
 
-                whitespace:
-                  true,
+                whitespace: true,
 
-                message:
-                  "Vui lòng nhập tên công khám.",
+                message: "Vui lòng nhập tên công khám.",
               },
             ]}
           >
-
-            <Input
-              placeholder="Ví dụ: Khám Nội tổng hợp"
-            />
-
+            <Input placeholder="Ví dụ: Khám Nội tổng hợp" />
           </Form.Item>
 
-
-          <Form.Item
-            label="Ghi chú"
-
-            name="note"
-          >
-
-            <Input.TextArea
-              rows={
-                3
-              }
-
-              placeholder="Ghi chú nếu có"
-            />
-
+          <Form.Item label="Ghi chú" name="note">
+            <Input.TextArea rows={3} placeholder="Ghi chú nếu có" />
           </Form.Item>
 
-
-          <Form.Item
-            label="Đang sử dụng"
-
-            name="active"
-
-            valuePropName="checked"
-          >
-
-            <Switch
-              checkedChildren="Đang dùng"
-
-              unCheckedChildren="Ngừng dùng"
-            />
-
+          <Form.Item label="Đang sử dụng" name="active" valuePropName="checked">
+            <Switch checkedChildren="Đang dùng" unCheckedChildren="Ngừng dùng" />
           </Form.Item>
-
         </Form>
-
       </Modal>
-
 
       {/* =================================================
           STYLE
@@ -1782,7 +927,6 @@ export default function ExaminationServices() {
           }
         `}
       </style>
-
     </>
   );
 }

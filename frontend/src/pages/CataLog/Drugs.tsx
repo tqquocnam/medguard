@@ -31,6 +31,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch } from "../../api/apiClient";
+import { Link } from "react-router-dom";
 
 const { Title, Text } = Typography;
 
@@ -1285,16 +1286,20 @@ export default function Drugs() {
         {/* =================================================
             BREADCRUMB
         ================================================= */}
-
         <Breadcrumb
           className="drugs-breadcrumb"
           items={[
             {
-              title: <HomeOutlined />,
+              title: (
+                <Link to="/">
+                  {" "}
+                  <HomeOutlined />
+                </Link>
+              ),
             },
 
             {
-              title: "Danh mục",
+              title: <Link to="/catalog">Danh mục</Link>,
             },
 
             {

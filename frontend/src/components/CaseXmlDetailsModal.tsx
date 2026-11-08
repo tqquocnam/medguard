@@ -679,7 +679,7 @@ export default function CaseXmlDetailsModal({ open, caseId, onClose }: Props) {
 
             <div className="mg-xml-modal-subtitle">
               {currentDetails
-                ? `${currentDetails.ma_bn || currentDetails.ma_lk || ""} · ${
+                ? `${currentDetails.ma_bn || currentDetails.ma_lk || ""} - ${
                     currentDetails.ho_ten || ""
                   }`
                 : "Thông tin khám chữa bệnh"}
