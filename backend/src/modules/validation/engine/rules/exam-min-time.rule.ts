@@ -155,7 +155,7 @@ function examOrderGapViolation(xml3: any): Record<string, unknown> | null {
   const displayedMinutes = Number(gapMinutes.toFixed(4));
 
   const message =
-    "Thời gian khám bệnh giữa các lần nhỏ hơn 5 phút: " +
+    "Thời gian khám bệnh giữa các lần nhỏ hơn hoặc bằng 5 phút: " +
     `${earlier.display} → ${later.display} ` +
     `(${displayedMinutes} phút).`;
 

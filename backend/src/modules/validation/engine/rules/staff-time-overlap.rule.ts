@@ -64,12 +64,6 @@ function formatActivityTime(start: Date, end: Date): string {
 function formatActivityName(activityType: string, itemName: string | null): string {
   const name = itemName?.trim() || "Hoạt động";
 
-  const isEcg = name.normalize("NFC").toLocaleLowerCase("vi-VN").includes("điện tim");
-
-  if (!isEcg) {
-    return name;
-  }
-
   switch (activityType) {
     case "SERVICE_ORDER":
       return `Thời gian y lệnh ${name}`;
@@ -82,7 +76,6 @@ function formatActivityName(activityType: string, itemName: string | null): stri
       return name;
   }
 }
-
 // ======================================================
 // RULE
 // ======================================================
@@ -1019,6 +1012,21 @@ export const staffTimeOverlapRule: RuleValidator = {
               -- source = thuoc, target = dien tim (khong tu dong quy loi nguoc).
               (
                 a.activity_type = 'DRUG_ORDER'
+                AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
+                AND a.activity_start = b.activity_start
+              )              OR
+              -- Đọc kết quả điện tim trùng y lệnh CLS ở hồ sơ khác.
+              -- a = điện tim, b = y lệnh CLS.
+              -- Cùng doctor_code đã được kiểm tra ở JOIN phía trên.
+              (
+                a.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
+                AND b.activity_type = 'SERVICE_ORDER'
+                AND a.activity_start = b.activity_start
+              )
+              OR
+              -- Chiều đối chiếu ngược khi đang kiểm tra hồ sơ có y lệnh CLS.
+              (
+                a.activity_type = 'SERVICE_ORDER'
                 AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
                 AND a.activity_start = b.activity_start
               )

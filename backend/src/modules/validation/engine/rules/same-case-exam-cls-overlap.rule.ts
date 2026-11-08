@@ -2,6 +2,13 @@ import type { RuleValidator } from "../rule.types.js";
 
 type Row = Record<string, unknown>;
 
+interface Exam {
+  row: Row;
+  index: number;
+  start: number;
+  doctor: string;
+}
+
 function object(value: unknown): Row {
   if (Array.isArray(value)) return object(value[0]);
 
@@ -14,6 +21,7 @@ function text(value: unknown): string {
 
 function parseTime(value: unknown): number | null {
   const raw = text(value);
+
   if (!/^\d{12}(\d{2})?$/.test(raw)) return null;
 
   const y = Number(raw.slice(0, 4));
@@ -61,6 +69,10 @@ function isExam(row: Row): boolean {
   return /^khám(?:\s|$)/i.test(text(row.TEN_DICH_VU).normalize("NFC"));
 }
 
+function isLab(row: Row): boolean {
+  return Number(row.MA_NHOM) === 1;
+}
+
 function getRows(xml: unknown): Row[] {
   const root = object(xml);
   const container = object(root.CHITIEU_CHITIET_DVKT_VTYT ?? root);
@@ -70,6 +82,33 @@ function getRows(xml: unknown): Row[] {
   return (Array.isArray(value) ? value : value ? [value] : [])
     .filter((item) => item !== null && typeof item === "object" && !Array.isArray(item))
     .map(object);
+}
+
+// Xác định công khám chỉ định dựa trên:
+// - Cùng MA_BAC_SI.
+// - Công khám bắt đầu không muộn hơn NGAY_YL.
+// - Chọn lần khám gần NGAY_YL nhất của bác sĩ đó.
+//
+// Không dùng NGAY_TH_YL / NGAY_KQ của xét nghiệm để gán công khám.
+function findOrderingExam(service: Row, exams: Exam[]): Exam | null {
+  const doctor = text(service.MA_BAC_SI);
+  const orderTime = parseTime(service.NGAY_YL);
+
+  if (!doctor || orderTime === null) return null;
+
+  const candidates = exams
+    .filter((exam) => exam.doctor === doctor && exam.start <= orderTime)
+    .sort((a, b) => b.start - a.start);
+
+  if (candidates.length === 0) return null;
+
+  // Hai công khám cùng bác sĩ, cùng giờ:
+  // không tự chọn một công khám khi dữ liệu chưa phân biệt được.
+  if (candidates.length > 1 && candidates[0].start === candidates[1].start) {
+    return null;
+  }
+
+  return candidates[0];
 }
 
 export const sameCaseExamClsOverlapRule: RuleValidator = {
@@ -96,10 +135,8 @@ export const sameCaseExamClsOverlapRule: RuleValidator = {
 
     const rows = getRows(context.xml3);
 
-    const exams = rows.map((row, index) => ({ row, index })).filter(({ row }) => isExam(row));
+    const examRows = rows.map((row, index) => ({ row, index })).filter(({ row }) => isExam(row));
 
-    // Mặc định nhóm 1–3: xét nghiệm, siêu âm, chẩn đoán
-    // hình ảnh/thăm dò chức năng. Có thể cấu hình thêm.
     const configuredGroups = rule.config?.clsGroups;
     const clsGroups = new Set(
       (Array.isArray(configuredGroups) ? configuredGroups : [1, 2, 3]).map(Number),
@@ -110,92 +147,108 @@ export const sameCaseExamClsOverlapRule: RuleValidator = {
       .filter(({ row }) => !isExam(row) && clsGroups.has(Number(row.MA_NHOM)));
 
     const configuredMinutes = Number(rule.config?.examWindowMinutes ?? 5);
+
     const examMinutes =
       Number.isFinite(configuredMinutes) && configuredMinutes > 0 ? configuredMinutes : 5;
 
     const violations: Row[] = [];
+
     let invalidExamCount = 0;
     let invalidServiceCount = 0;
-    let checkedExamCount = 0;
+    let skippedOtherExamLabPairCount = 0;
 
-    const intervals = services.flatMap(({ row, index }) => {
-      const start = parseTime(row.NGAY_TH_YL);
-      const end = parseTime(row.NGAY_KQ);
+    const unresolvedLabIndexes = new Set<number>();
+    const exams: Exam[] = [];
+
+    for (const { row, index } of examRows) {
+      const start = parseTime(row.NGAY_TH_YL) ?? parseTime(row.NGAY_YL);
+
+      if (start === null) {
+        invalidExamCount++;
+        continue;
+      }
+
+      exams.push({
+        row,
+        index,
+        start,
+        doctor: text(row.MA_BAC_SI),
+      });
+    }
+
+    // Tính trước công khám chỉ định cho từng dịch vụ.
+    const mappedServices = services.map(({ row, index }) => ({
+      row,
+      index,
+      orderingExam: findOrderingExam(row, exams),
+    }));
+
+    const intervals = mappedServices.flatMap((service) => {
+      const start = parseTime(service.row.NGAY_TH_YL);
+      const end = parseTime(service.row.NGAY_KQ);
 
       if (start === null || end === null || end <= start) {
         invalidServiceCount++;
         return [];
       }
 
-      return [{ row, index, start, end }];
+      return [{ ...service, start, end }];
     });
 
-    for (const { row: exam, index: examIndex } of exams) {
-      const examStart = parseTime(exam.NGAY_TH_YL) ?? parseTime(exam.NGAY_YL);
+    for (const exam of exams) {
+      const hasCls = mappedServices.some((service) => service.orderingExam?.index === exam.index);
 
-      if (examStart === null) {
-        invalidExamCount++;
-        continue;
-      }
-
-      checkedExamCount++;
-
-      const doctor = text(exam.MA_BAC_SI);
-
-      // Theo logic đang có: CLS thuộc lần khám khi cùng bác sĩ,
-      // y lệnh từ lúc khám đến trước lần khám tiếp theo của bác sĩ.
-      const nextExamStart = exams
-        .filter(
-          ({ row, index }) =>
-            index !== examIndex && doctor !== "" && text(row.MA_BAC_SI) === doctor,
-        )
-        .map(({ row }) => parseTime(row.NGAY_TH_YL) ?? parseTime(row.NGAY_YL))
-        .filter((time): time is number => time !== null && time > examStart)
-        .sort((a, b) => a - b)[0];
-
-      const hasCls =
-        doctor !== "" &&
-        services.some(({ row }) => {
-          const order = parseTime(row.NGAY_YL);
-
-          return (
-            text(row.MA_BAC_SI) === doctor &&
-            order !== null &&
-            order >= examStart &&
-            (nextExamStart === undefined || order < nextExamStart)
-          );
-        });
-
-      const examEnd = hasCls ? examStart : examStart + examMinutes * 60_000;
+      // Giữ logic hiện tại:
+      // Có CLS do công khám này chỉ định: mốc bắt đầu.
+      // Không có CLS: khoảng khám mặc định 5 phút.
+      const examEnd = hasCls ? exam.start : exam.start + examMinutes * 60_000;
 
       for (const service of intervals) {
-        // Công khám dạng mốc: chỉ bắt khi nằm trong khoảng CLS.
-        // Hai khoảng chỉ chạm đầu/cuối không tính chồng thời gian.
         const overlaps =
-          examEnd === examStart
-            ? service.start <= examStart && examStart < service.end
-            : examStart < service.end && service.start < examEnd;
+          examEnd === exam.start
+            ? service.start <= exam.start && exam.start < service.end
+            : exam.start < service.end && service.start < examEnd;
 
         if (!overlaps) continue;
 
-        const examName = text(exam.TEN_DICH_VU) || "Công khám";
+        if (isLab(service.row) && examRows.length > 1) {
+          if (service.orderingExam === null) {
+            // Chưa xác định được xét nghiệm thuộc công khám nào.
+            // Không quy lỗi cho công khám đang xét.
+            unresolvedLabIndexes.add(service.index);
+            continue;
+          }
+
+          if (service.orderingExam.index !== exam.index) {
+            // Xét nghiệm thuộc công khám khác.
+            // Ví dụ: xét nghiệm công khám 1 thực hiện trong
+            // khoảng khám Tai Mũi Họng của công khám 2.
+            skippedOtherExamLabPairCount++;
+            continue;
+          }
+        }
+
+        const examName = text(exam.row.TEN_DICH_VU) || "Công khám";
+
         const serviceName = text(service.row.TEN_DICH_VU) || "Dịch vụ CLS";
 
         const examTime =
-          examEnd === examStart
-            ? formatTime(examStart)
-            : `${formatTime(examStart)} → ${formatTime(examEnd)}`;
+          examEnd === exam.start
+            ? formatTime(exam.start)
+            : `${formatTime(exam.start)} → ${formatTime(examEnd)}`;
 
         violations.push({
-          sourceEventId: `xml3-${examIndex}`,
+          sourceEventId: `xml3-${exam.index}`,
           conflictEventId: `xml3-${service.index}`,
           sourceCaseId: context.medicalCase.id,
           conflictCaseId: context.medicalCase.id,
           sourceItemName: examName,
           conflictItemName: serviceName,
-          doctorCode: doctor,
+          doctorCode: exam.doctor,
           performerCode: text(service.row.NGUOI_THUC_HIEN),
-          sourceStart: formatTime(examStart),
+          orderingExamEventId:
+            service.orderingExam === null ? null : `xml3-${service.orderingExam.index}`,
+          sourceStart: formatTime(exam.start),
           sourceEnd: formatTime(examEnd),
           conflictStart: formatTime(service.start),
           conflictEnd: formatTime(service.end),
@@ -207,12 +260,16 @@ export const sameCaseExamClsOverlapRule: RuleValidator = {
       }
     }
 
+    const unresolvedLabCount = unresolvedLabIndexes.size;
+
     const details = {
       violations,
       invalidExamCount,
       invalidServiceCount,
-      checkedExamCount,
+      checkedExamCount: exams.length,
       validServiceCount: intervals.length,
+      skippedOtherExamLabPairCount,
+      unresolvedLabCount,
     };
 
     if (violations.length > 0) {
@@ -229,7 +286,8 @@ export const sameCaseExamClsOverlapRule: RuleValidator = {
     const incomplete =
       invalidExamCount > 0 ||
       invalidServiceCount > 0 ||
-      checkedExamCount === 0 ||
+      unresolvedLabCount > 0 ||
+      exams.length === 0 ||
       intervals.length === 0;
 
     return {
@@ -237,7 +295,7 @@ export const sameCaseExamClsOverlapRule: RuleValidator = {
       status: incomplete ? "SKIP" : "PASS",
       issueCount: 0,
       message: incomplete
-        ? "Chưa đủ khoảng thời gian hợp lệ để kết luận toàn bộ hồ sơ."
+        ? "Chưa đủ dữ liệu thời gian hoặc công khám chỉ định xét nghiệm để kết luận toàn bộ hồ sơ."
         : "Không phát hiện khám và CLS trùng thời gian trong cùng hồ sơ.",
       details,
     };
