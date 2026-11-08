@@ -1,11 +1,6 @@
-import type {
-  RuleValidator,
-} from "../rule.types.js";
+import type { RuleValidator } from "../rule.types.js";
 
-import {
-  formatDateTime,
-} from "../date-utils.js";
-
+import { formatDateTime } from "../date-utils.js";
 
 // ======================================================
 // DATABASE ROW
@@ -18,11 +13,9 @@ interface ConflictRow {
 
   conflict_case_id: string;
 
-  conflict_ma_bn:
-    string | null;
+  conflict_ma_bn: string | null;
 
-  conflict_patient_name:
-    string | null;
+  conflict_patient_name: string | null;
 
   staff_code: string;
 
@@ -30,17 +23,13 @@ interface ConflictRow {
 
   conflict_activity: string;
 
-  source_item_code:
-    string | null;
+  source_item_code: string | null;
 
-  source_item_name:
-    string | null;
+  source_item_name: string | null;
 
-  conflict_item_code:
-    string | null;
+  conflict_item_code: string | null;
 
-  conflict_item_name:
-    string | null;
+  conflict_item_name: string | null;
 
   source_start: Date;
 
@@ -50,7 +39,6 @@ interface ConflictRow {
 
   conflict_end: Date;
 }
-
 
 // ======================================================
 // FORMAT THỜI GIAN
@@ -62,58 +50,48 @@ interface ConflictRow {
 // 04/10/2026 08:40 -> 04/10/2026 08:45
 // ======================================================
 
-function formatActivityTime(
-  start: Date,
-  end: Date
-): string {
+function formatActivityTime(start: Date, end: Date): string {
+  const startText = formatDateTime(start);
 
-  const startText =
-    formatDateTime(
-      start
-    );
+  const endText = formatDateTime(end);
 
-
-  const endText =
-    formatDateTime(
-      end
-    );
-
-
-  if (
-    start.getTime() ===
-    end.getTime()
-  ) {
+  if (start.getTime() === end.getTime()) {
     return startText;
   }
 
-
-  return (
-    `${startText} -> ${endText}`
-  );
+  return `${startText} -> ${endText}`;
 }
+function formatActivityName(activityType: string, itemName: string | null): string {
+  const name = itemName?.trim() || "Hoạt động";
 
+  const isEcg = name.normalize("NFC").toLocaleLowerCase("vi-VN").includes("điện tim");
+
+  if (!isEcg) {
+    return name;
+  }
+
+  switch (activityType) {
+    case "SERVICE_ORDER":
+      return `Thời gian y lệnh ${name}`;
+
+    case "ECG_RESULT_POINT":
+    case "ECG_RESULT_DOCTOR_EXAM":
+      return `Thời gian đọc kết quả ${name}`;
+
+    default:
+      return name;
+  }
+}
 
 // ======================================================
 // RULE
 // ======================================================
 
-export const staffTimeOverlapRule:
-  RuleValidator = {
+export const staffTimeOverlapRule: RuleValidator = {
+  async evaluate(context, rule, runtime) {
+    const { client } = runtime;
 
-  async evaluate(
-    context,
-    rule,
-    runtime
-  ) {
-
-    const {
-      client,
-    } = runtime;
-
-
-    const caseId =
-      context.medicalCase.id;
-
+    const caseId = context.medicalCase.id;
 
     // ==================================================
     // CÔNG KHÁM MẶC ĐỊNH 5 PHÚT
@@ -121,21 +99,14 @@ export const staffTimeOverlapRule:
     // CHỈ áp dụng khi CÔNG KHÁM không có CLS/XN/DVKT do bác sĩ đó chỉ định.
     // ==================================================
 
-    const examWindowMinutes =
-      Number(
-        rule.config
-          ?.examWindowMinutes ??
-        5
-      );
-
+    const examWindowMinutes = Number(rule.config?.examWindowMinutes ?? 5);
 
     // ==================================================
     // QUERY
     // ==================================================
 
-    const query =
-      await client.query<ConflictRow>(
-        `
+    const query = await client.query<ConflictRow>(
+      `
         WITH
         -- Gioi han tap ho so doi chieu quanh ngay thanh toan cua ho so A.
         -- Cong/tru 1 ngay de khong bo sot su kien qua nua dem.
@@ -1155,69 +1126,46 @@ export const staffTimeOverlapRule:
 
           cp.conflict_event_id ASC
         `,
-        [
-          caseId,
-          examWindowMinutes,
-        ]
-      );
+      [caseId, examWindowMinutes],
+    );
 
-
-    const conflicts =
-      query.rows;
-
+    const conflicts = query.rows;
 
     // ==================================================
     // PASS
     // ==================================================
 
-    if (
-      conflicts.length ===
-      0
-    ) {
-
+    if (conflicts.length === 0) {
       return {
-        ruleId:
-          rule.id,
+        ruleId: rule.id,
 
-        ruleCode:
-          rule.code,
+        ruleCode: rule.code,
 
-        status:
-          "PASS",
+        status: "PASS",
 
-        severity:
-          rule.severity,
+        severity: rule.severity,
 
-        issueCount:
-          0,
+        issueCount: 0,
 
-        message:
-          "Không phát hiện trùng thời gian nhân viên giữa các hồ sơ.",
+        message: "Không phát hiện trùng thời gian nhân viên giữa các hồ sơ.",
 
         details: {
-          conflictCount:
-            0,
+          conflictCount: 0,
 
-          conflictCaseId:
-            null,
+          conflictCaseId: null,
 
-          conflictPatient:
-            null,
+          conflictPatient: null,
 
-          violations:
-            [],
+          violations: [],
         },
       };
     }
-
 
     // ==================================================
     // HỒ SƠ B
     // ==================================================
 
-    const first =
-      conflicts[0];
-
+    const first = conflicts[0];
 
     // Các hồ sơ đối chiếu duy nhất, để modal hiển thị A với B/C/D...
     const conflictCaseMap = new Map<
@@ -1241,214 +1189,118 @@ export const staffTimeOverlapRule:
     // FORMAT DANH SÁCH LỖI
     // ==================================================
 
-    const violations =
-      conflicts.map(
-        (
-          row,
-          index
-        ) => {
+    const violations = conflicts.map((row, index) => {
+      const sourceTime = formatActivityTime(row.source_start, row.source_end);
 
-          const sourceTime =
-            formatActivityTime(
-              row.source_start,
-              row.source_end
-            );
+      const conflictTime = formatActivityTime(row.conflict_start, row.conflict_end);
 
+      // const sourceName = row.source_item_name ?? "Hoạt động";
 
-          const conflictTime =
-            formatActivityTime(
-              row.conflict_start,
-              row.conflict_end
-            );
+      // const conflictName = row.conflict_item_name ?? "Hoạt động";
 
+      const sourceName = formatActivityName(row.source_activity, row.source_item_name);
 
-          const sourceName =
-            row.source_item_name ??
-            "Hoạt động";
+      const conflictName = formatActivityName(row.conflict_activity, row.conflict_item_name);
 
+      const patientName = row.conflict_patient_name ?? "Không rõ bệnh nhân";
 
-          const conflictName =
-            row.conflict_item_name ??
-            "Hoạt động";
+      // =============================================
+      // FORMAT GIỐNG WEB MẪU
+      //
+      // 005769/ST-CCHN
+      // [Siêu âm ổ bụng:
+      // 04/10/2026 08:40
+      // (Trùng thời gian)
+      // TRẦN QUỐC THIÊN -
+      // Khám Nội tổng hợp:
+      // 04/10/2026 08:40]
+      // =============================================
 
+      const displayMessage =
+        `${row.staff_code} ` +
+        `[${sourceName}: ` +
+        `${sourceTime} ` +
+        `(Trùng thời gian) ` +
+        `${patientName} - ` +
+        `${conflictName}:` +
+        `${conflictTime}]`;
 
-          const patientName =
-            row.conflict_patient_name ??
-            "Không rõ bệnh nhân";
+      return {
+        index: index + 1,
 
+        sourceEventId: row.source_event_id,
 
-          // =============================================
-          // FORMAT GIỐNG WEB MẪU
-          //
-          // 005769/ST-CCHN
-          // [Siêu âm ổ bụng:
-          // 04/10/2026 08:40
-          // (Trùng thời gian)
-          // TRẦN QUỐC THIÊN -
-          // Khám Nội tổng hợp:
-          // 04/10/2026 08:40]
-          // =============================================
+        conflictEventId: row.conflict_event_id,
 
-          const displayMessage =
-            `${row.staff_code} ` +
+        sourceCaseId: caseId,
 
-            `[${sourceName}: ` +
+        conflictCaseId: row.conflict_case_id,
 
-            `${sourceTime} ` +
+        staffCode: row.staff_code,
 
-            `(Trùng thời gian) ` +
+        sourceActivity: row.source_activity,
 
-            `${patientName} - ` +
+        conflictActivity: row.conflict_activity,
 
-            `${conflictName}:` +
+        sourceItemCode: row.source_item_code,
 
-            `${conflictTime}]`;
+        sourceItemName: row.source_item_name,
 
+        conflictItemCode: row.conflict_item_code,
 
-          return {
-            index:
-              index + 1,
+        conflictItemName: row.conflict_item_name,
 
+        sourceStart: formatDateTime(row.source_start),
 
-            sourceEventId:
-              row.source_event_id,
+        sourceEnd: formatDateTime(row.source_end),
 
+        conflictStart: formatDateTime(row.conflict_start),
 
-            conflictEventId:
-              row.conflict_event_id,
+        conflictEnd: formatDateTime(row.conflict_end),
 
+        conflictPatientName: row.conflict_patient_name,
 
-            sourceCaseId:
-              caseId,
+        conflictPatientCode: row.conflict_ma_bn,
 
+        conflictPatient: {
+          maBn: row.conflict_ma_bn,
 
-            conflictCaseId:
-              row.conflict_case_id,
+          hoTen: row.conflict_patient_name,
+        },
 
-
-            staffCode:
-              row.staff_code,
-
-
-            sourceActivity:
-              row.source_activity,
-
-
-            conflictActivity:
-              row.conflict_activity,
-
-
-            sourceItemCode:
-              row.source_item_code,
-
-
-            sourceItemName:
-              row.source_item_name,
-
-
-            conflictItemCode:
-              row.conflict_item_code,
-
-
-            conflictItemName:
-              row.conflict_item_name,
-
-
-            sourceStart:
-              formatDateTime(
-                row.source_start
-              ),
-
-
-            sourceEnd:
-              formatDateTime(
-                row.source_end
-              ),
-
-
-            conflictStart:
-              formatDateTime(
-                row.conflict_start
-              ),
-
-
-            conflictEnd:
-              formatDateTime(
-                row.conflict_end
-              ),
-
-
-            conflictPatientName:
-              row.conflict_patient_name,
-
-
-            conflictPatientCode:
-              row.conflict_ma_bn,
-
-
-            conflictPatient: {
-
-              maBn:
-                row.conflict_ma_bn,
-
-
-              hoTen:
-                row.conflict_patient_name,
-            },
-
-
-            displayMessage,
-          };
-        }
-      );
-
+        displayMessage,
+      };
+    });
 
     // ==================================================
     // FAIL
     // ==================================================
 
     return {
-      ruleId:
-        rule.id,
+      ruleId: rule.id,
 
-      ruleCode:
-        rule.code,
+      ruleCode: rule.code,
 
-      status:
-        "FAIL",
+      status: "FAIL",
 
-      severity:
-        rule.severity,
+      severity: rule.severity,
 
-      issueCount:
-        violations.length,
+      issueCount: violations.length,
 
       message:
         `Phát hiện ${violations.length} hoạt động trùng thời gian với ` +
         `${conflictCases.length} hồ sơ khác.`,
 
       details: {
-
-        conflictCaseId:
-          first
-            .conflict_case_id,
-
+        conflictCaseId: first.conflict_case_id,
 
         conflictPatient: {
+          maBn: first.conflict_ma_bn,
 
-          maBn:
-            first
-              .conflict_ma_bn,
-
-
-          hoTen:
-            first
-              .conflict_patient_name,
+          hoTen: first.conflict_patient_name,
         },
 
-
-        conflictCount:
-          violations.length,
+        conflictCount: violations.length,
 
         conflictCaseCount: conflictCases.length,
         conflictCases,

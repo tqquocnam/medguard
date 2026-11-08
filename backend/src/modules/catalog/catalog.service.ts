@@ -752,32 +752,36 @@ export async function listServices(params: ListServicesParams) {
 }
 
 export async function getService(code: string) {
-  const normalizedCode = String(code ?? "").trim();
+  const normalizedCode = normalizeText(code);
+
+  if (!normalizedCode) {
+    throw new Error("Thiếu mã dịch vụ.");
+  }
 
   const result = await db.query(
     `
     SELECT
       s.*,
       COALESCE(
-        json_agg(
-          json_build_object(
-            'code', m.code,
-            'name', m.name,
-            'warnTimeOverlap', m.warn_time_overlap
+        (
+          SELECT json_agg(
+            json_build_object(
+              'code', m.code,
+              'name', m.name,
+              'warnTimeOverlap', m.warn_time_overlap
+            )
+            ORDER BY m.name, m.code
           )
-          ORDER BY m.name, m.code
-        )
-        FILTER (WHERE m.code IS NOT NULL),
+          FROM catalog.service_machines sm
+          INNER JOIN catalog.machines m
+            ON m.code = sm.machine_code
+          WHERE sm.service_code = s.code
+            AND sm.active = true
+        ),
         '[]'::json
       ) AS machines
     FROM catalog.services s
-    LEFT JOIN catalog.service_machines sm
-      ON sm.service_code = s.code
-      AND sm.active = true
-    LEFT JOIN catalog.machines m
-      ON m.code = sm.machine_code
     WHERE s.code = $1
-    GROUP BY s.code
     `,
     [normalizedCode],
   );
@@ -805,7 +809,6 @@ export async function getService(code: string) {
     machines: Array.isArray(row.machines) ? row.machines : [],
   };
 }
-
 function validateServiceInput(data: ServiceInput) {
   const code = String(data.code ?? "").trim();
 
