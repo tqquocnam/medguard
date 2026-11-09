@@ -5,705 +5,467 @@ export interface ImportValidationError {
 
 export interface ImportCaseValidation {
   index: number;
-
-  maLk:
-    string | null;
-
-  maBn:
-    string | null;
-
-  hoTen:
-    string | null;
-
+  maLk: string | null;
+  maBn: string | null;
+  hoTen: string | null;
+  ngayVao: string | null;
+  ngayRa: string | null;
+  tongChi: string | number | null;
+  xmlTypes: string[];
   valid: boolean;
-
-  errors:
-    ImportValidationError[];
+  errors: ImportValidationError[];
 }
 
+type Row = Record<string, unknown>;
 
-// ============================================
-// PARSE THỜI GIAN BHYT
-//
-// 20261004
-// 202610040840
-// 20261004084030
-// ============================================
+// Cấu trúc XML1 theo file XML bạn cung cấp.
+// Kiểm tra sự hiện diện của thẻ, kể cả thẻ được phép để trống.
+const XML1_FIELDS = [
+  "MA_LK",
+  "STT",
+  "MA_BN",
+  "HO_TEN",
+  "SO_CCCD",
+  "NGAY_SINH",
+  "GIOI_TINH",
+  "NHOM_MAU",
+  "MA_QUOCTICH",
+  "MA_DANTOC",
+  "MA_NGHE_NGHIEP",
+  "DIA_CHI",
+  "MATINH_CU_TRU",
+  "MAHUYEN_CU_TRU",
+  "MAXA_CU_TRU",
+  "DIEN_THOAI",
+  "MA_THE_BHYT",
+  "MA_DKBD",
+  "GT_THE_TU",
+  "GT_THE_DEN",
+  "NGAY_MIEN_CCT",
+  "LY_DO_VV",
+  "LY_DO_VNT",
+  "MA_LY_DO_VNT",
+  "CHAN_DOAN_VAO",
+  "CHAN_DOAN_RV",
+  "MA_BENH_CHINH",
+  "MA_BENH_KT",
+  "MA_BENH_YHCT",
+  "MA_PTTT_QT",
+  "MA_DOITUONG_KCB",
+  "MA_NOI_DI",
+  "MA_NOI_DEN",
+  "MA_TAI_NAN",
+  "NGAY_VAO",
+  "NGAY_VAO_NOI_TRU",
+  "NGAY_RA",
+  "GIAY_CHUYEN_TUYEN",
+  "SO_NGAY_DTRI",
+  "PP_DIEU_TRI",
+  "KET_QUA_DTRI",
+  "MA_LOAI_RV",
+  "GHI_CHU",
+  "NGAY_TTOAN",
+  "T_THUOC",
+  "T_VTYT",
+  "T_TONGCHI_BV",
+  "T_TONGCHI_BH",
+  "T_BNTT",
+  "T_BNCCT",
+  "T_BHTT",
+  "T_NGUONKHAC",
+  "T_BHTT_GDV",
+  "NAM_QT",
+  "THANG_QT",
+  "MA_LOAI_KCB",
+  "MA_KHOA",
+  "MA_CSKCB",
+  "MA_KHUVUC",
+  "CAN_NANG",
+  "CAN_NANG_CON",
+  "NAM_NAM_LIEN_TUC",
+  "NGAY_TAI_KHAM",
+  "MA_HSBA",
+  "MA_TTDV",
+  "DU_PHONG",
+] as const;
 
-function parseBhytTime(
-  value: unknown
-): Date | null {
+// Chính sách kiểm tra dữ liệu bắt buộc của MedGuard.
+// Các trường còn lại trong XML1_FIELDS được phép có giá trị trống.
+// Giá trị số 0 vẫn được tính là có dữ liệu.
+const REQUIRED_XML1_FIELDS: Record<string, string> = {
+  MA_LK: "mã liên kết",
+  STT: "số thứ tự",
+  MA_BN: "mã bệnh nhân",
+  HO_TEN: "họ và tên",
+  NGAY_SINH: "ngày sinh",
+  GIOI_TINH: "giới tính",
+  MA_QUOCTICH: "mã quốc tịch",
+  MA_DANTOC: "mã dân tộc",
+  MA_NGHE_NGHIEP: "mã nghề nghiệp",
+  DIA_CHI: "địa chỉ",
+  MATINH_CU_TRU: "mã tỉnh cư trú",
+  MAHUYEN_CU_TRU: "mã huyện cư trú",
+  MAXA_CU_TRU: "mã xã cư trú",
+  MA_THE_BHYT: "mã thẻ BHYT",
+  MA_DKBD: "mã nơi đăng ký khám ban đầu",
+  GT_THE_TU: "ngày bắt đầu giá trị thẻ",
+  GT_THE_DEN: "ngày kết thúc giá trị thẻ",
+  LY_DO_VV: "lý do vào viện",
+  CHAN_DOAN_VAO: "chẩn đoán vào viện",
+  CHAN_DOAN_RV: "chẩn đoán ra viện",
+  MA_BENH_CHINH: "mã bệnh chính",
+  MA_DOITUONG_KCB: "mã đối tượng khám chữa bệnh",
+  MA_TAI_NAN: "mã tai nạn",
+  NGAY_VAO: "thời gian vào viện",
+  NGAY_RA: "thời gian ra viện",
+  SO_NGAY_DTRI: "số ngày điều trị",
+  KET_QUA_DTRI: "kết quả điều trị",
+  MA_LOAI_RV: "mã loại ra viện",
+  NGAY_TTOAN: "thời gian thanh toán",
+  T_THUOC: "tiền thuốc",
+  T_VTYT: "tiền vật tư y tế",
+  T_TONGCHI_BV: "tổng chi phí bệnh viện",
+  T_TONGCHI_BH: "tổng chi phí bảo hiểm",
+  T_BNTT: "tiền bệnh nhân tự trả",
+  T_BNCCT: "tiền bệnh nhân cùng chi trả",
+  T_BHTT: "tiền BHYT thanh toán",
+  T_NGUONKHAC: "tiền nguồn khác",
+  T_BHTT_GDV: "tiền BHYT thanh toán gói dịch vụ",
+  NAM_QT: "năm quyết toán",
+  THANG_QT: "tháng quyết toán",
+  MA_LOAI_KCB: "mã loại khám chữa bệnh",
+  MA_KHOA: "mã khoa",
+  MA_CSKCB: "mã cơ sở khám chữa bệnh",
+  CAN_NANG: "cân nặng (kg)",
+};
+
+function object(value: unknown): Row {
+  if (Array.isArray(value)) return object(value[0]);
+
+  return value !== null && typeof value === "object" ? (value as Row) : {};
+}
+
+function text(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.length === 1 ? text(value[0]) : "";
+  }
+
+  if (value !== null && typeof value === "object") {
+    const row = value as Row;
+    return "#text" in row ? text(row["#text"]) : "";
+  }
+
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function hasField(row: Row, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(row, field);
+}
+
+// Dùng UTC để so sánh thời gian ổn định trên localhost và VPS.
+// Không tự sửa các ngày sai như 31/02 thành ngày khác.
+function parseBhytTime(value: unknown): Date | null {
+  const raw = text(value);
+
+  if (!/^(?:\d{8}|\d{12}|\d{14})$/.test(raw)) {
+    return null;
+  }
+
+  const year = Number(raw.slice(0, 4));
+  const month = Number(raw.slice(4, 6));
+  const day = Number(raw.slice(6, 8));
+  const hour = Number(raw.slice(8, 10) || "0");
+  const minute = Number(raw.slice(10, 12) || "0");
+  const second = Number(raw.slice(12, 14) || "0");
 
   if (
-    value === null ||
-    value === undefined
+    year < 1900 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
   ) {
     return null;
   }
 
-
-  const raw =
-    String(
-      value
-    )
-      .trim()
-      .replace(
-        /\D/g,
-        ""
-      );
-
+  const result = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 
   if (
-    raw.length !== 8 &&
-    raw.length !== 12 &&
-    raw.length !== 14
+    result.getUTCFullYear() !== year ||
+    result.getUTCMonth() !== month - 1 ||
+    result.getUTCDate() !== day ||
+    result.getUTCHours() !== hour ||
+    result.getUTCMinutes() !== minute ||
+    result.getUTCSeconds() !== second
   ) {
     return null;
   }
-
-
-  const year =
-    Number(
-      raw.slice(
-        0,
-        4
-      )
-    );
-
-  const month =
-    Number(
-      raw.slice(
-        4,
-        6
-      )
-    );
-
-  const day =
-    Number(
-      raw.slice(
-        6,
-        8
-      )
-    );
-
-  const hour =
-    raw.length >= 12
-      ? Number(
-          raw.slice(
-            8,
-            10
-          )
-        )
-      : 0;
-
-  const minute =
-    raw.length >= 12
-      ? Number(
-          raw.slice(
-            10,
-            12
-          )
-        )
-      : 0;
-
-  const second =
-    raw.length >= 14
-      ? Number(
-          raw.slice(
-            12,
-            14
-          )
-        )
-      : 0;
-
-
-  const result =
-    new Date(
-      year,
-      month - 1,
-      day,
-      hour,
-      minute,
-      second
-    );
-
-
-  if (
-    Number.isNaN(
-      result.getTime()
-    )
-  ) {
-    return null;
-  }
-
 
   return result;
 }
 
+function formatTime(value: unknown): string {
+  const raw = text(value);
+  const date = parseBhytTime(raw);
 
-// ============================================
-// FORMAT
-// ============================================
+  if (!date) return raw;
 
-function formatTime(
-  value: unknown
-): string {
+  const pad = (number: number) => String(number).padStart(2, "0");
 
-  const date =
-    parseBhytTime(
-      value
-    );
+  const formatted =
+    `${pad(date.getUTCDate())}/` +
+    `${pad(date.getUTCMonth() + 1)}/` +
+    `${date.getUTCFullYear()} ` +
+    `${pad(date.getUTCHours())}:` +
+    `${pad(date.getUTCMinutes())}`;
 
-
-  if (!date) {
-    return String(
-      value ??
-      ""
-    );
-  }
-
-
-  const pad =
-    (
-      number: number
-    ) =>
-      String(
-        number
-      ).padStart(
-        2,
-        "0"
-      );
-
-
-  return (
-    `${pad(
-      date.getDate()
-    )}/` +
-
-    `${pad(
-      date.getMonth() + 1
-    )}/` +
-
-    `${date.getFullYear()} ` +
-
-    `${pad(
-      date.getHours()
-    )}:` +
-
-    `${pad(
-      date.getMinutes()
-    )}`
-  );
+  return raw.length === 14 ? `${formatted}:${pad(date.getUTCSeconds())}` : formatted;
 }
 
-
-// ============================================
-// DUYỆT TOÀN BỘ JSON
-// ============================================
-
-function collectObjects(
-  data: unknown,
-
-  result:
-    Record<
-      string,
-      any
-    >[] = []
-) {
-
-  if (
-    data === null ||
-    data === undefined
-  ) {
+function collectObjects(data: unknown, result: Row[] = []): Row[] {
+  if (Array.isArray(data)) {
+    for (const item of data) collectObjects(item, result);
     return result;
   }
 
-
-  if (
-    Array.isArray(
-      data
-    )
-  ) {
-
-    for (
-      const item
-      of data
-    ) {
-      collectObjects(
-        item,
-        result
-      );
-    }
-
+  if (data === null || typeof data !== "object") {
     return result;
   }
 
+  const row = data as Row;
+  result.push(row);
 
-  if (
-    typeof data !==
-    "object"
-  ) {
-    return result;
+  for (const value of Object.values(row)) {
+    collectObjects(value, result);
   }
-
-
-  const object =
-    data as Record<
-      string,
-      any
-    >;
-
-
-  result.push(
-    object
-  );
-
-
-  for (
-    const value
-    of Object.values(
-      object
-    )
-  ) {
-
-    collectObjects(
-      value,
-      result
-    );
-  }
-
 
   return result;
 }
 
+function checkXml1Fields(tongHop: Row): ImportValidationError[] {
+  const errors: ImportValidationError[] = [];
 
-// ============================================
-// KIỂM TRA THỜI GIAN Y LỆNH
-// ============================================
+  for (const field of XML1_FIELDS) {
+    const label = REQUIRED_XML1_FIELDS[field];
 
-function checkOrderTimes(
-  medicalCase: any
-): ImportValidationError[] {
-
-  const errors:
-    ImportValidationError[] =
-    [];
-
-
-  for (
-    const file
-    of medicalCase.files ??
-    []
-  ) {
-
-    const xmlType =
-      String(
-        file.type ??
-        ""
-      ).toUpperCase();
-
-
-    if (
-      xmlType !== "XML2" &&
-      xmlType !== "XML3"
-    ) {
+    if (!hasField(tongHop, field)) {
+      errors.push({
+        code: `MISSING_XML1_TAG_${field}`,
+        message: label ? `XML1: Thiếu thẻ ${field} — ${label}.` : `XML1: Thiếu thẻ ${field}.`,
+      });
       continue;
     }
 
-
-    const objects =
-      collectObjects(
-        file.data
-      );
-
-
-    for (
-      const row
-      of objects
-    ) {
-
-      const ngayYl =
-        row.NGAY_YL ??
-        row.NGAY_CHI_DINH;
-
-
-      const ngayThYl =
-        row.NGAY_TH_YL ??
-        row.NGAY_THUC_HIEN_YL ??
-        row.NGAY_THUC_HIEN;
-
-
-      if (
-        !ngayYl ||
-        !ngayThYl
-      ) {
-        continue;
-      }
-
-
-      const orderTime =
-        parseBhytTime(
-          ngayYl
-        );
-
-
-      const performTime =
-        parseBhytTime(
-          ngayThYl
-        );
-
-
-      if (
-        !orderTime ||
-        !performTime
-      ) {
-
-        errors.push({
-          code:
-            "INVALID_ORDER_TIME",
-
-          message:
-            `${
-              row.TEN_DICH_VU ??
-              row.TEN_THUOC ??
-              row.MA_DICH_VU ??
-              row.MA_THUOC ??
-              "Y lệnh"
-            }: thời gian y lệnh hoặc thời gian thực hiện không hợp lệ.`,
-        });
-
-
-        continue;
-      }
-
-
-      // ========================================
-      // THỰC HIỆN KHÔNG ĐƯỢC TRƯỚC Y LỆNH
-      //
-      // NGAY_YL = 08:40
-      // NGAY_TH_YL = 08:45
-      // => ĐÚNG
-      //
-      // NGAY_YL = 08:40
-      // NGAY_TH_YL = 08:35
-      // => LỖI
-      // ========================================
-
-      if (
-        performTime.getTime() <
-        orderTime.getTime()
-      ) {
-
-        errors.push({
-          code:
-            "PERFORM_BEFORE_ORDER",
-
-          message:
-            `${
-              row.TEN_DICH_VU ??
-              row.TEN_THUOC ??
-              row.MA_DICH_VU ??
-              row.MA_THUOC ??
-              "Y lệnh"
-            }: thời gian thực hiện ` +
-
-            `${formatTime(
-              ngayThYl
-            )} trước thời gian y lệnh ` +
-
-            `${formatTime(
-              ngayYl
-            )}.`,
-        });
-      }
+    if (label && !text(tongHop[field])) {
+      errors.push({
+        code: `EMPTY_XML1_${field}`,
+        message: `XML1: Thiếu ${label} (${field}); giá trị đang để trống.`,
+      });
     }
   }
 
+  const weight = text(tongHop.CAN_NANG);
+
+  if (weight) {
+    // Chấp nhận 55,5 hoặc 55.5; không chấp nhận chữ hay đơn vị.
+    const normalized = weight.replace(",", ".");
+    const validNumber = /^\d+(?:\.\d+)?$/.test(normalized);
+    const value = Number(normalized);
+
+    if (!validNumber || !Number.isFinite(value) || value <= 0) {
+      errors.push({
+        code: "INVALID_XML1_CAN_NANG",
+        message:
+          `XML1: Cân nặng (CAN_NANG) "${weight}" không hợp lệ; ` + "phải là số kg lớn hơn 0.",
+      });
+    }
+  }
 
   return errors;
 }
 
+function checkXml1Dates(tongHop: Row): ImportValidationError[] {
+  const errors: ImportValidationError[] = [];
 
-// ============================================
-// VALIDATE TOÀN BỘ FILE
-// ============================================
+  const fields = ["NGAY_SINH", "GT_THE_TU", "GT_THE_DEN", "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN"];
 
-export function validateImportFile(
-  parsed: any
-) {
+  for (const field of fields) {
+    const value = text(tongHop[field]);
 
-  const results:
-    ImportCaseValidation[] =
-    [];
+    // Trường trống đã được báo trong checkXml1Fields.
+    if (value && !parseBhytTime(value)) {
+      errors.push({
+        code: `INVALID_${field}`,
+        message:
+          `XML1: ${field} "${value}" không hợp lệ. ` +
+          "Định dạng: YYYYMMDD, YYYYMMDDHHmm hoặc YYYYMMDDHHmmss.",
+      });
+    }
+  }
 
+  const start = parseBhytTime(tongHop.NGAY_VAO);
+  const end = parseBhytTime(tongHop.NGAY_RA);
 
-  const cases =
-    parsed.cases ??
-    [];
+  if (start && end && end.getTime() < start.getTime()) {
+    errors.push({
+      code: "INVALID_VISIT_TIME",
+      message:
+        `XML1: Thời gian ra viện ${formatTime(tongHop.NGAY_RA)} ` +
+        `trước thời gian vào viện ${formatTime(tongHop.NGAY_VAO)}.`,
+    });
+  }
 
+  return errors;
+}
 
-  for (
-    let index = 0;
-    index <
-    cases.length;
-    index++
-  ) {
+function checkOrderTimes(files: Row[]): ImportValidationError[] {
+  const errors: ImportValidationError[] = [];
 
-    const medicalCase =
-      cases[index];
+  for (const file of files) {
+    const xmlType = text(file.type).toUpperCase();
 
+    if (xmlType !== "XML2" && xmlType !== "XML3") {
+      continue;
+    }
 
-    const errors:
-      ImportValidationError[] =
-      [];
+    for (const row of collectObjects(file.data)) {
+      const ngayYl = row.NGAY_YL ?? row.NGAY_CHI_DINH;
 
+      const ngayThYl = row.NGAY_TH_YL ?? row.NGAY_THUC_HIEN_YL ?? row.NGAY_THUC_HIEN;
 
-    const xml1 =
-      (
-        medicalCase.files ??
-        []
-      ).find(
-        (
-          file: any
-        ) =>
-          String(
-            file.type ??
-            ""
-          ).toUpperCase() ===
-          "XML1"
-      );
+      if (!text(ngayYl) || !text(ngayThYl)) {
+        continue;
+      }
 
+      const itemName =
+        text(row.TEN_DICH_VU) ||
+        text(row.TEN_THUOC) ||
+        text(row.MA_DICH_VU) ||
+        text(row.MA_THUOC) ||
+        "Y lệnh";
 
-    // ========================================
-    // XML1
-    // ========================================
+      const orderTime = parseBhytTime(ngayYl);
+      const performTime = parseBhytTime(ngayThYl);
+
+      if (!orderTime || !performTime) {
+        errors.push({
+          code: "INVALID_ORDER_TIME",
+          message: `${itemName}: thời gian y lệnh hoặc ` + "thời gian thực hiện không hợp lệ.",
+        });
+        continue;
+      }
+
+      if (performTime.getTime() < orderTime.getTime()) {
+        errors.push({
+          code: "PERFORM_BEFORE_ORDER",
+          message:
+            `${itemName}: thời gian thực hiện ` +
+            `${formatTime(ngayThYl)} trước thời gian y lệnh ` +
+            `${formatTime(ngayYl)}.`,
+        });
+      }
+    }
+  }
+
+  return errors;
+}
+
+export function validateImportFile(parsed: unknown) {
+  const source = object(parsed);
+  const cases = Array.isArray(source.cases) ? source.cases : [];
+
+  const results: ImportCaseValidation[] = [];
+
+  for (let index = 0; index < cases.length; index++) {
+    const medicalCase = object(cases[index]);
+
+    const files = Array.isArray(medicalCase.files)
+      ? medicalCase.files.map((file) => object(file))
+      : [];
+
+    const errors: ImportValidationError[] = [];
+
+    const xml1Files = files.filter((file) => text(file.type).toUpperCase() === "XML1");
+
+    const xml1 = xml1Files[0];
+    const xml1Data = object(xml1?.data);
+    const rawTongHop = xml1Data.TONG_HOP;
+    const tongHop = object(rawTongHop);
 
     if (!xml1) {
-
       errors.push({
-        code:
-          "MISSING_XML1",
-
-        message:
-          "Hồ sơ không có XML1.",
+        code: "MISSING_XML1",
+        message: "Hồ sơ không có XML1.",
       });
-    }
-
-
-    const tongHop =
-      xml1?.data
-        ?.TONG_HOP ??
-      {};
-
-
-    const maLk =
-      tongHop.MA_LK ??
-      medicalCase.maLk ??
-      null;
-
-
-    const maBn =
-      tongHop.MA_BN ??
-      medicalCase.maBn ??
-      null;
-
-
-    const hoTen =
-      tongHop.HO_TEN ??
-      medicalCase.hoTen ??
-      null;
-
-
-    // ========================================
-    // MA_LK
-    // ========================================
-
-    if (
-      !String(
-        maLk ??
-        ""
-      ).trim()
+    } else if (
+      rawTongHop === null ||
+      typeof rawTongHop !== "object" ||
+      (Array.isArray(rawTongHop) &&
+        (rawTongHop.length !== 1 ||
+          rawTongHop[0] === null ||
+          typeof rawTongHop[0] !== "object" ||
+          Array.isArray(rawTongHop[0])))
     ) {
-
       errors.push({
-        code:
-          "MISSING_MA_LK",
+        code: "INVALID_XML1_TONG_HOP",
+        message: "XML1: Không tìm thấy một phần dữ liệu TONG_HOP hợp lệ.",
+      });
+    } else {
+      errors.push(...checkXml1Fields(tongHop), ...checkXml1Dates(tongHop));
+    }
 
-        message:
-          "Thiếu mã liên kết MA_LK.",
+    if (xml1Files.length > 1) {
+      errors.push({
+        code: "DUPLICATE_XML1",
+        message: "Hồ sơ có nhiều hơn một XML1.",
       });
     }
 
+    errors.push(...checkOrderTimes(files));
 
-    // ========================================
-    // NGÀY VÀO / NGÀY RA
-    // ========================================
+    // Fallback chỉ phục vụ hiển thị.
+    // Kiểm tra trường bắt buộc luôn đọc trực tiếp XML1,
+    // không lấy dữ liệu fallback để bỏ qua lỗi thiếu trường.
+    const maLk = text(tongHop.MA_LK) || text(medicalCase.maLk) || null;
 
-    const ngayVao =
-      tongHop.NGAY_VAO ??
-      medicalCase.ngayVao;
+    const maBn = text(tongHop.MA_BN) || text(medicalCase.maBn) || null;
 
+    const hoTen = text(tongHop.HO_TEN) || text(medicalCase.hoTen) || null;
 
-    const ngayRa =
-      tongHop.NGAY_RA ??
-      medicalCase.ngayRa;
+    const ngayVao = text(tongHop.NGAY_VAO) || text(medicalCase.ngayVao) || null;
 
+    const ngayRa = text(tongHop.NGAY_RA) || text(medicalCase.ngayRa) || null;
 
-    const start =
-      ngayVao
-        ? parseBhytTime(
-            ngayVao
-          )
-        : null;
-
-
-    const end =
-      ngayRa
-        ? parseBhytTime(
-            ngayRa
-          )
-        : null;
-
-
-    if (
-      ngayVao &&
-      !start
-    ) {
-
-      errors.push({
-        code:
-          "INVALID_NGAY_VAO",
-
-        message:
-          "NGAY_VAO không đúng định dạng.",
-      });
-    }
-
-
-    if (
-      ngayRa &&
-      !end
-    ) {
-
-      errors.push({
-        code:
-          "INVALID_NGAY_RA",
-
-        message:
-          "NGAY_RA không đúng định dạng.",
-      });
-    }
-
-
-    if (
-      start &&
-      end &&
-      end.getTime() <
-        start.getTime()
-    ) {
-
-      errors.push({
-        code:
-          "INVALID_VISIT_TIME",
-
-        message:
-          "Thời gian ra viện nhỏ hơn thời gian vào viện.",
-      });
-    }
-
-
-    // ========================================
-    // Y LỆNH
-    // ========================================
-
-    errors.push(
-      ...checkOrderTimes(
-        medicalCase
-      )
-    );
-
+    const tongChi =
+      text(tongHop.T_TONGCHI_BV) || text(tongHop.T_TONGCHI) || text(medicalCase.tongChi) || null;
 
     results.push({
-      index:
-        medicalCase.index ??
-        index + 1,
-
-      maLk:
-        maLk
-          ? String(
-              maLk
-            )
-          : null,
-
-      maBn:
-        maBn
-          ? String(
-              maBn
-            )
-          : null,
-
-      hoTen:
-        hoTen
-          ? String(
-              hoTen
-            )
-          : null,
-
-      valid:
-        errors.length ===
-        0,
-
+      index: index + 1,
+      maLk,
+      maBn,
+      hoTen,
+      ngayVao,
+      ngayRa,
+      tongChi,
+      xmlTypes: [...new Set(files.map((file) => text(file.type).toUpperCase()).filter(Boolean))],
+      valid: errors.length === 0,
       errors,
     });
   }
 
-
-  const invalidCases =
-    results.filter(
-      (
-        item
-      ) =>
-        !item.valid
-    );
-
-
-  const validCases =
-    results.filter(
-      (
-        item
-      ) =>
-        item.valid
-    );
-
+  const invalid = results.filter((item) => !item.valid).length;
 
   return {
-
-    // ========================================
-    // QUAN TRỌNG NHẤT
-    //
-    // Chỉ cần một ca lỗi:
-    // canImport = false
-    // ========================================
-
-    canImport:
-      invalidCases.length ===
-      0,
-
-
+    // File không có hồ sơ cũng không được import.
+    canImport: results.length > 0 && invalid === 0,
     summary: {
-
-      total:
-        results.length,
-
-      valid:
-        validCases.length,
-
-      invalid:
-        invalidCases.length,
+      total: results.length,
+      valid: results.length - invalid,
+      invalid,
     },
-
-
-    cases:
-      results,
+    cases: results,
   };
 }
