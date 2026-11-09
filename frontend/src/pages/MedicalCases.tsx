@@ -1093,11 +1093,11 @@ export default function MedicalCases() {
   // ====================================================
 
   return (
-    <div style={pageStyle}>
+    <div className="medguard-medical-cases-page" style={pageStyle}>
+      {" "}
       {/* ==================================================
           HEADER
       ================================================== */}
-
       <div
         style={{
           flexShrink: 0,
@@ -1146,11 +1146,9 @@ export default function MedicalCases() {
           Theo dõi và kiểm tra dữ liệu hồ sơ khám chữa bệnh BHYT
         </Typography.Text>
       </div>
-
       {/* ==================================================
           THỐNG KÊ
       ================================================== */}
-
       <div
         className="medguard-stat-grid"
         style={{
@@ -1323,15 +1321,12 @@ export default function MedicalCases() {
           </div>
         </Card>
       </div>
-
       {/* ==================================================
           FILTER
       ================================================== */}
-
       {/* ==================================================
     MEDGUARD - MODERN FILTER PANEL
 ================================================== */}
-
       <Card
         className="medguard-filter-panel"
         style={{
@@ -1664,11 +1659,9 @@ export default function MedicalCases() {
           </div>
         )}
       </Card>
-
       {/* ==================================================
           TABLE
       ================================================== */}
-
       <div
         ref={tableAreaRef}
         style={{
@@ -2048,11 +2041,9 @@ export default function MedicalCases() {
           </div>
         </Card>
       </div>
-
       {/* ==================================================
           STYLE
       ================================================== */}
-
       <style>
         {`
 
@@ -2988,13 +2979,207 @@ export default function MedicalCases() {
     transform: translateY(0);
   }
 }
+  /* ==========================================
+   DANH SÁCH HỒ SƠ: ƯU TIÊN CHIỀU CAO BẢNG
+========================================== */
+
+.medguard-medical-cases-page {
+  gap: 6px !important;
+  min-width: 0;
+}
+
+/* Tiêu đề trang */
+.medguard-medical-cases-page > div:first-child .ant-typography {
+  margin-bottom: 0 !important;
+}
+
+.medguard-medical-cases-page > div:first-child h3 {
+  font-size: 19px !important;
+}
+
+/* Bỏ dòng mô tả phụ để tiết kiệm chiều cao */
+.medguard-medical-cases-page > div:first-child > span.ant-typography {
+  display: none !important;
+}
+
+/* 4 ô thống kê trên cùng một hàng */
+.medguard-medical-cases-page .medguard-stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+.medguard-medical-cases-page .medguard-stat-grid > .ant-card {
+  min-width: 0;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+.medguard-medical-cases-page .medguard-stat-grid .ant-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 7px 10px !important;
+}
+
+.medguard-medical-cases-page .medguard-stat-grid .ant-card-body > .ant-typography {
+  font-size: 11px !important;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.medguard-medical-cases-page .medguard-stat-grid .ant-card-body > div {
+  margin-top: 0 !important;
+  font-size: 16px !important;
+  line-height: 1.3 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bộ lọc */
+.medguard-medical-cases-page .medguard-filter-panel {
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.medguard-medical-cases-page .medguard-filter-panel > .ant-card-body {
+  padding: 7px 10px !important;
+}
+
+/* Thu gọn tiêu đề bộ lọc */
+.medguard-medical-cases-page .medguard-filter-panel > .ant-card-body > div:first-child {
+  margin-bottom: 5px !important;
+}
+
+.medguard-medical-cases-page .medguard-filter-panel > .ant-card-body > div:first-child .ant-typography-secondary {
+  display: none !important;
+}
+
+/* Giữ 5 trường trên một hàng ở màn hình laptop */
+.medguard-medical-cases-page .medguard-filter-grid {
+  grid-template-columns:
+    minmax(105px, 0.85fr)
+    minmax(125px, 1fr)
+    minmax(155px, 1.3fr)
+    minmax(125px, 1fr)
+    minmax(100px, 0.8fr) !important;
+  gap: 7px !important;
+}
+
+.medguard-medical-cases-page .medguard-filter-label {
+  margin-bottom: 3px !important;
+  font-size: 11px !important;
+}
+
+.medguard-medical-cases-page .medguard-filter-actions-row {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  gap: 8px !important;
+}
+
+.medguard-medical-cases-page .medguard-filter-date-fields {
+  grid-template-columns: 90px 115px 160px;
+  gap: 7px !important;
+}
+
+.medguard-medical-cases-page .medguard-filter-buttons {
+  gap: 7px;
+}
+
+.medguard-medical-cases-page .medguard-filter-active {
+  margin-top: 5px !important;
+  padding: 3px 8px !important;
+  gap: 6px;
+  font-size: 11px !important;
+}
+
+/* Thanh tiêu đề bảng */
+.medguard-medical-cases-page .medguard-case-table-header {
+  min-height: 32px;
+  padding: 5px 10px !important;
+  gap: 8px;
+}
+
+.medguard-medical-cases-page .medguard-case-table-header > .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Giữ chữ trong bảng dễ đọc */
+.medguard-medical-cases-page .medguard-case-table-fixed .ant-table-thead > tr > th {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  font-size: 13px;
+}
+
+.medguard-medical-cases-page .medguard-case-table-fixed .ant-table-tbody > tr > td {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  font-size: 13px;
+}
+
+/* Phân trang gọn hơn, luôn ở ngoài vùng cuộn */
+.medguard-medical-cases-page .medguard-case-pagination-footer {
+  min-height: 42px !important;
+  padding: 5px 10px !important;
+}
+
+.medguard-medical-cases-page .medguard-case-pagination-footer .ant-pagination {
+  margin: 0 !important;
+}
+
+/* Màn hình hẹp */
+@media (max-width: 1050px) {
+  .medguard-medical-cases-page .medguard-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .medguard-medical-cases-page .medguard-filter-actions-row {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .medguard-medical-cases-page {
+    overflow-y: auto !important;
+  }
+
+  .medguard-medical-cases-page .medguard-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .medguard-medical-cases-page .medguard-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .medguard-medical-cases-page .medguard-filter-date-fields {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .medguard-medical-cases-page .medguard-filter-buttons {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .medguard-medical-cases-page .medguard-filter-buttons .ant-btn {
+    width: auto;
+  }
+
+  .medguard-medical-cases-page > div:has(> .ant-card .medguard-case-table-content) {
+    flex: 1 0 320px !important;
+    min-height: 320px !important;
+  }
+}
 
 
 
 
         `}
       </style>
-
       {/* ==================================================
           MODAL CHI TIẾT
       ================================================== */}
@@ -3003,7 +3188,6 @@ export default function MedicalCases() {
         caseId={xmlDetailCase?.id ?? null}
         onClose={() => setXmlDetailCase(null)}
       />
-
       <CaseCheckResultsModal
         open={resultCase !== null}
         caseId={resultCase?.id ?? null}
@@ -3012,11 +3196,9 @@ export default function MedicalCases() {
         treatmentGroup={resultCase?.treatment_group}
         onClose={closeCaseResults}
       />
-
       {/* ==================================================
           OVERLAY CHECKING
       ================================================== */}
-
       {checking && (
         <div className="medguard-checking-screen">
           <div className="medguard-checking-card">
