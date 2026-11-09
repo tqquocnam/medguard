@@ -286,16 +286,74 @@ function checkXml1Fields(tongHop: Row): ImportValidationError[] {
 
   return errors;
 }
+// NGAY_SINH được phép chỉ biết năm hoặc biết năm + tháng.
+// Ví dụ:
+// 196300000000 -> chỉ biết năm 1963.
+// 196305000000 -> biết tháng 05/1963.
+// 196305210000 -> biết ngày 21/05/1963.
+//
+// Không thay đổi cách kiểm tra ngày vào, ngày ra, y lệnh.
+function isValidBirthDate(value: unknown): boolean {
+  const raw = text(value);
+
+  if (!/^(?:\d{4}|\d{8}|\d{12}|\d{14})$/.test(raw)) {
+    return false;
+  }
+
+  const year = Number(raw.slice(0, 4));
+
+  if (year < 1900 || year > new Date().getUTCFullYear()) {
+    return false;
+  }
+
+  // Chỉ có năm.
+  if (raw.length === 4) return true;
+
+  const month = Number(raw.slice(4, 6));
+  const day = Number(raw.slice(6, 8));
+  const timePart = raw.slice(8);
+
+  // Không biết tháng/ngày: phần còn lại phải bằng 0.
+  if (month === 0 && day === 0) {
+    return /^0*$/.test(timePart);
+  }
+
+  // Không thể biết ngày khi không biết tháng.
+  if (month < 1 || month > 12) {
+    return false;
+  }
+
+  // Biết năm + tháng, chưa biết ngày.
+  if (day === 0) {
+    return /^0*$/.test(timePart);
+  }
+
+  // Có đầy đủ ngày/tháng/năm thì kiểm tra ngày thực tế.
+  return parseBhytTime(raw) !== null;
+}
 
 function checkXml1Dates(tongHop: Row): ImportValidationError[] {
   const errors: ImportValidationError[] = [];
 
-  const fields = ["NGAY_SINH", "GT_THE_TU", "GT_THE_DEN", "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN"];
+  const birthDate = text(tongHop.NGAY_SINH);
+
+  // Thiếu/trống đã được báo tại checkXml1Fields().
+  if (birthDate && !isValidBirthDate(birthDate)) {
+    errors.push({
+      code: "INVALID_NGAY_SINH",
+      message:
+        `XML1: NGAY_SINH "${birthDate}" không hợp lệ. ` +
+        "Cho phép chỉ có năm sinh, năm/tháng sinh hoặc ngày sinh đầy đủ; " +
+        "phần tháng/ngày chưa biết được ghi bằng 00.",
+    });
+  }
+
+  // Các ngày này vẫn phải là ngày thực tế hợp lệ.
+  const fields = ["GT_THE_TU", "GT_THE_DEN", "NGAY_VAO", "NGAY_RA", "NGAY_TTOAN"];
 
   for (const field of fields) {
     const value = text(tongHop[field]);
 
-    // Trường trống đã được báo trong checkXml1Fields.
     if (value && !parseBhytTime(value)) {
       errors.push({
         code: `INVALID_${field}`,
