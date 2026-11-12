@@ -37,6 +37,9 @@ function formatActivityName(activityType: string, itemName: string | null): stri
     case "SERVICE_ORDER":
       return `Thời gian y lệnh ${name}`;
 
+    case "ULTRASOUND_EXECUTION":
+      return `Thời gian thực hiện ${name}`;
+
     case "ECG_RESULT_DOCTOR_EXAM":
       return `Thời gian đọc kết quả ${name}`;
 
@@ -425,6 +428,43 @@ export const staffTimeOverlapRule: RuleValidator = {
 
           UNION ALL
 
+          -- D2. Siêu âm:
+          -- khoảng thực hiện gắn với NGUOI_THUC_HIEN.
+          SELECT
+            e.id AS event_id,
+            e.medical_case_id,
+
+            NULLIF(
+              TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'),
+              ''
+            ) AS staff_code,
+
+            'ULTRASOUND_EXECUTION' AS activity_type,
+            e.item_code,
+            e.item_name,
+            e.execution_start AS activity_start,
+            e.execution_end AS activity_end
+
+          FROM event_times e
+
+          WHERE UPPER(COALESCE(e.event_type, ''))
+                IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
+
+            AND LOWER(
+              COALESCE(e.item_name, '')
+            ) LIKE '%siêu âm%'
+
+            AND NULLIF(
+              TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'),
+              ''
+            ) IS NOT NULL
+
+            AND e.execution_start IS NOT NULL
+            AND e.execution_end IS NOT NULL
+            AND e.execution_end > e.execution_start
+
+          UNION ALL
+
           -- E. Đọc kết quả điện tim:
           -- lấy MA_BS_DOC_KQ từ XML4.
           --
@@ -547,6 +587,14 @@ export const staffTimeOverlapRule: RuleValidator = {
               AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
             )
 
+            -- Quy lỗi cho y lệnh CLS trùng khoảng siêu âm của cùng nhân sự.
+            AND (
+              (a.activity_type <> 'ULTRASOUND_EXECUTION'
+               AND b.activity_type <> 'ULTRASOUND_EXECUTION')
+              OR (a.activity_type = 'SERVICE_ORDER'
+                  AND b.activity_type = 'ULTRASOUND_EXECUTION')
+            )
+
             -- Nội soi chỉ đối chiếu với công khám và thuốc.
             AND (
               (
@@ -570,11 +618,13 @@ export const staffTimeOverlapRule: RuleValidator = {
               (
                 a.activity_type NOT IN (
                   'SERVICE_EXECUTION',
+                  'ULTRASOUND_EXECUTION',
                   'ECG_RESULT_DOCTOR_EXAM'
                 )
 
                 AND b.activity_type NOT IN (
                   'SERVICE_EXECUTION',
+                  'ULTRASOUND_EXECUTION',
                   'ECG_RESULT_DOCTOR_EXAM'
                 )
 
@@ -628,6 +678,15 @@ export const staffTimeOverlapRule: RuleValidator = {
                     AND a.activity_start = b.activity_start
                   )
                 )
+              )
+
+              OR
+
+              -- Y lệnh CLS trong khoảng thực hiện siêu âm, gồm hai đầu mút.
+              (
+                a.activity_type = 'SERVICE_ORDER'
+                AND b.activity_type = 'ULTRASOUND_EXECUTION'
+                AND a.activity_start BETWEEN b.activity_start AND b.activity_end
               )
 
               OR

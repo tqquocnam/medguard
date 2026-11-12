@@ -1,4 +1,5 @@
 import type { RuleValidator } from "./rule.types.js";
+import { serviceOrderBeforeExamRule } from "./rules/service-order-before-exam.rule.js";
 
 import { icdRequiredRule } from "./rules/icd-required.rule.js";
 
@@ -107,6 +108,7 @@ import { outpatientExamAdmissionTimeRule } from "./rules/outpatient-exam-admissi
 import { sameCaseExamClsOverlapRule } from "./rules/same-case-exam-cls-overlap.rule.js";
 
 export const ruleRegistry: Record<string, RuleValidator> = {
+  SERVICE_ORDER_BEFORE_EXAM: serviceOrderBeforeExamRule,
   ICD_REQUIRED: icdRequiredRule,
 
   VISIT_TIME_VALID: visitTimeRule,
