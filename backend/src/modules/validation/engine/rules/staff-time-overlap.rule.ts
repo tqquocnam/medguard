@@ -40,6 +40,7 @@ function formatActivityName(activityType: string, itemName: string | null): stri
     case "ULTRASOUND_EXECUTION":
       return `Thời gian thực hiện ${name}`;
 
+    case "XRAY_RESULT":
     case "ECG_RESULT_DOCTOR_EXAM":
       return `Thời gian đọc kết quả ${name}`;
 
@@ -516,6 +517,60 @@ export const staffTimeOverlapRule: RuleValidator = {
             ) LIKE '%điện tim%'
 
             AND e.execution_end IS NOT NULL
+
+          UNION ALL
+
+          -- F. Đọc kết quả X-quang:
+          -- lấy MA_BS_DOC_KQ từ XML4.
+          --
+          -- Ghép bằng:
+          -- cùng hồ sơ + MA_DICH_VU + NGAY_KQ.
+          --
+          -- Không dùng STT để ghép XML3 với XML4.
+          -- Không fallback sang bác sĩ chỉ định
+          -- hoặc người thực hiện.
+          SELECT
+            e.id AS event_id,
+            e.medical_case_id,
+            reader.staff_code,
+            'XRAY_RESULT' AS activity_type,
+            e.item_code,
+            e.item_name,
+            e.execution_end AS activity_start,
+            e.execution_end AS activity_end
+
+          FROM event_times e
+
+          INNER JOIN xml4_result_readers reader
+            ON reader.medical_case_id = e.medical_case_id
+
+           AND reader.service_code = NULLIF(
+             TRIM(e.raw_data ->> 'MA_DICH_VU'),
+             ''
+           )
+
+           AND reader.result_time_key = CASE
+             WHEN TRIM(
+               COALESCE(e.raw_data ->> 'NGAY_KQ', '')
+             ) ~ '^[0-9]{12}([0-9]{2})?$'
+
+             THEN RPAD(
+               TRIM(e.raw_data ->> 'NGAY_KQ'),
+               14,
+               '0'
+             )
+
+             ELSE NULL
+           END
+
+          WHERE UPPER(COALESCE(e.event_type, ''))
+                IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
+
+            AND LOWER(
+              COALESCE(e.item_name, '')
+            ) LIKE '%x-quang%'
+
+            AND e.execution_end IS NOT NULL
         ),
 
         source_activity AS (
@@ -591,7 +646,14 @@ export const staffTimeOverlapRule: RuleValidator = {
             AND (
               (a.activity_type <> 'ULTRASOUND_EXECUTION'
                AND b.activity_type <> 'ULTRASOUND_EXECUTION')
-              OR (a.activity_type = 'SERVICE_ORDER'
+              OR (a.activity_type IN ('SERVICE_ORDER', 'XRAY_RESULT')
+                  AND b.activity_type = 'ULTRASOUND_EXECUTION')
+            )
+
+            -- X-quang chỉ quy lỗi cho giờ đọc kết quả trùng khoảng siêu âm.
+            AND (
+              (a.activity_type <> 'XRAY_RESULT' AND b.activity_type <> 'XRAY_RESULT')
+              OR (a.activity_type = 'XRAY_RESULT'
                   AND b.activity_type = 'ULTRASOUND_EXECUTION')
             )
 
@@ -682,9 +744,9 @@ export const staffTimeOverlapRule: RuleValidator = {
 
               OR
 
-              -- Y lệnh CLS trong khoảng thực hiện siêu âm, gồm hai đầu mút.
+              -- Y lệnh CLS hoặc đọc kết quả X-quang trong khoảng siêu âm, gồm hai đầu mút.
               (
-                a.activity_type = 'SERVICE_ORDER'
+                a.activity_type IN ('SERVICE_ORDER', 'XRAY_RESULT')
                 AND b.activity_type = 'ULTRASOUND_EXECUTION'
                 AND a.activity_start BETWEEN b.activity_start AND b.activity_end
               )
