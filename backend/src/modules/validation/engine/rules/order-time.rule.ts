@@ -1,3 +1,5 @@
+import { serviceOrderBeforeExamViolations } from "./service-order-before-exam.helper.js";
+
 import type {
   RuleValidator,
 } from "../rule.types.js";
@@ -15,7 +17,8 @@ export const orderTimeRule:
     context,
     rule
   ) {
-    const violations: any[] = [];
+    const examViolations = serviceOrderBeforeExamViolations(context);
+    const violations: any[] = [...examViolations];
 
     let checkedEvents = 0;
 
@@ -182,10 +185,11 @@ export const orderTimeRule:
         ruleCode: rule.code,
 
         status: "FAIL",
-        severity: rule.severity,
+        severity: examViolations.length > 0 ? "ERROR" : rule.severity,
+        issueCount: violations.length,
 
         message:
-          `Có ${violations.length} hoạt động sai logic thời gian y lệnh/thực hiện/kết quả.`,
+          `Có ${violations.length} hoạt động sai logic thời gian công khám/y lệnh/thực hiện/kết quả.`,
 
         details: {
           violations,
