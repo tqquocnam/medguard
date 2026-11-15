@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import XmlImport from "./pages/XmlImport";
 import MedicalCases from "./pages/MedicalCases";
+import PaperReview from "./pages/PaperReview";
 import Checks from "./pages/Checks";
 import Doctors from "./pages/Doctors";
 import Catalog from "./pages/Catalog";
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/dashboard" element={<Navigate to="/" replace />} />
           <Route path="/xml-import" element={<XmlImport />} />
           <Route path="/medical-cases" element={<MedicalCases />} />
+          <Route path="/paper-review" element={<PaperReview />} />
           <Route path="/checks" element={<Checks />} />
           <Route path="/schedule" element={<StaffSchedules />} />
           <Route path="/doctors" element={<Doctors />} />

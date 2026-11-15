@@ -18,3 +18,5 @@ backend/.env
 .DS_Store
 Thumbs.db
 *.log
+# Patient scans and OCR work files
+backend/data/
