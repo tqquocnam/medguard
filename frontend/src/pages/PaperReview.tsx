@@ -55,6 +55,7 @@ type Page = {
   note: string;
   version: number;
   confidence: number;
+  ai_processed?: boolean;
 };
 type Finding = {
   code: string;
@@ -73,7 +74,14 @@ type Batch = {
 };
 type FileRow = { id: string; original_name: string; status: string; error: string | null };
 type BatchData = { batch: Batch; files: FileRow[]; pages: Page[]; findings: Finding[] };
+type AiObservation = { value: string; status: "PRESENT" | "MISSING" | "UNCLEAR"; evidence: string };
 type Ocr = {
+  ai?: {
+    provider: string;
+    model: string;
+    observations: Record<keyof Fields, AiObservation>;
+    issues: string[];
+  };
   text: string;
   width: number;
   height: number;
@@ -149,9 +157,21 @@ function PaperReviewScreen() {
   const [batches, setBatches] = useState<Batch[]>([]),
     [batchId, setBatchId] = useState(""),
     [data, setData] = useState<BatchData | null>(null);
-  const [cap, setCap] = useState<{ ready: boolean; message: string } | null>(null),
+  const [cap, setCap] = useState<{
+      ready: boolean;
+      message: string;
+      reader?: string;
+      model?: string;
+      dailyLimit?: number;
+    } | null>(null),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
+  const [aiUsage, setAiUsage] = useState<{
+    requests: number;
+    daily_limit: number;
+    input_tokens: number;
+    output_tokens: number;
+  } | null>(null);
   const [uploadBatchId, setUploadBatchId] = useState("");
   const [createOpen, setCreateOpen] = useState(false),
     [batchName, setBatchName] = useState(""),
@@ -184,9 +204,13 @@ function PaperReviewScreen() {
       if (!batchId) return;
       const r = await api.get<BatchData>(`/paper-review/batches/${batchId}`, { signal });
       setData(r.data);
+      if (cap?.reader === "openai") {
+        const usage = await api.get("/paper-review/ai-usage", { signal });
+        setAiUsage(usage.data);
+      }
       setError("");
     },
-    [batchId],
+    [batchId, cap?.reader],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -449,8 +473,16 @@ function PaperReviewScreen() {
         className="pr-info"
         type="info"
         showIcon
-        title="Phạm vi bản đầu: thông tin bệnh nhân và ICD"
-        description="Ảnh đọc được cần xác nhận trước khi kết luận lỗi. Chưa đối chiếu thuốc, dịch vụ, chữ ký hay XML. Mỗi ảnh chỉ nên có một mặt giấy; trang ký cần ghép thủ công với đúng lượt khám."
+        title={
+          cap?.reader === "openai"
+            ? "AI tự đọc, ghép lượt và kiểm tra thông tin / ICD"
+            : "Phạm vi bản đầu: thông tin bệnh nhân và ICD"
+        }
+        description={
+          cap?.reader === "openai"
+            ? "AI đọc ảnh qua OpenAI API (có phí). Trang đủ dấu hiệu sẽ tự chạy rule; bạn chỉ cần xem các lỗi và chỗ không chắc. Chưa đối chiếu thuốc, dịch vụ, chữ ký hay XML. Kết quả AI có thể sai."
+            : "Ảnh đọc được cần xác nhận trước khi kết luận lỗi. Chưa đối chiếu thuốc, dịch vụ, chữ ký hay XML. Mỗi ảnh chỉ nên có một mặt giấy; trang ký cần ghép thủ công với đúng lượt khám."
+        }
       />
       <Card size="small">
         <div className="pr-toolbar">
@@ -499,6 +531,38 @@ function PaperReviewScreen() {
               Ghép gợi ý
             </Button>
           </Popconfirm>
+          {cap?.reader === "openai" && (
+            <Popconfirm
+              title="Đọc lại các trang chưa sửa bằng OpenAI API?"
+              description="Ảnh được gửi đến OpenAI và tính phí theo API. Trang đã được người dùng sửa/xác nhận sẽ giữ nguyên."
+              onConfirm={async () => {
+                try {
+                  const r = await api.post(`/paper-review/batches/${batchId}/read-ai`);
+                  await refresh();
+                  message.success(`Đã đưa ${r.data.queued} file vào hàng đợi AI.`);
+                } catch (e) {
+                  message.error(errorText(e));
+                }
+              }}
+            >
+              <Button
+                disabled={
+                  !batchId ||
+                  !cap.ready ||
+                  uploading ||
+                  fileRows.some((f) => f.status === "PROCESSING")
+                }
+              >
+                Đọc lại bằng AI
+              </Button>
+            </Popconfirm>
+          )}
+          {cap?.reader === "openai" && aiUsage && (
+            <Text type="secondary">
+              API hôm nay: {aiUsage.requests}/{aiUsage.daily_limit} lượt ·{" "}
+              {aiUsage.input_tokens + aiUsage.output_tokens} token đã ghi nhận
+            </Text>
+          )}
           <Button
             icon={<DownloadOutlined />}
             disabled={!pages.length}
@@ -696,7 +760,11 @@ function PaperReviewScreen() {
                     </Tag>
                     <br />
                     <Text type="secondary">
-                      {p.confirmed ? "Đã xác nhận OCR" : "Chưa xác nhận OCR"}
+                      {p.confirmed
+                        ? "Người dùng đã xác nhận"
+                        : p.ai_processed
+                          ? "AI đã đọc tự động"
+                          : "Chưa xác nhận OCR"}
                     </Text>
                   </>
                 );
@@ -785,6 +853,13 @@ function PaperReviewScreen() {
               }}
             />
           </label>
+          {cap?.reader === "openai" && (
+            <Alert
+              type="info"
+              title="Ảnh/PDF được đọc qua OpenAI API"
+              description="Các trang ảnh sẽ được gửi đến OpenAI để trích xuất và có tính phí API. Khóa API chỉ được lưu ở backend."
+            />
+          )}
           <Text>{files.length} file đã chọn</Text>
           <div className="pr-file-list">
             {files.map((f, i) => (
@@ -863,8 +938,9 @@ function PaperReviewScreen() {
             <div className="pr-image-pane">
               <div className="pr-toolbar">
                 <Text>
-                  Ảnh đối chiếu · điểm OCR {Math.round(ocr.confidence)}/100 (không phải xác suất
-                  đúng)
+                  {ocr.ai
+                    ? `AI: ${ocr.ai.model} · không có điểm độ chính xác đã kiểm chứng`
+                    : `Ảnh đối chiếu · điểm OCR ${Math.round(ocr.confidence)}/100 (không phải xác suất đúng)`}
                 </Text>
                 <Button size="small" onClick={() => setZoom((z) => Math.max(100, z - 25))}>
                   −
@@ -905,8 +981,16 @@ function PaperReviewScreen() {
             <div className="pr-form-pane">
               <Alert
                 type="warning"
-                title="Đối chiếu với ảnh trước khi xác nhận"
-                description="Thông tin bên dưới là gợi ý OCR. Để trống nếu giấy không có thông tin; sửa OCR không làm thay đổi bản giấy."
+                title={
+                  ocr.ai
+                    ? "AI đã trích xuất — chỉ xem lại các chỗ cần xử lý"
+                    : "Đối chiếu với ảnh trước khi xác nhận"
+                }
+                description={
+                  ocr.ai
+                    ? "Không cần xác nhận thủ công từng trang khi AI đủ dấu hiệu để chạy rule. Nếu sửa dữ liệu, hãy đối chiếu lại với giấy gốc; kết quả AI có thể sai."
+                    : "Thông tin bên dưới là gợi ý OCR. Để trống nếu giấy không có thông tin; sửa OCR không làm thay đổi bản giấy."
+                }
               />
               <div className="pr-findings">
                 {editingFindings.map((f, i) => (
@@ -920,64 +1004,93 @@ function PaperReviewScreen() {
                   </button>
                 ))}
               </div>
-              <Form form={form} layout="vertical">
-                <div className="pr-field-grid">
-                  <Form.Item name="document_type" label="Loại giấy">
-                    <Select options={types} />
-                  </Form.Item>
-                  <Form.Item name="case_key" label="Nhóm lượt khám">
-                    <Input maxLength={100} placeholder="Dùng cùng mã cho các trang cùng lượt" />
-                  </Form.Item>
-                  {(Object.keys(fieldLabels) as (keyof Fields)[]).map((key) => (
-                    <Form.Item
-                      key={key}
-                      name={["fields", key]}
-                      label={fieldLabels[key]}
-                      className={key === "icd" ? "pr-wide" : ""}
-                    >
-                      {key === "gender" ? (
-                        <Select
-                          allowClear
-                          options={[
-                            { value: "NAM", label: "Nam" },
-                            { value: "NU", label: "Nữ" },
-                          ]}
-                          onChange={(v) => {
-                            if (!v) form.setFieldValue(["fields", key], "");
-                          }}
-                          onFocus={() => setHighlight(key)}
-                        />
-                      ) : key === "icd" ? (
-                        <Input.TextArea
-                          rows={2}
-                          maxLength={2000}
-                          onFocus={() => setHighlight(key)}
-                        />
-                      ) : (
-                        <Input maxLength={200} onFocus={() => setHighlight(key)} />
-                      )}
+              {ocr.ai && (
+                <details open className="pr-ai-evidence">
+                  <summary>Thông tin AI đọc từ ảnh</summary>
+                  <dl>
+                    {(Object.keys(fieldLabels) as (keyof Fields)[]).map((key) => (
+                      <div key={key}>
+                        <dt>{fieldLabels[key]}</dt>
+                        <dd>
+                          <strong>{ocr.ai!.observations[key]?.value || "—"}</strong>
+                          <br />
+                          <Text type="secondary">
+                            {ocr.ai!.observations[key]?.status === "MISSING"
+                              ? "Không có trên giấy"
+                              : ocr.ai!.observations[key]?.status === "UNCLEAR"
+                                ? "Chưa đọc chắc"
+                                : "Đọc được"}{" "}
+                            · {ocr.ai!.observations[key]?.evidence || "Không có trích đoạn"}
+                          </Text>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              )}
+              <details open={!ocr.ai}>
+                <summary>Sửa thông tin / xác nhận bổ sung (nếu cần)</summary>
+                <Form form={form} layout="vertical">
+                  <div className="pr-field-grid">
+                    <Form.Item name="document_type" label="Loại giấy">
+                      <Select options={types} />
                     </Form.Item>
-                  ))}
-                </div>
-                <Form.Item name="confirmed" valuePropName="checked">
-                  <Checkbox>
-                    Tôi đã đối chiếu nội dung, loại giấy và nhóm lượt khám với ảnh.
-                  </Checkbox>
-                </Form.Item>
-                <Form.Item name="review_status" label="Trạng thái xử lý">
-                  <Select
-                    options={Object.entries(reviewLabels).map(([value, label]) => ({
-                      value,
-                      label,
-                    }))}
-                  />
-                </Form.Item>
-                <Form.Item name="note" label="Ghi chú">
-                  <Input.TextArea maxLength={2000} rows={2} />
-                </Form.Item>
-              </Form>
+                    <Form.Item name="case_key" label="Nhóm lượt khám">
+                      <Input maxLength={100} placeholder="Dùng cùng mã cho các trang cùng lượt" />
+                    </Form.Item>
+                    {(Object.keys(fieldLabels) as (keyof Fields)[]).map((key) => (
+                      <Form.Item
+                        key={key}
+                        name={["fields", key]}
+                        label={fieldLabels[key]}
+                        className={key === "icd" ? "pr-wide" : ""}
+                      >
+                        {key === "gender" ? (
+                          <Select
+                            allowClear
+                            options={[
+                              { value: "NAM", label: "Nam" },
+                              { value: "NU", label: "Nữ" },
+                            ]}
+                            onChange={(v) => {
+                              if (!v) form.setFieldValue(["fields", key], "");
+                            }}
+                            onFocus={() => setHighlight(key)}
+                          />
+                        ) : key === "icd" ? (
+                          <Input.TextArea
+                            rows={2}
+                            maxLength={2000}
+                            onFocus={() => setHighlight(key)}
+                          />
+                        ) : (
+                          <Input maxLength={200} onFocus={() => setHighlight(key)} />
+                        )}
+                      </Form.Item>
+                    ))}
+                  </div>
+                  <Form.Item name="confirmed" valuePropName="checked">
+                    <Checkbox>
+                      Tôi đã đối chiếu nội dung, loại giấy và nhóm lượt khám với ảnh.
+                    </Checkbox>
+                  </Form.Item>
+                  <Form.Item name="review_status" label="Trạng thái xử lý">
+                    <Select
+                      options={Object.entries(reviewLabels).map(([value, label]) => ({
+                        value,
+                        label,
+                      }))}
+                    />
+                  </Form.Item>
+                  <Form.Item name="note" label="Ghi chú">
+                    <Input.TextArea maxLength={2000} rows={2} />
+                  </Form.Item>
+                </Form>
+              </details>
               <details>
-                <summary>Văn bản OCR gốc</summary>
+                <summary>
+                  {ocr.ai ? "Trích đoạn AI dùng để đọc thông tin" : "Văn bản OCR gốc"}
+                </summary>
                 <pre className="pr-ocr-text">{ocr.text || "Không đọc được chữ."}</pre>
               </details>
             </div>

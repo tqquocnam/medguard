@@ -1,3 +1,4 @@
+import type { AiAnalysis } from "./review.ai.js";
 export type DocumentType = "STATEMENT" | "PRESCRIPTION" | "ORDER" | "CONTINUATION" | "UNKNOWN";
 export interface Fields {
   patientId: string;
@@ -18,6 +19,7 @@ export interface OcrLine {
   height: number;
 }
 export interface OcrResult {
+  ai?: AiAnalysis;
   text: string;
   confidence: number;
   width: number;
@@ -128,7 +130,47 @@ export function suggestedCaseKey(fields: Fields): string {
     ? `${fields.encounterId}@${fields.visitDate}`
     : "";
 }
+export function automationReasons(
+  ai: AiAnalysis,
+  fields: Fields,
+  documentType: DocumentType,
+  required: Rules = defaultRules,
+): string[] {
+  const reasons = [...ai.issues];
+  if (!fields.patientId || !fields.name)
+    reasons.push("Chưa đọc rõ mã bệnh nhân và họ tên để đối chiếu danh tính.");
+  if (
+    documentType !== ai.documentType ||
+    (Object.keys(fields) as (keyof Fields)[]).some((k) => fields[k] !== ai.fields[k])
+  )
+    return ["Nội dung đã thay đổi sau khi AI đọc; cần kiểm tra lại."];
+  if (documentType === "UNKNOWN" || documentType === "CONTINUATION")
+    reasons.push("Chưa đủ dấu hiệu tự xử lý loại trang này.");
+  const relevant: (keyof Fields)[] = ["patientId", "encounterId", "name", "visitDate"];
+  if (required.requiredBirthDate) relevant.push("birthDate");
+  if (required.requiredGender) relevant.push("gender");
+  if (required.requiredIcd && (documentType === "STATEMENT" || documentType === "PRESCRIPTION"))
+    relevant.push("icd");
+  if (required.requiredWeight) relevant.push("weight");
+  for (const k of relevant) {
+    const o = ai.observations[k];
+    if (!o || o.status === "UNCLEAR" || (o.status === "PRESENT" && !o.value))
+      reasons.push(`AI chưa đọc chắc trường ${k}.`);
+  }
+  if (!fields.encounterId || !validDate(fields.visitDate))
+    reasons.push("Chưa có mã lượt và ngày khám đủ rõ để tự ghép.");
+  return [...new Set(reasons)];
+}
+export function autoReviewReasons(page: ReviewPage, rules: Rules): string[] {
+  if (!page.ocr?.ai) return ["Chưa xác nhận nội dung đọc từ ảnh và loại giấy."];
+  const reasons = automationReasons(page.ocr.ai, page.fields, page.document_type, rules);
+  if (!page.case_key || page.case_key !== suggestedCaseKey(page.ocr.ai.fields))
+    reasons.push("Nhóm lượt khám chưa khớp dấu hiệu AI đọc được.");
+  return reasons;
+}
 export function checkPages(pages: ReviewPage[], rules: Rules): Finding[] {
+  const ready = (p: ReviewPage) =>
+    p.confirmed || (!!p.ocr?.ai && autoReviewReasons(p, rules).length === 0);
   const findings: Finding[] = [];
   const add = (
     code: string,
@@ -139,17 +181,19 @@ export function checkPages(pages: ReviewPage[], rules: Rules): Finding[] {
   ) => {
     findings.push({
       code,
-      severity: error && ps.every((p) => p.confirmed) ? "ERROR" : "REVIEW",
+      severity: error && ps.every(ready) ? "ERROR" : "REVIEW",
       message,
       pageIds: ps.map((p) => p.id),
       field,
     });
   };
   for (const p of pages) {
-    if (!p.confirmed)
+    if (!ready(p))
       add(
         "OCR_UNCONFIRMED",
-        "Chưa xác nhận nội dung đọc từ ảnh và loại giấy.",
+        p.ocr?.ai
+          ? autoReviewReasons(p, rules).join(" ")
+          : "Chưa xác nhận nội dung đọc từ ảnh và loại giấy.",
         [p],
         undefined,
         false,

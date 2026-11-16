@@ -1,3 +1,4 @@
+import { aiEnabled, aiConfigured, aiModel, aiDailyLimit, readWithAi } from "./review.ai.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, stat } from "node:fs/promises";
@@ -18,26 +19,63 @@ export async function command(bin: string, args: string[], timeout = 120000): Pr
   });
   return stdout;
 }
-let capabilityCache: { at: number; value: { ready: boolean; message: string } } | undefined;
-export async function capabilities() {
+interface Capabilities {
+  ready: boolean;
+  message: string;
+  reader: string;
+  model: string | null;
+  dailyLimit: number | null;
+}
+let capabilityCache: { at: number; value: Capabilities } | undefined;
+export async function capabilities(): Promise<Capabilities> {
   if (capabilityCache && Date.now() - capabilityCache.at < 30000) return capabilityCache.value;
-  let value;
+  const cloud = aiEnabled();
+  const base = {
+    reader: cloud ? "openai" : "tesseract",
+    model: cloud ? aiModel() : null,
+    dailyLimit: null as number | null,
+  };
+  if (cloud) {
+    try {
+      base.dailyLimit = aiDailyLimit();
+    } catch {
+      return {
+        ...base,
+        ready: false,
+        message: "PAPER_REVIEW_AI_DAILY_LIMIT phải là số nguyên từ 1 đến 10000.",
+      };
+    }
+  }
+  if (process.env.PAPER_REVIEW_ENABLED === "false")
+    return { ...base, ready: false, message: "Chức năng đang tắt trên máy chủ." };
+  if (cloud && !aiConfigured())
+    return {
+      ...base,
+      ready: false,
+      message: "Cần OPENAI_API_KEY trong backend/.env để đọc bằng AI.",
+    };
+  let value: Capabilities;
   try {
-    const langs = await command("tesseract", ["--list-langs"], 10000);
-    if (!/^vie\s*$/m.test(langs) || !/^eng\s*$/m.test(langs)) throw new Error("Missing language");
+    if (!cloud) {
+      const langs = await command("tesseract", ["--list-langs"], 10000);
+      if (!/^vie\s*$/m.test(langs) || !/^eng\s*$/m.test(langs)) throw new Error("Missing language");
+    }
     await command("pdfinfo", ["-v"], 10000);
     await command("pdftoppm", ["-v"], 10000);
     value = {
-      ready: process.env.PAPER_REVIEW_ENABLED !== "false",
-      message:
-        process.env.PAPER_REVIEW_ENABLED === "false"
-          ? "Chức năng đang tắt trên máy chủ."
-          : "OCR nội bộ sẵn sàng (Việt + Anh).",
+      ...base,
+      ready: true,
+      message: cloud
+        ? "AI qua OpenAI API đã cấu hình (chưa kiểm tra key/quota trực tuyến)."
+        : "OCR nội bộ sẵn sàng (Việt + Anh).",
     };
   } catch {
     value = {
+      ...base,
       ready: false,
-      message: "Máy chủ cần Tesseract (vie + eng) và Poppler. Xem docs/PAPER_REVIEW.md.",
+      message: cloud
+        ? "Máy chủ cần Poppler (pdfinfo, pdftoppm)."
+        : "Máy chủ cần Tesseract (vie + eng) và Poppler. Xem docs/PAPER_REVIEW.md.",
     };
   }
   capabilityCache = { at: Date.now(), value };
@@ -115,16 +153,20 @@ export async function recognizePage(dir: string, mime: string, page: number) {
     ]);
   } else {
     // Normalize EXIF orientation and dimensions before OCR. Preview uses the same pixels.
-    await sharp(source, { limitInputPixels: 40000000, failOn: "error" })
+    const pipeline = sharp(source, { limitInputPixels: 40000000, failOn: "error" });
+    if (!aiEnabled()) pipeline.grayscale().normalize().sharpen();
+    await pipeline
       .rotate()
       .resize({ width: 2400, height: 2400, fit: "inside" })
-      .grayscale()
-      .normalize()
-      .sharpen()
       .png()
       .toFile(image);
   }
   if ((await stat(image)).size > 40 * 1024 * 1024) throw new Error("Ảnh trang quá lớn.");
+  if (aiEnabled()) {
+    const meta = await sharp(image).metadata();
+    const result = await readWithAi(image, { width: meta.width || 1, height: meta.height || 1 });
+    return { imageName, ocr: result.ocr };
+  }
   let result = parseTsv(
     await command("tesseract", [
       image,

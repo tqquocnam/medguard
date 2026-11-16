@@ -53,7 +53,7 @@ test("paper-review API, durable queue, PDF OCR, RLS, optimistic edits and Excel"
   process.env.JWT_SECRET = "disposable-paper-review-test-secret";
   process.env.PAPER_REVIEW_STORAGE = await mkdtemp(path.join(tmpdir(), "paper-review-test-"));
   const admin = new pg.Pool({ connectionString: connection });
-  await admin.query(`CREATE SCHEMA auth; CREATE ROLE medguard_branch NOLOGIN;
+  await admin.query(`CREATE SCHEMA auth; DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='medguard_branch') THEN CREATE ROLE medguard_branch NOLOGIN; END IF; END $$;
     CREATE TABLE auth.branches(id varchar(5) PRIMARY KEY,name text,active boolean DEFAULT true);
     CREATE TABLE auth.users(id uuid PRIMARY KEY,username text,full_name text,role text,active boolean DEFAULT true,branch_id varchar(5) REFERENCES auth.branches(id));
     CREATE FUNCTION auth.current_branch_id() RETURNS varchar(5) LANGUAGE SQL STABLE AS $$ SELECT NULLIF(current_setting('medguard.branch_id',true),'')::varchar(5) $$;
@@ -68,6 +68,9 @@ test("paper-review API, durable queue, PDF OCR, RLS, optimistic edits and Excel"
     [userA, userB],
   );
   await admin.query(await readFile(path.resolve("migrations/20261115_paper_review.sql"), "utf8"));
+  await admin.query(
+    await readFile(path.resolve("migrations/20261116_paper_review_ai.sql"), "utf8"),
+  );
   const { default: routes } = await import("../src/modules/paper-review/review.routes.js");
   const { requireAuth } = await import("../src/modules/auth/auth.middleware.js");
   const { processNextFile } = await import("../src/modules/paper-review/review.worker.js");

@@ -1,3 +1,4 @@
+import { aiEnabled, aiDailyLimit } from "./review.ai.js";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
 import { randomUUID, createHash } from "node:crypto";
@@ -58,7 +59,7 @@ async function batch(batchId: string) {
 async function pagesFor(batchId: string) {
   const r = await db.query(
     `SELECT p.id,p.file_id,p.page_number,p.document_type,p.case_key,p.confirmed,p.fields,p.review_status,p.note,p.version,
-    p.updated_at,f.original_name,f.status AS file_status,round((p.ocr->>'confidence')::numeric,1) AS confidence
+    p.ocr,p.updated_at,f.original_name,f.status AS file_status,round((p.ocr->>'confidence')::numeric,1) AS confidence
     FROM paper_review.pages p JOIN paper_review.files f ON f.id=p.file_id AND f.branch_id=p.branch_id
     WHERE p.branch_id=$1 AND p.batch_id=$2 ORDER BY f.created_at,p.page_number`,
     [requireBranch(), batchId],
@@ -71,10 +72,13 @@ router.get(
     const ocr = await capabilities();
     try {
       await db.query("SELECT id FROM paper_review.batches LIMIT 0");
+      await db.query("SELECT reprocess_token,reader FROM paper_review.files LIMIT 0");
+      if (aiEnabled()) await db.query("SELECT id FROM paper_review.ai_requests LIMIT 0");
     } catch {
       res.json({
         ready: false,
-        message: "Cần chạy migration 20261115_paper_review.sql trước khi sử dụng.",
+        message:
+          "Cần kiểm tra migration 20261115_paper_review.sql và 20261116_paper_review_ai.sql trước khi dùng bản mới.",
       });
       return;
     }
@@ -200,8 +204,16 @@ router.post(
         dirs.push(dir);
         await rename(file.path, path.join(dir, "original"));
         await client.query(
-          `INSERT INTO paper_review.files(id,branch_id,batch_id,original_name,mime_type,sha256) VALUES($1,$2,$3,$4,$5,$6)`,
-          [fileId, branch, batchId, path.basename(file.originalname).slice(0, 255), mime, digest],
+          `INSERT INTO paper_review.files(id,branch_id,batch_id,original_name,mime_type,sha256,reader) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+          [
+            fileId,
+            branch,
+            batchId,
+            path.basename(file.originalname).slice(0, 255),
+            mime,
+            digest,
+            aiEnabled() ? "openai" : "tesseract",
+          ],
         );
         accepted.push(fileId);
       }
@@ -231,7 +243,7 @@ router.get(
     res.json({
       batch: info,
       files: files.rows,
-      pages,
+      pages: pages.map(({ ocr, ...p }) => ({ ...p, ai_processed: !!ocr?.ai })),
       findings: checkPages(pages as ReviewPage[], rules),
     });
   }),
@@ -278,6 +290,56 @@ router.post(
     } finally {
       client.release();
     }
+  }),
+);
+router.post(
+  "/batches/:batchId/read-ai",
+  route(async (req, res) => {
+    if (!aiEnabled() || !(await capabilities()).ready)
+      throw new InputError("Bật AI và cấu hình API key trước khi đọc lại.", 503);
+    const batchId = id(req.params.batchId);
+    await batch(batchId);
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT id FROM paper_review.batches WHERE id=$1 AND branch_id=$2 FOR UPDATE",
+        [batchId, requireBranch()],
+      );
+      const pending = await client.query(
+        "SELECT id,status FROM paper_review.files WHERE batch_id=$1 AND branch_id=$2 FOR UPDATE",
+        [batchId, requireBranch()],
+      );
+      if (pending.rows.some((f) => f.status === "PROCESSING"))
+        throw new InputError("Chờ file đang xử lý xong rồi đọc lại.", 409);
+      const files = await client.query(
+        `UPDATE paper_review.files f SET status='QUEUED',attempts=0,error=NULL,reprocess_token=$3,reader='openai'
+      WHERE f.batch_id=$1 AND f.branch_id=$2 AND (NOT EXISTS(SELECT 1 FROM paper_review.pages p WHERE p.file_id=f.id AND p.branch_id=f.branch_id) OR EXISTS(SELECT 1 FROM paper_review.pages p WHERE p.file_id=f.id AND p.branch_id=f.branch_id AND p.confirmed=false AND p.reviewed_by IS NULL)) RETURNING f.id`,
+        [batchId, requireBranch(), randomUUID()],
+      );
+      await client.query("COMMIT");
+      res.json({ queued: files.rowCount });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }),
+);
+router.get(
+  "/ai-usage",
+  route(async (_req, res) => {
+    if (!aiEnabled()) {
+      res.json({ reader: "tesseract" });
+      return;
+    }
+    const r = await db.query(
+      `SELECT count(*)::int AS requests,coalesce(sum(input_tokens),0)::int AS input_tokens,coalesce(sum(output_tokens),0)::int AS output_tokens
+    FROM paper_review.ai_requests WHERE branch_id=$1 AND created_at >= date_trunc('day',now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh'`,
+      [requireBranch()],
+    );
+    res.json({ ...r.rows[0], daily_limit: aiDailyLimit() });
   }),
 );
 router.post(
@@ -451,7 +513,7 @@ router.get(
       { header: "Trang", key: "page_number", width: 8 },
       { header: "Loại giấy", key: "document_type", width: 20 },
       { header: "Mã bệnh nhân", key: "patientId", width: 20 },
-      { header: "Đã xác nhận OCR", key: "confirmed", width: 20 },
+      { header: "Người dùng xác nhận", key: "confirmed", width: 20 },
       { header: "Kết quả rule", key: "result", width: 25 },
       { header: "Nội dung phát hiện", key: "findings", width: 80 },
       { header: "Xử lý", key: "review_status", width: 18 },

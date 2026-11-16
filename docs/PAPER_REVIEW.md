@@ -2,6 +2,8 @@
 
 Menu **Rà soát hồ sơ BHYT**, đường dẫn `/paper-review`.
 
+**Cập nhật 16/11: đã bổ sung chế độ AI qua OpenAI API.** Xem [PAPER_REVIEW_AI.md](PAPER_REVIEW_AI.md) để bật tự đọc/ghép/chạy rule và đọc lại lô đã tải. Các mô tả “OCR nội bộ / cần xác nhận mỗi trang” bên dưới áp dụng chế độ Tesseract mặc định. Bản code mới cần cả migration 20261115 và 20261116, kể cả giữ chế độ Tesseract.
+
 ## Đã thực hiện
 
 - Tải nhiều PNG/JPEG/PDF vào một lô, tải lần lượt từng file. 20 MB/file, 500 trang/PDF, tối đa 1.000 file chờ mỗi chi nhánh. Chống trùng SHA-256 trong cùng lô.
