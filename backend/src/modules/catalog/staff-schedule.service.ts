@@ -114,10 +114,10 @@ export async function listStaffSchedules(params: {
 
       JOIN catalog.medical_staff ms
         ON ms.id = s.staff_id
-        AND ms.branch_id = $1
+        AND ms.branch_id = $1::text
 
       WHERE
-        s.branch_id = $1
+        s.branch_id = $1::text
 
         AND (
           $2::uuid IS NULL
@@ -207,7 +207,7 @@ export async function createStaffSchedule(branchId: string, input: StaffSchedule
       note
     )
     SELECT
-      $1,
+      $1::text,
       ms.id,
       $3::date,
       $4::time,
@@ -218,7 +218,7 @@ export async function createStaffSchedule(branchId: string, input: StaffSchedule
     FROM catalog.medical_staff ms
     WHERE
       ms.id = $2::uuid
-      AND ms.branch_id = $1
+      AND ms.branch_id = $1::text
     RETURNING *
     `,
     [
@@ -259,9 +259,9 @@ export async function updateStaffSchedule(branchId: string, id: string, input: S
 
     WHERE
       s.id = $2::uuid
-      AND s.branch_id = $1
+      AND s.branch_id = $1::text
       AND ms.id = $3::uuid
-      AND ms.branch_id = $1
+      AND ms.branch_id = $1::text
 
     RETURNING s.*
     `,
@@ -290,7 +290,7 @@ export async function deleteStaffSchedule(branchId: string, id: string) {
     DELETE FROM catalog.medical_staff_schedules
     WHERE
       id = $2::uuid
-      AND branch_id = $1
+      AND branch_id = $1::text
     RETURNING id
     `,
     [branchId, id],
@@ -329,7 +329,7 @@ export async function generateDefaultSchedule(
     await client.query(
       `
       SELECT pg_advisory_xact_lock(
-        hashtextextended($1, 0)
+        hashtextextended($1::text, 0)
       )
       `,
       [`schedule:${branchId}:${staffId}:${year}:${month}`],
@@ -341,7 +341,7 @@ export async function generateDefaultSchedule(
       FROM catalog.medical_staff
       WHERE
         id = $2::uuid
-        AND branch_id = $1
+        AND branch_id = $1::text
         AND active = TRUE
       FOR SHARE
       `,
@@ -418,7 +418,7 @@ export async function generateDefaultSchedule(
           source
         )
         SELECT
-          $1,
+          $1::text,
           $2::uuid,
           e.work_date,
           $4::time,
@@ -432,7 +432,7 @@ export async function generateDefaultSchedule(
           SELECT 1
           FROM catalog.medical_staff_schedules s
           WHERE
-            s.branch_id = $1
+            s.branch_id = $1::text
             AND s.staff_id = $2::uuid
             AND s.work_date = e.work_date
         )
