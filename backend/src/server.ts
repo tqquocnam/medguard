@@ -49,6 +49,9 @@ import { requireAuth } from "./modules/auth/auth.middleware.js";
 // APP
 // ======================================================
 
+import paperReviewRoutes from "./modules/paper-review/review.routes.js";
+import { startPaperReviewWorker } from "./modules/paper-review/review.worker.js";
+
 const app =
   express();
 
@@ -294,6 +297,8 @@ app.use("/api", requireAuth, (_req, res, next) => {
   next();
 });
 
+app.use("/api/paper-review", paperReviewRoutes);
+
 // ======================================================
 // GRAPHQL PROXY
 // ======================================================
@@ -400,6 +405,8 @@ app.use(
 // ======================================================
 // START SERVER
 // ======================================================
+
+startPaperReviewWorker();
 
 app.listen(
   PORT,

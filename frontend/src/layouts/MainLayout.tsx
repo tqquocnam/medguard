@@ -64,6 +64,7 @@ export default function MainLayout() {
       children: [
         { key: "/xml-import", icon: <UploadOutlined />, label: "XML Import" },
         { key: "/medical-cases", icon: <AppstoreOutlined />, label: "Danh sách hồ sơ" },
+        { key: "/paper-review", icon: <SafetyCertificateOutlined />, label: "Rà soát hồ sơ BHYT" },
         { key: "/checks", icon: <CheckSquareOutlined />, label: "Kiểm tra hồ sơ" },
       ],
     },
