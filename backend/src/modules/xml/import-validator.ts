@@ -112,7 +112,7 @@ const REQUIRED_XML1_FIELDS: Record<string, string> = {
   GT_THE_DEN: "ngày kết thúc giá trị thẻ",
   LY_DO_VV: "lý do vào viện",
   CHAN_DOAN_VAO: "chẩn đoán vào viện",
-  CHAN_DOAN_RV: "chẩn đoán ra viện",
+  // CHAN_DOAN_RV: "chẩn đoán ra viện",
   MA_BENH_CHINH: "mã bệnh chính",
   MA_DOITUONG_KCB: "mã đối tượng khám chữa bệnh",
   MA_TAI_NAN: "mã tai nạn",
