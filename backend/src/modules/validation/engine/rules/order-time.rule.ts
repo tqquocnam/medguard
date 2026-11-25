@@ -82,8 +82,7 @@ function getRows(xml: unknown): Row[] {
 }
 
 
-function ordersBeforeExam(xml3: unknown): Row[] {
-  const rows = getRows(xml3);
+function ordersBeforeExam(rows: Row[]): Row[] {
   const doctor = (row: Row) => text(row.MA_BAC_SI).toUpperCase();
   const day = (time: number) => Math.floor(time / 86_400_000);
   const exams = rows.filter(isExam).map(row => ({row, time: parseTime(row.NGAY_YL)}));
@@ -113,6 +112,51 @@ function ordersBeforeExam(xml3: unknown): Row[] {
   return violations;
 }
 
+function xrayExamOverlaps(rows: Row[]): Row[] {
+  const exams = rows.filter(isExam).flatMap((row) => {
+    const start = parseTime(row.NGAY_TH_YL) ?? parseTime(row.NGAY_YL);
+    if (start === null) return [];
+    return [{ row, start, end: start + 5 * 60_000 }];
+  });
+  const violations: Row[] = [];
+  const reportedPairs = new Set<string>();
+
+  for (const row of rows) {
+    if (isExam(row) || !/x[-\s]quang/i.test(text(row.TEN_DICH_VU))) continue;
+
+    const start = parseTime(row.NGAY_TH_YL);
+    const end = parseTime(row.NGAY_KQ);
+    if (start === null || end === null || end < start) continue;
+
+    for (const exam of exams) {
+      // iCheck counts a shared endpoint as a conflict.
+      if (end < exam.start || exam.end < start) continue;
+
+      const itemName = text(row.TEN_DICH_VU);
+      const examName = text(exam.row.TEN_DICH_VU) || "Công khám";
+      const pairKey = JSON.stringify([
+        text(row.MA_DICH_VU) || itemName, start, end,
+        text(exam.row.MA_DICH_VU) || examName, exam.start, exam.end,
+      ]);
+      if (reportedPairs.has(pairKey)) continue;
+      reportedPairs.add(pairKey);
+
+      violations.push({
+        type: "XRAY_EXAM_OVERLAP",
+        sourceType: "XML3",
+        itemCode: row.MA_DICH_VU,
+        itemName,
+        examName,
+        displayMessage:
+          `${itemName}: ${formatTime(start)} → ${formatTime(end)} (Trùng thời gian) - ` +
+          `${examName}: ${formatTime(exam.start)} → ${formatTime(exam.end)}.`,
+      });
+    }
+  }
+
+  return violations;
+}
+
 export const orderTimeRule:
   RuleValidator = {
 
@@ -120,8 +164,9 @@ export const orderTimeRule:
     context,
     rule
   ) {
-    const examOrderViolations = ordersBeforeExam(context.xml3);
-    const violations: any[] = [...examOrderViolations];
+    const rows = getRows(context.xml3);
+    const examViolations = [...ordersBeforeExam(rows), ...xrayExamOverlaps(rows)];
+    const violations: Row[] = [...examViolations];
 
     let checkedEvents = 0;
 
@@ -289,7 +334,7 @@ export const orderTimeRule:
 
         status: "FAIL",
         issueCount: violations.length,
-        severity: examOrderViolations.length > 0 ? "ERROR" : rule.severity,
+        severity: examViolations.length > 0 ? "ERROR" : rule.severity,
 
         message:
           `Có ${violations.length} lỗi thời gian y lệnh/công khám/thực hiện/kết quả.`,

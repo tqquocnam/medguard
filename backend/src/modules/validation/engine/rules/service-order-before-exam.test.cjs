@@ -24,6 +24,27 @@ test('screenshot: exactly one ERROR for 14:18 before 14:24; no assumed 14:24-14:
 test('14:25 order after 14:24 exam does not fail despite overlapping ultrasound interval', async () => {
   assert.equal((await check([exam('A', '202611061424'), service('A', '202611061425')])).filter(r => r.status === 'FAIL').length, 0);
 });
+test('X-ray ending at the second exam start is one error even with different staff and duplicate rows', async () => {
+  const firstExam = { ...exam('A', '202611220714'), TEN_DICH_VU: 'Khám Nhi' };
+  const secondExam = { ...exam('B', '202611220733'), TEN_DICH_VU: 'Khám Tai Mũi Họng' };
+  const xray = {
+    MA_NHOM: '2', MA_DICH_VU: '18.0112.0029', TEN_DICH_VU: 'Chụp X-quang khớp gối',
+    MA_BAC_SI: 'A', NGUOI_THUC_HIEN: 'C',
+    NGAY_YL: '202611220716', NGAY_TH_YL: '202611220730', NGAY_KQ: '202611220733',
+  };
+  const lab = { ...xray, MA_NHOM: '1', TEN_DICH_VU: 'Xét nghiệm máu', NGAY_KQ: '202611220747' };
+  const [result] = await check([firstExam, lab, xray, { ...xray }, secondExam]);
+  assert.equal(result.status, 'FAIL');
+  assert.equal(result.severity, 'ERROR');
+  assert.equal(result.issueCount, 1);
+  assert.equal(result.details.violations[0].type, 'XRAY_EXAM_OVERLAP');
+  assert.match(result.details.violations[0].displayMessage, /07:30.*07:33.*Khám Tai Mũi Họng.*07:33.*07:38/);
+
+  for (const resultTime of ['20261122073259', '', '202611220729']) {
+    const [withoutOverlap] = await check([firstExam, lab, { ...xray, NGAY_KQ: resultTime }, secondExam]);
+    assert.notEqual(withoutOverlap.status, 'FAIL');
+  }
+});
 test('only compare NGAY_YL, not later NGAY_TH_YL of exam', async () => {
   assert.equal((await check([exam('A', '202611061420', '202611061424'), service('A', '202611061422')])).filter(r => r.status === 'FAIL').length, 0);
 });
