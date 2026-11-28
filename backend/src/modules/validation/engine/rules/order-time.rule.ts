@@ -115,8 +115,9 @@ function ordersBeforeExam(rows: Row[]): Row[] {
 function xrayExamOverlaps(rows: Row[]): Row[] {
   const exams = rows.filter(isExam).flatMap((row) => {
     const start = parseTime(row.NGAY_TH_YL) ?? parseTime(row.NGAY_YL);
-    if (start === null) return [];
-    return [{ row, start, end: start + 5 * 60_000 }];
+    const doctorCode = text(row.MA_BAC_SI).toUpperCase();
+    if (start === null || !doctorCode) return [];
+    return [{ row, doctorCode, start, end: start + 5 * 60_000 }];
   });
   const violations: Row[] = [];
   const reportedPairs = new Set<string>();
@@ -124,18 +125,23 @@ function xrayExamOverlaps(rows: Row[]): Row[] {
   for (const row of rows) {
     if (isExam(row) || !/x[-\s]quang/i.test(text(row.TEN_DICH_VU))) continue;
 
+    const performerCode = text(row.NGUOI_THUC_HIEN).toUpperCase();
+    if (!performerCode) continue;
+
     const start = parseTime(row.NGAY_TH_YL);
     const end = parseTime(row.NGAY_KQ);
     if (start === null || end === null || end < start) continue;
 
     for (const exam of exams) {
+      if (performerCode !== exam.doctorCode) continue;
+
       // iCheck counts a shared endpoint as a conflict.
       if (end < exam.start || exam.end < start) continue;
 
       const itemName = text(row.TEN_DICH_VU);
       const examName = text(exam.row.TEN_DICH_VU) || "Công khám";
       const pairKey = JSON.stringify([
-        text(row.MA_DICH_VU) || itemName, start, end,
+        performerCode, text(row.MA_DICH_VU) || itemName, start, end,
         text(exam.row.MA_DICH_VU) || examName, exam.start, exam.end,
       ]);
       if (reportedPairs.has(pairKey)) continue;
