@@ -37,9 +37,6 @@ function formatActivityName(activityType: string, itemName: string | null): stri
     case "SERVICE_ORDER":
       return `Thời gian y lệnh ${name}`;
 
-    case "ULTRASOUND_READER_WINDOW":
-      return `Khoảng siêu âm ${name} (người đọc kết quả)`;
-
     case "ULTRASOUND_EXECUTION":
       return `Thời gian thực hiện ${name}`;
 
@@ -432,16 +429,18 @@ export const staffTimeOverlapRule: RuleValidator = {
 
           UNION ALL
 
-          -- D2. Siêu âm: ưu tiên người thực hiện trong XML3.
-          -- Nếu thiếu, chỉ đối chiếu y lệnh thuốc với người đọc đã ghép từ XML4.
+          -- D2. Siêu âm:
+          -- khoảng thực hiện gắn với NGUOI_THUC_HIEN.
           SELECT
             e.id AS event_id,
             e.medical_case_id,
-            COALESCE(performer.staff_code, reader.staff_code) AS staff_code,
-            CASE WHEN performer.staff_code IS NOT NULL
-              THEN 'ULTRASOUND_EXECUTION'
-              ELSE 'ULTRASOUND_READER_WINDOW'
-            END AS activity_type,
+
+            NULLIF(
+              TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'),
+              ''
+            ) AS staff_code,
+
+            'ULTRASOUND_EXECUTION' AS activity_type,
             e.item_code,
             e.item_name,
             e.execution_start AS activity_start,
@@ -449,22 +448,20 @@ export const staffTimeOverlapRule: RuleValidator = {
 
           FROM event_times e
 
-          CROSS JOIN LATERAL (
-            SELECT NULLIF(TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'), '') AS staff_code
-          ) performer
-
-          LEFT JOIN xml4_result_readers reader
-            ON performer.staff_code IS NULL
-           AND reader.medical_case_id = e.medical_case_id
-           AND reader.service_code = NULLIF(TRIM(e.raw_data ->> 'MA_DICH_VU'), '')
-           AND reader.result_time_key = TO_CHAR(e.execution_end, 'YYYYMMDDHH24MISS')
-
           WHERE UPPER(COALESCE(e.event_type, ''))
                 IN ('SERVICE', 'LAB', 'CLS', 'DVKT')
 
-            AND LOWER(COALESCE(e.item_name, '')) LIKE '%siêu âm%'
-            AND COALESCE(performer.staff_code, reader.staff_code) IS NOT NULL
+            AND LOWER(
+              COALESCE(e.item_name, '')
+            ) LIKE '%siêu âm%'
+
+            AND NULLIF(
+              TRIM(e.raw_data ->> 'NGUOI_THUC_HIEN'),
+              ''
+            ) IS NOT NULL
+
             AND e.execution_start IS NOT NULL
+            AND e.execution_end IS NOT NULL
             AND e.execution_end > e.execution_start
 
           UNION ALL
@@ -605,11 +602,7 @@ export const staffTimeOverlapRule: RuleValidator = {
             a.activity_start AS source_start,
             a.activity_end AS source_end,
             b.activity_start AS conflict_start,
-            CASE
-              WHEN a.activity_type = 'ECG_RESULT_DOCTOR_EXAM' AND b.activity_type = 'EXAM'
-                THEN b.activity_start + ($2::integer * INTERVAL '1 minute')
-              ELSE b.activity_end
-            END AS conflict_end
+            b.activity_end AS conflict_end
 
           FROM source_activity a
 
@@ -649,19 +642,12 @@ export const staffTimeOverlapRule: RuleValidator = {
               AND b.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
             )
 
-            -- Quy lỗi cho y lệnh hoặc giờ đọc X-quang trùng khoảng siêu âm.
+            -- Quy lỗi cho y lệnh CLS trùng khoảng siêu âm của cùng nhân sự.
             AND (
               (a.activity_type <> 'ULTRASOUND_EXECUTION'
                AND b.activity_type <> 'ULTRASOUND_EXECUTION')
-              OR (a.activity_type IN ('DRUG_ORDER', 'SERVICE_ORDER', 'XRAY_RESULT')
+              OR (a.activity_type IN ('SERVICE_ORDER', 'XRAY_RESULT')
                   AND b.activity_type = 'ULTRASOUND_EXECUTION')
-            )
-
-            AND (
-              (a.activity_type <> 'ULTRASOUND_READER_WINDOW'
-               AND b.activity_type <> 'ULTRASOUND_READER_WINDOW')
-              OR (a.activity_type = 'DRUG_ORDER'
-                  AND b.activity_type = 'ULTRASOUND_READER_WINDOW')
             )
 
             -- X-quang chỉ quy lỗi cho giờ đọc kết quả trùng khoảng siêu âm.
@@ -695,14 +681,12 @@ export const staffTimeOverlapRule: RuleValidator = {
                 a.activity_type NOT IN (
                   'SERVICE_EXECUTION',
                   'ULTRASOUND_EXECUTION',
-                  'ULTRASOUND_READER_WINDOW',
                   'ECG_RESULT_DOCTOR_EXAM'
                 )
 
                 AND b.activity_type NOT IN (
                   'SERVICE_EXECUTION',
                   'ULTRASOUND_EXECUTION',
-                  'ULTRASOUND_READER_WINDOW',
                   'ECG_RESULT_DOCTOR_EXAM'
                 )
 
@@ -760,18 +744,10 @@ export const staffTimeOverlapRule: RuleValidator = {
 
               OR
 
-              -- Y lệnh hoặc giờ đọc X-quang trong khoảng siêu âm, gồm hai đầu mút.
+              -- Y lệnh CLS hoặc đọc kết quả X-quang trong khoảng siêu âm, gồm hai đầu mút.
               (
-                a.activity_type IN ('DRUG_ORDER', 'SERVICE_ORDER', 'XRAY_RESULT')
+                a.activity_type IN ('SERVICE_ORDER', 'XRAY_RESULT')
                 AND b.activity_type = 'ULTRASOUND_EXECUTION'
-                AND a.activity_start BETWEEN b.activity_start AND b.activity_end
-              )
-
-              OR
-
-              (
-                a.activity_type = 'DRUG_ORDER'
-                AND b.activity_type = 'ULTRASOUND_READER_WINDOW'
                 AND a.activity_start BETWEEN b.activity_start AND b.activity_end
               )
 
@@ -808,13 +784,12 @@ export const staffTimeOverlapRule: RuleValidator = {
               OR
 
               -- Đọc kết quả điện tim trùng công khám.
-              -- Dùng đủ khoảng khám cho đối chiếu giờ đọc điện tim.
+              -- Dùng khoảng khám đã tính theo CLS.
               (
                 a.activity_type = 'ECG_RESULT_DOCTOR_EXAM'
                 AND b.activity_type = 'EXAM'
                 AND a.activity_start
-                    BETWEEN b.activity_start
-                        AND b.activity_start + ($2::integer * INTERVAL '1 minute')
+                    BETWEEN b.activity_start AND b.activity_end
               )
 
               OR
