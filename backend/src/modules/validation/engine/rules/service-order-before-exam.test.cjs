@@ -68,3 +68,20 @@ test('equal times, different doctors/days, missing/invalid timestamps do not inv
     [exam('A', '202611061424'), service('', '202611061418')], [],
   ]) assert.equal((await check(rows)).filter(r => r.status === 'FAIL').length, 0);
 });
+
+test('ECG execution overlaps a same-case exam only for the person performing both', async () => {
+  const visit = exam('A', '202611231255');
+  const ecg = {
+    MA_NHOM: '2', MA_BAC_SI: 'A', NGUOI_THUC_HIEN: 'A',
+    TEN_DICH_VU: 'Điện tim thường', NGAY_YL: '202611231256',
+    NGAY_TH_YL: '202611231256', NGAY_KQ: '202611231311',
+  };
+  const [conflict] = await check([visit, ecg, { ...ecg }]);
+  assert.equal(conflict.issueCount, 1);
+  assert.equal(conflict.details.violations[0].type, 'ECG_EXECUTION_EXAM_OVERLAP');
+
+  for (const performer of ['B', '']) {
+    const [result] = await check([visit, { ...ecg, NGUOI_THUC_HIEN: performer }]);
+    assert.notEqual(result.status, 'FAIL');
+  }
+});

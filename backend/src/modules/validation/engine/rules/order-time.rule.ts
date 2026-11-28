@@ -112,7 +112,7 @@ function ordersBeforeExam(rows: Row[]): Row[] {
   return violations;
 }
 
-function xrayExamOverlaps(rows: Row[]): Row[] {
+function imagingExamOverlaps(rows: Row[]): Row[] {
   const exams = rows.filter(isExam).flatMap((row) => {
     const start = parseTime(row.NGAY_TH_YL) ?? parseTime(row.NGAY_YL);
     const doctorCode = text(row.MA_BAC_SI).toUpperCase();
@@ -123,7 +123,11 @@ function xrayExamOverlaps(rows: Row[]): Row[] {
   const reportedPairs = new Set<string>();
 
   for (const row of rows) {
-    if (isExam(row) || !/x[-\s]quang/i.test(text(row.TEN_DICH_VU))) continue;
+    if (isExam(row)) continue;
+
+    const itemName = text(row.TEN_DICH_VU);
+    const isXray = /x[-\s]quang/i.test(itemName);
+    if (!isXray && !/điện tim/i.test(itemName.normalize("NFC"))) continue;
 
     const performerCode = text(row.NGUOI_THUC_HIEN).toUpperCase();
     if (!performerCode) continue;
@@ -138,7 +142,6 @@ function xrayExamOverlaps(rows: Row[]): Row[] {
       // iCheck counts a shared endpoint as a conflict.
       if (end < exam.start || exam.end < start) continue;
 
-      const itemName = text(row.TEN_DICH_VU);
       const examName = text(exam.row.TEN_DICH_VU) || "Công khám";
       const pairKey = JSON.stringify([
         performerCode, text(row.MA_DICH_VU) || itemName, start, end,
@@ -148,7 +151,7 @@ function xrayExamOverlaps(rows: Row[]): Row[] {
       reportedPairs.add(pairKey);
 
       violations.push({
-        type: "XRAY_EXAM_OVERLAP",
+        type: isXray ? "XRAY_EXAM_OVERLAP" : "ECG_EXECUTION_EXAM_OVERLAP",
         sourceType: "XML3",
         itemCode: row.MA_DICH_VU,
         itemName,
@@ -171,7 +174,7 @@ export const orderTimeRule:
     rule
   ) {
     const rows = getRows(context.xml3);
-    const examViolations = [...ordersBeforeExam(rows), ...xrayExamOverlaps(rows)];
+    const examViolations = [...ordersBeforeExam(rows), ...imagingExamOverlaps(rows)];
     const violations: Row[] = [...examViolations];
 
     let checkedEvents = 0;
